@@ -1,0 +1,9 @@
+{
+  "name": "pm-ext-slack-standup",
+  "version": "0.1.0",
+  "description": "Post pm context as a Slack standup message",
+  "author": "@unbraind",
+  "entry": "index.js",
+  "priority": 50,
+  "capabilities": ["commands", "hooks"]
+}

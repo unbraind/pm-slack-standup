@@ -1,0 +1,29 @@
+{
+  "name": "pm-ext-slack-standup",
+  "version": "0.1.0",
+  "description": "Post pm context as a Slack standup message",
+  "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist/",
+    "manifest.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "peerDependencies": {
+    "@unbrained/pm-cli": ">=2026.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "pm-cli",
+    "pm-cli-extension",
+    "slack",
+    "standup"
+  ],
+  "license": "MIT"
+}
