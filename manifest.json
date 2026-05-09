@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Post pm context as a Slack standup message",
   "author": "@unbraind",
-  "entry": "index.js",
+  "entry": "./dist/index.js",
   "priority": 50,
-  "capabilities": ["commands", "hooks"]
+  "capabilities": [
+    "commands",
+    "hooks"
+  ]
 }
