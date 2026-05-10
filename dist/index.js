@@ -1,5 +1,5 @@
 import https from "node:https";
-import { defineExtension } from "@unbrained/pm-cli/sdk";
+function defineExtension(m){return m}
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
