@@ -140,31 +140,31 @@ export default defineExtension({
                 "pm standup --include-done --format text",
                 "PM_SLACK_WEBHOOK=https://... pm standup --channel '#standups'",
             ],
-            flags: {
-                webhook: {
-                    type: "string",
+            flags: [
+                {
+                    long: "--webhook",
+                    value_name: "url",
                     description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)",
                 },
-                channel: {
-                    type: "string",
+                {
+                    long: "--channel",
+                    value_name: "name",
                     description: "Channel name to prepend to the standup message (e.g. #team-eng)",
                 },
-                "dry-run": {
-                    type: "boolean",
+                {
+                    long: "--dry-run",
                     description: "Print the message without posting to Slack",
-                    default: false,
                 },
-                "include-done": {
-                    type: "boolean",
+                {
+                    long: "--include-done",
                     description: "Include items with 'done' status in a Done Today section",
-                    default: false,
                 },
-                format: {
-                    type: "string",
+                {
+                    long: "--format",
+                    value_name: "fmt",
                     description: "Output format: 'slack' uses mrkdwn bold/italic, 'text' is plain (default: slack)",
-                    default: "slack",
                 },
-            },
+            ],
             async run(ctx) {
                 const args = ctx.args;
                 // Resolve webhook
