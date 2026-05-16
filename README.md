@@ -27,20 +27,20 @@ Then register it in your pm-cli config.
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) and create (or select) an app.
 2. Under **Incoming Webhooks**, activate and add a new webhook to your workspace.
-3. Copy the webhook URL (`https://hooks.slack.com/services/T.../B.../...`).
+3. Copy the webhook URL into your shell environment.
 
 ### 2. Configure the webhook
 
 Either pass it directly as a flag:
 
 ```bash
-pm standup --webhook https://hooks.slack.com/services/T.../B.../...
+pm standup --webhook <slack-webhook-url>
 ```
 
 Or set the environment variable (recommended — add to `.env` or shell profile):
 
 ```bash
-export PM_SLACK_WEBHOOK=https://hooks.slack.com/services/T.../B.../...
+export PM_SLACK_WEBHOOK=<slack-webhook-url>
 ```
 
 ## Usage
@@ -79,7 +79,7 @@ pm standup --include-done --format text
 **Full explicit invocation:**
 ```bash
 pm standup \
-  --webhook https://hooks.slack.com/services/T.../B.../... \
+  --webhook <slack-webhook-url> \
   --channel '#standups' \
   --include-done
 ```

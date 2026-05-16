@@ -4,6 +4,7 @@
   "description": "Post pm context as a Slack standup message",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist/",
     "manifest.json",
@@ -11,7 +12,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "@unbrained/pm-cli": ">=2026.5.0"
