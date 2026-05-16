@@ -1,8 +1,17 @@
 import https from "node:https";
-function defineExtension(m){return m}
+import { spawnSync } from "node:child_process";
+const defineExtension = ((extension) => extension);
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+function fetchItemsByStatus(pmRoot, subcommand) {
+    const result = spawnSync("pm", ["--path", pmRoot, subcommand, "--json"], { encoding: "utf-8" });
+    if (result.error || result.status !== 0) {
+        console.error(`pm ${subcommand} failed: ${result.stderr}`);
+        return [];
+    }
+    return (JSON.parse(result.stdout).items ?? []);
+}
 function typeLabel(item) {
     if (!item.type)
         return "";
@@ -84,7 +93,7 @@ function buildMessage(wip, blocked, done, upNext, opts) {
         else {
             lines.push(`📋 Up Next (${upNext.length})`);
         }
-        upNext.forEach((item, i) => {
+        upNext.forEach((item) => {
             const label = typeLabel(item);
             const title = label ? `${label} ${item.title}` : item.title;
             const prio = item.priority != null ? ` (priority ${item.priority})` : "";
@@ -157,7 +166,7 @@ export default defineExtension({
                 },
                 {
                     long: "--include-done",
-                    description: "Include items with 'done' status in a Done Today section",
+                    description: "Include items with 'closed' status in a Done Today section",
                 },
                 {
                     long: "--format",
@@ -166,25 +175,24 @@ export default defineExtension({
                 },
             ],
             async run(ctx) {
-                const args = ctx.args;
-                // Resolve webhook
-                const webhookUrl = args.webhook ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
-                const dryRun = args["dry-run"] ?? false;
-                const includeDone = args["include-done"] ?? false;
-                const format = args.format === "text" ? "text" : "slack";
-                const channel = args.channel;
+                // Resolve options
+                const webhookUrl = ctx.options["webhook"] ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
+                const dryRun = Boolean(ctx.options["dry-run"]);
+                const includeDone = Boolean(ctx.options["include-done"]);
+                const rawFormat = ctx.options["format"];
+                const format = rawFormat === "text" ? "text" : "slack";
+                const channel = ctx.options["channel"];
                 if (!dryRun && !webhookUrl) {
-                    ctx.log.info("No webhook URL provided. Set --webhook or PM_SLACK_WEBHOOK env var, or use --dry-run.");
-                    return { error: "missing_webhook" };
+                    return {
+                        error: "missing_webhook",
+                        message: "No webhook URL provided. Set --webhook or PM_SLACK_WEBHOOK env var, or use --dry-run.",
+                    };
                 }
-                // Fetch items
-                ctx.log.info("Fetching pm items…");
-                const [wipItems, blockedItems, todoItems, doneItems] = await Promise.all([
-                    ctx.pm.listItems({ status: "wip" }),
-                    ctx.pm.listItems({ status: "blocked" }),
-                    ctx.pm.listItems({ status: "todo" }),
-                    includeDone ? ctx.pm.listItems({ status: "done" }) : Promise.resolve([]),
-                ]);
+                // Fetch items using pm subcommands
+                const wipItems = fetchItemsByStatus(ctx.pm_root, "list-in-progress");
+                const blockedItems = fetchItemsByStatus(ctx.pm_root, "list-blocked");
+                const todoItems = fetchItemsByStatus(ctx.pm_root, "list-open");
+                const doneItems = includeDone ? fetchItemsByStatus(ctx.pm_root, "list-closed") : [];
                 // Sort todo by priority (lower number = higher priority), take top 3
                 const upNext = [...todoItems]
                     .sort((a, b) => {
@@ -195,9 +203,9 @@ export default defineExtension({
                     .slice(0, 3);
                 const message = buildMessage(wipItems, blockedItems, doneItems, upNext, { channel, format, includeDate: true });
                 if (dryRun) {
-                    ctx.log.info("--- DRY RUN (message not posted) ---");
-                    ctx.log.info(message);
-                    ctx.log.info("--- END ---");
+                    console.error("--- DRY RUN (message not posted) ---");
+                    process.stdout.write(message + "\n");
+                    console.error("--- END ---");
                     return {
                         dryRun: true,
                         message,
@@ -207,9 +215,7 @@ export default defineExtension({
                         upNext: upNext.length,
                     };
                 }
-                ctx.log.info("Posting standup to Slack…");
                 await postToSlack(webhookUrl, message);
-                ctx.log.info("Standup posted successfully.");
                 return {
                     posted: true,
                     wip: wipItems.length,
