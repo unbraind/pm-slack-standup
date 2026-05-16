@@ -2,6 +2,14 @@
   "name": "pm-ext-slack-standup",
   "version": "0.1.0",
   "description": "Post pm context as a Slack standup message",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unbraind/pm-cli-ext-slack-standup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/unbraind/pm-cli-ext-slack-standup/issues"
+  },
+  "homepage": "https://github.com/unbraind/pm-cli-ext-slack-standup#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
