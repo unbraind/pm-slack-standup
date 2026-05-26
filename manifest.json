@@ -1,5 +1,5 @@
 {
-  "name": "pm-ext-slack-standup",
+  "name": "pm-slack-standup",
   "version": "0.1.0",
   "description": "Post pm context as a Slack standup message",
   "author": "@unbraind",
@@ -8,5 +8,8 @@
   "capabilities": [
     "commands",
     "schema"
-  ]
+  ],
+  "pm": {
+    "compatibility": "v2"
+  }
 }

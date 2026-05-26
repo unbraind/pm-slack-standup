@@ -1,4 +1,4 @@
-# pm-ext-slack-standup
+# pm-slack-standup
 
 A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current project context as a formatted Slack standup message.
 
@@ -16,7 +16,7 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 Place the built extension in your pm-cli extensions directory, or install via npm (when published):
 
 ```bash
-npm install pm-ext-slack-standup
+npm install pm-slack-standup
 ```
 
 Then register it in your pm-cli config.
@@ -158,3 +158,7 @@ npm run dev   # watch mode
 ## License
 
 MIT
+
+## Release Automation
+
+This package is release-ready for GitHub, npm, and Bun-compatible installs. CI runs type checking, build, production dependency audit, package packing, Bun install verification, and pm-changelog validation. The daily release workflow publishes only when commits exist after the latest release tag and uses pm-changelog to generate CHANGELOG.md and GitHub release notes.
