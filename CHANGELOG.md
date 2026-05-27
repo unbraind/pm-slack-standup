@@ -1,12 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add publish retry + provenance fallback to release workflow ([pm-slack-standup-5yh1](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-5yh1.toon))
+
 ## 2026.05.27 - 2026-05-27
 
 ### Added
 
 - Add bun-install verification to release workflow ([pm-slack-standup-rexb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-rexb.toon))
-
-## 2026.05.26 - 2026-05-26
 
 ### Fixed
 
