@@ -13,13 +13,15 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 
 ## Installation
 
-Place the built extension in your pm-cli extensions directory, or install via npm (when published):
-
 ```bash
-npm install pm-slack-standup
+pm install github.com/unbraind/pm-slack-standup --global
 ```
 
-Then register it in your pm-cli config.
+Or install per-project:
+
+```bash
+pm install github.com/unbraind/pm-slack-standup --project
+```
 
 ## Setup
 
