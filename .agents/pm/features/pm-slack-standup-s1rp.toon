@@ -1,0 +1,11 @@
+id: pm-slack-standup-s1rp
+title: Hands-on functional test pass 2026-05-29 (real data)
+description: "Functional testing with real pm data + production hardening. Verified standup composes a real report from live pm context, --dry-run prevents POST, empty workspace handled, real-post failure exits non-zero."
+type: Feature
+status: open
+priority: 2
+tags: []
+created_at: "2026-05-29T15:43:46.373Z"
+updated_at: "2026-05-29T15:43:46.373Z"
+author: codex
+body: ""
