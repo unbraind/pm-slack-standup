@@ -23,6 +23,48 @@ interface PmItem {
 type Format = "slack" | "text";
 
 // ---------------------------------------------------------------------------
+// Option helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * pm normalizes CLI flags to camelCase at runtime (e.g. `--dry-run` becomes
+ * `dryRun`), so reading only the kebab-case key silently misses the value.
+ * Read both forms (plus any explicit aliases) to be robust.
+ */
+function camelCase(key: string): string {
+  return key.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+function readBoolOption(
+  options: Record<string, unknown>,
+  key: string
+): boolean {
+  for (const candidate of [key, camelCase(key)]) {
+    const value = options[candidate];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const v = value.trim().toLowerCase();
+      if (v === "true" || v === "1" || v === "yes" || v === "on") return true;
+      if (v === "false" || v === "0" || v === "no" || v === "off") return false;
+    }
+  }
+  return false;
+}
+
+function readStrOption(
+  options: Record<string, unknown>,
+  key: string
+): string | undefined {
+  for (const candidate of [key, camelCase(key)]) {
+    const value = options[candidate];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -164,7 +206,14 @@ function postToSlack(webhookUrl: string, text: string): Promise<void> {
       });
     });
 
-    req.on("error", reject);
+    req.on("error", (err: Error) => {
+      reject(new Error(`Slack webhook request failed: ${err.message}`));
+    });
+
+    req.setTimeout(10_000, () => {
+      req.destroy(new Error("Slack webhook request timed out after 10s"));
+    });
+
     req.write(payload);
     req.end();
   });
@@ -176,7 +225,7 @@ function postToSlack(webhookUrl: string, text: string): Promise<void> {
 
 export default defineExtension({
   name: "pm-slack-standup",
-  version: "2026.5.28",
+  version: "2026.5.29",
 
   activate(api) {
     api.registerCommand({
@@ -216,21 +265,23 @@ export default defineExtension({
       ],
 
       async run(ctx) {
-        // Resolve options
+        // Resolve options. pm normalizes flags to camelCase at runtime, so we
+        // read both kebab- and camelCase forms via the option helpers.
         const webhookUrl =
-          (ctx.options["webhook"] as string | undefined) ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
+          readStrOption(ctx.options, "webhook") ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
 
-        const dryRun = Boolean(ctx.options["dry-run"]);
-        const includeDone = Boolean(ctx.options["include-done"]);
-        const rawFormat = ctx.options["format"];
+        const dryRun = readBoolOption(ctx.options, "dry-run");
+        const includeDone = readBoolOption(ctx.options, "include-done");
+        const rawFormat = readStrOption(ctx.options, "format");
         const format: Format = rawFormat === "text" ? "text" : "slack";
-        const channel = ctx.options["channel"] as string | undefined;
+        const channel = readStrOption(ctx.options, "channel");
 
         if (!dryRun && !webhookUrl) {
-          return {
-            error: "missing_webhook",
-            message: "No webhook URL provided. Set --webhook or PM_SLACK_WEBHOOK env var, or use --dry-run.",
-          };
+          // Throw so pm reports a non-zero exit code; returning an error object
+          // would let the command exit 0 and mask the failure.
+          throw new Error(
+            "No webhook URL provided. Set --webhook or PM_SLACK_WEBHOOK env var, or use --dry-run."
+          );
         }
 
         // Fetch items using pm subcommands

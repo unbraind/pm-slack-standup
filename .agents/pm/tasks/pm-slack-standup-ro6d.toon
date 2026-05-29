@@ -1,0 +1,13 @@
+id: pm-slack-standup-ro6d
+title: dry-run / include-done flags ignored due to kebab-case option read (option normalization)
+description: "Symptom: pm standup --dry-run errored with missing_webhook instead of dry-running; --include-done had no effect. Repro: pm standup --dry-run (no webhook). Observed: 'No webhook URL provided' (dryRun=false). Expected: prints message, no POST, exit 0. Root cause: code read ctx.options['dry-run']/['include-done'] but pm normalizes flags to camelCase (dryRun/includeDone), so kebab keys were always undefined. Fix: readBoolOption/readStrOption read both kebab+camelCase forms. Proven live: dry-run prints + no POST even with webhook set; include-done surfaces Done Today; format text + channel take effect."
+type: Task
+status: closed
+priority: 1
+tags: []
+created_at: "2026-05-29T15:44:04.579Z"
+updated_at: "2026-05-29T15:44:07.746Z"
+author: codex
+parent: pm-slack-standup-s1rp
+close_reason: "Fixed: readBoolOption/readStrOption read both kebab+camelCase; flags verified live."
+body: ""

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026.05.29 - 2026-05-29
+
+### Other
+
+- dry-run / include-done flags ignored due to kebab-case option read \(option normalization\) ([pm-slack-standup-ro6d](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-ro6d.toon))
+- Missing-webhook failure returns error object and exits 0 \(wrong exit code\) ([pm-slack-standup-xk28](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-xk28.toon))
+
 ## 2026.05.28 - 2026-05-28
 
 ### Added
