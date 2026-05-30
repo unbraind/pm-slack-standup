@@ -177,7 +177,7 @@ function postToSlack(webhookUrl, text) {
 // ---------------------------------------------------------------------------
 export default defineExtension({
     name: "pm-slack-standup",
-    version: "2026.5.29",
+    version: "2026.5.30",
     activate(api) {
         api.registerCommand({
             name: "standup",
