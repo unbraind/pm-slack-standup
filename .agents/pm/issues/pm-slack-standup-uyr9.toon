@@ -1,0 +1,13 @@
+id: pm-slack-standup-uyr9
+title: standup threw plain Error (no exitCode) → runtime double-invocation
+description: "standup threw plain Error on missing webhook and on a failed Slack POST; pm re-invokes the handler on the unhandled path. Added CommandError mirroring SDK EXIT_CODE; missing-webhook=2, POST-failure=1; single invocation."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-01T10:31:18.026Z"
+updated_at: "2026-06-01T10:31:18.279Z"
+author: codex
+parent: pm-slack-standup-s1rp
+close_reason: "Fixed: CommandError carries exitCode. Verified standup dry-run + format text; missing webhook exits 2, failed POST exits 1, single invocation."
+body: ""
