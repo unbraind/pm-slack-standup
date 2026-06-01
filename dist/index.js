@@ -2,6 +2,29 @@ import https from "node:https";
 import { spawnSync } from "node:child_process";
 const defineExtension = ((extension) => extension);
 // ---------------------------------------------------------------------------
+// Error contract
+// ---------------------------------------------------------------------------
+// pm's extension command runtime only treats a thrown error as a cleanly
+// handled non-zero exit when the error carries a numeric `exitCode` property
+// (see @unbrained/pm-cli runCommandHandler). A plain `Error` makes the runtime
+// fall through to its "unhandled" path, which RE-INVOKES the command handler a
+// second time and exits with a generic code. We mirror the SDK's EXIT_CODE
+// contract here rather than importing it: standalone-installed extensions load
+// only their own `dist/`, so `@unbrained/pm-cli` is not resolvable at runtime.
+const EXIT_CODE = {
+    GENERIC_FAILURE: 1,
+    USAGE: 2,
+    NOT_FOUND: 3,
+};
+class CommandError extends Error {
+    exitCode;
+    constructor(message, exitCode = EXIT_CODE.GENERIC_FAILURE) {
+        super(message);
+        this.name = "CommandError";
+        this.exitCode = exitCode;
+    }
+}
+// ---------------------------------------------------------------------------
 // Option helpers
 // ---------------------------------------------------------------------------
 /**
@@ -226,7 +249,7 @@ export default defineExtension({
                 if (!dryRun && !webhookUrl) {
                     // Throw so pm reports a non-zero exit code; returning an error object
                     // would let the command exit 0 and mask the failure.
-                    throw new Error("No webhook URL provided. Set --webhook or PM_SLACK_WEBHOOK env var, or use --dry-run.");
+                    throw new CommandError("No webhook URL provided. Set --webhook or PM_SLACK_WEBHOOK env var, or use --dry-run.", EXIT_CODE.USAGE);
                 }
                 // Fetch items using pm subcommands
                 const wipItems = fetchItemsByStatus(ctx.pm_root, "list-in-progress");
@@ -255,7 +278,14 @@ export default defineExtension({
                         upNext: upNext.length,
                     };
                 }
-                await postToSlack(webhookUrl, message);
+                try {
+                    await postToSlack(webhookUrl, message);
+                }
+                catch (err) {
+                    // Rethrow with a numeric exitCode so the runtime exits non-zero and
+                    // runs the handler exactly once (a plain Error re-invokes it).
+                    throw new CommandError(err instanceof Error ? err.message : String(err));
+                }
                 return {
                     posted: true,
                     wip: wipItems.length,
