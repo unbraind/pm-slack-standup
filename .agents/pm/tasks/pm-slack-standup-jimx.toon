@@ -1,0 +1,13 @@
+id: pm-slack-standup-jimx
+title: Add --sections selection/ordering with dedicated Blocked section
+description: ""
+type: Task
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:29:07.733Z"
+updated_at: "2026-06-02T22:29:23.717Z"
+author: codex
+parent: pm-slack-standup-h64p
+close_reason: "parseSections + resolveSections; --sections in_progress,blocked verified to drop done/up_next; Blocked always rendered"
+body: ""

@@ -1,0 +1,12 @@
+id: pm-slack-standup-h64p
+title: "Deep feature expansion: multi-format output, grouping, sections, date windows"
+description: ""
+type: Feature
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:28:53.327Z"
+updated_at: "2026-06-02T22:29:25.001Z"
+author: codex
+close_reason: "All sub-tasks closed; built, 20 unit tests green, functionally verified against real pm data, README updated"
+body: ""

@@ -1,0 +1,13 @@
+id: pm-slack-standup-m9ze
+title: Missing-creds real post -> CommandError (exit 1); no network in dry-run
+description: ""
+type: Task
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:29:08.256Z"
+updated_at: "2026-06-02T22:29:24.148Z"
+author: codex
+parent: pm-slack-standup-h64p
+close_reason: Real post w/o webhook now throws CommandError exit 1 (was graceful exit 0); strace proved 0 connects to webhook host in dry-run vs 1 on real post
+body: ""

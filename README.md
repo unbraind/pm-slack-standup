@@ -5,12 +5,14 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 ## Features
 
 - Posts WIP, Blocked, Up Next (and optional Done) items to Slack as a rich **Block Kit** message (header, one section per bucket, context footer) with an automatic plain-text fallback
-- `pm standup export` — write the standup to a file as Markdown or JSON (the JSON form includes the full Block Kit payload for archiving or re-posting)
-- Group section items by `status` (default) or `assignee` (`--group-by`)
+- **Four output formats** (`--format`): `slack` (Slack mrkdwn, the default), `blockkit` (the raw Block Kit `blocks` JSON), `markdown` (GitHub/CommonMark), and `plain` text
+- **`--dry-run`** — build and print the message in the chosen format **without** posting to Slack (no network call is made)
+- Group section items by `status` (default), `assignee`, `sprint`, or `type` (`--group-by`)
+- Choose which sections to render and in what order with `--sections` (`in_progress`, `blocked`, `done`, `up_next`); a dedicated **Blocked** section always surfaces blocked items
+- Scope the "recently closed / Done" window with `--since <iso>` **or** `--days <n>` (relative)
 - Map pm authors to Slack handles so they get mentioned (`--mention-map`)
-- Restrict the Done section to a recent window (`--since <iso>`, with `--include-done`)
-- Dry-run mode to preview both the rendered message and the Block Kit JSON
-- Webhook URL configurable via flag or environment variable; missing webhook is a graceful no-op (never blocks a workflow)
+- `pm standup export` — write the standup to a file as Markdown or JSON (the JSON form includes the full Block Kit payload for archiving or re-posting)
+- `--channel` override; webhook URL configurable via flag or environment variable. A real post with **no webhook configured** fails with a clear, structured error (exit 1) rather than crashing — use `--dry-run` to preview without credentials
 
 ## Installation
 
@@ -58,12 +60,31 @@ pm standup [flags]
 |------|------|---------|-------------|
 | `--webhook <url>` | string | — | Slack incoming webhook URL (overrides `PM_SLACK_WEBHOOK`) |
 | `--channel <name>` | string | — | Channel name shown in the message (e.g. `#team-eng`) |
-| `--dry-run` | boolean | `false` | Print the rendered message and the Block Kit JSON without posting |
+| `--dry-run` | boolean | `false` | Build and print the message in the chosen format **without** posting |
+| `--format <fmt>` | string | `slack` | Output format: `slack` (mrkdwn) \| `blockkit` (JSON) \| `markdown` \| `plain` |
 | `--include-done` | boolean | `false` | Include recently-closed items in a Done section |
-| `--since <iso>` | string | — | ISO date/time window; filters the Done section to items updated since then |
-| `--group-by <status\|assignee>` | string | `status` | Group section items by status (default) or assignee |
+| `--since <iso>` | string | — | ISO date/time window; scopes the Done section to items updated since then |
+| `--days <n>` | number | — | Relative window: scope Done to items updated in the last N days (combines with `--since`, more restrictive bound wins) |
+| `--group-by <field>` | string | `status` | Group section items by `status` \| `assignee` \| `sprint` \| `type` |
+| `--sections <list>` | string | all | Comma list of sections to render/order: `in_progress`, `blocked`, `done`, `up_next` |
 | `--mention-map <map>` | string | — | Map pm authors to Slack handles, e.g. `alice=@alice,bob=@bob` |
-| `--format <slack\|text>` | string | `slack` | Plain-text rendering used for the fallback / preview |
+
+> **Note on `text`:** the legacy `--format text` value is still accepted as an alias for `plain`.
+
+### Output formats
+
+`--format` selects what the command prints (in `--dry-run`) and how it renders the Slack message text:
+
+- **`slack`** (default) — Slack mrkdwn (`*bold*`, `_italic_`). The message posted to Slack is unchanged from previous versions.
+- **`blockkit`** — the raw Slack Block Kit `{ "blocks": [...] }` JSON, ready to POST to `chat.postMessage` or paste into Block Kit Builder.
+- **`markdown`** — GitHub/CommonMark with `#`/`##` headings and `-` bullets, for issues, wikis, or PR comments.
+- **`plain`** — emphasis-free plain text for email or terminals.
+
+```bash
+pm standup --dry-run --format blockkit                 # raw Block Kit JSON
+pm standup --dry-run --format markdown --include-done   # CommonMark
+pm standup --dry-run --format plain --days 7            # plain text, last 7 days
+```
 
 ## Export
 
@@ -96,7 +117,12 @@ pm standup --channel '#team-eng' --dry-run
 
 **Include done items and use plain text format:**
 ```bash
-pm standup --include-done --format text
+pm standup --include-done --format plain
+```
+
+**Group by sprint, only In Progress + Blocked:**
+```bash
+pm standup --dry-run --group-by sprint --sections in_progress,blocked
 ```
 
 **Full explicit invocation:**
@@ -132,7 +158,7 @@ pm standup \
 • [Chore] Update dependencies (priority 3)
 ```
 
-### Plain Text (`--format text`)
+### Plain Text (`--format plain`)
 
 ```
 📊 pm standup — 2026-05-09
@@ -176,7 +202,7 @@ npm run dev   # watch mode
 1. Reads every item once via `pm --path <root> list-all --json --include-body` and buckets them locally into In Progress, Blocked, open (Up Next) and optionally Done.
 2. Sorts open items by priority (ascending) and takes the top 3 as "Up Next".
 3. Builds a Slack Block Kit `blocks` array (header + a section per bucket + context footer) plus a plain-text `fallback`, optionally grouped by assignee and annotated with Slack mentions.
-4. Posts `{ text, blocks }` to the configured Slack webhook using Node.js native `https`. A missing webhook or a network failure is a non-blocking no-op (warns and exits 0).
+4. In `--dry-run`, prints the message in the chosen `--format` and exits without any network call. Otherwise posts `{ text, blocks }` to the configured Slack webhook using Node.js native `https`. A missing webhook (on a real post) or a failed post raises a structured `CommandError` and exits non-zero.
 
 ## License
 
