@@ -1,5 +1,7 @@
 import https from "node:https";
 import { spawnSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 const defineExtension = ((extension) => extension);
 // ---------------------------------------------------------------------------
 // Error contract
@@ -59,110 +61,230 @@ function readStrOption(options, key) {
     }
     return undefined;
 }
+/**
+ * Parse a `--mention-map` spec mapping pm authors to Slack handles.
+ * Accepts `author=@handle,other=@h2` (commas) or semicolon separators.
+ * A leading `@` on the handle is optional and normalized on.
+ */
+function parseMentionMap(spec) {
+    const map = {};
+    if (!spec)
+        return map;
+    for (const pair of spec.split(/[,;]/)) {
+        const eq = pair.indexOf("=");
+        if (eq < 0)
+            continue;
+        const author = pair.slice(0, eq).trim();
+        let handle = pair.slice(eq + 1).trim();
+        if (!author || !handle)
+            continue;
+        if (!handle.startsWith("@"))
+            handle = `@${handle}`;
+        map[author] = handle;
+    }
+    return map;
+}
 // ---------------------------------------------------------------------------
-// Helpers
+// Data fetch
 // ---------------------------------------------------------------------------
-function fetchItemsByStatus(pmRoot, subcommand) {
-    const result = spawnSync("pm", ["--path", pmRoot, subcommand, "--json"], { encoding: "utf-8" });
+/**
+ * Read every item once via `list-all --json --include-body`, then bucket by
+ * status locally. This is a single pm invocation (vs. four list-by-status
+ * calls) and gives us bodies + assignee + timestamps for grouping/windowing.
+ */
+function fetchAllItems(pmRoot) {
+    const result = spawnSync("pm", ["--path", pmRoot, "list-all", "--json", "--include-body"], { encoding: "utf-8" });
     if (result.error || result.status !== 0) {
-        console.error(`pm ${subcommand} failed: ${result.stderr}`);
+        console.error(`pm list-all failed: ${result.stderr ?? result.error?.message ?? ""}`);
         return [];
     }
-    return (JSON.parse(result.stdout).items ?? []);
+    try {
+        return (JSON.parse(result.stdout).items ?? []);
+    }
+    catch (err) {
+        console.error(`pm list-all returned unparseable JSON: ${err instanceof Error ? err.message : String(err)}`);
+        return [];
+    }
 }
+const WIP_STATUSES = new Set(["in_progress", "wip", "doing"]);
+const BLOCKED_STATUSES = new Set(["blocked", "on_hold"]);
+const OPEN_STATUSES = new Set(["open", "todo", "new", "draft"]);
+const DONE_STATUSES = new Set(["closed", "done", "complete", "completed"]);
+function statusOf(item) {
+    return (item.status ?? "").trim().toLowerCase();
+}
+/**
+ * Bucket items into standup sections.
+ * `since` (ISO date/time) filters the Done section to items updated within the
+ * window; WIP/blocked/up-next always reflect current state.
+ */
+function buildStandupData(items, opts) {
+    const sinceMs = opts.since ? Date.parse(opts.since) : NaN;
+    const withinWindow = (item) => {
+        if (isNaN(sinceMs))
+            return true;
+        const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
+        return isNaN(ts) ? false : ts >= sinceMs;
+    };
+    const wip = items.filter((i) => WIP_STATUSES.has(statusOf(i)));
+    const blocked = items.filter((i) => BLOCKED_STATUSES.has(statusOf(i)));
+    const open = items.filter((i) => OPEN_STATUSES.has(statusOf(i)));
+    const done = opts.includeDone
+        ? items.filter((i) => DONE_STATUSES.has(statusOf(i)) && withinWindow(i))
+        : [];
+    const upNext = [...open]
+        .sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999))
+        .slice(0, 3);
+    return { wip, blocked, done, upNext, total: items.length };
+}
+// ---------------------------------------------------------------------------
+// Rendering helpers
+// ---------------------------------------------------------------------------
 function typeLabel(item) {
     if (!item.type)
         return "";
     const label = item.type.charAt(0).toUpperCase() + item.type.slice(1);
     return `[${label}]`;
 }
-function itemLine(item, format) {
+function mentionFor(item, mentionMap) {
+    const author = item.assignee;
+    if (author && mentionMap[author])
+        return ` (${mentionMap[author]})`;
+    return "";
+}
+function itemText(item, mentionMap, withPriority = false) {
     const label = typeLabel(item);
     const title = label ? `${label} ${item.title}` : item.title;
-    return format === "slack" ? `• ${title}` : `• ${title}`;
+    const prio = withPriority && item.priority != null ? ` (priority ${item.priority})` : "";
+    return `${title}${prio}${mentionFor(item, mentionMap)}`;
 }
 function todayISO() {
     return new Date().toISOString().slice(0, 10);
 }
-function buildMessage(wip, blocked, done, upNext, opts) {
-    const { format } = opts;
+/**
+ * Group a list of items by assignee. Items with no assignee bucket under
+ * "_unassigned". Returns entries sorted by assignee name for stable output.
+ */
+function groupByAssignee(items) {
+    const groups = new Map();
+    for (const item of items) {
+        const key = item.assignee ?? "_unassigned";
+        (groups.get(key) ?? groups.set(key, []).get(key)).push(item);
+    }
+    return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+// ---------------------------------------------------------------------------
+// Plain-text / mrkdwn message (fallback + dry-run preview)
+// ---------------------------------------------------------------------------
+function renderSection(lines, emoji, title, items, emptyNote, opts, withPriority = false) {
+    const heading = opts.format === "slack" ? `${emoji} *${title}* (${items.length})` : `${emoji} ${title} (${items.length})`;
+    lines.push(heading);
+    if (items.length === 0) {
+        if (emptyNote)
+            lines.push(opts.format === "slack" ? `• _${emptyNote}_` : `• ${emptyNote}`);
+        return;
+    }
+    if (opts.groupBy === "assignee") {
+        for (const [assignee, group] of groupByAssignee(items)) {
+            const name = assignee === "_unassigned" ? "Unassigned" : assignee;
+            lines.push(opts.format === "slack" ? `  *${name}*` : `  ${name}`);
+            for (const item of group)
+                lines.push(`    • ${itemText(item, opts.mentionMap, withPriority)}`);
+        }
+    }
+    else {
+        for (const item of items)
+            lines.push(`• ${itemText(item, opts.mentionMap, withPriority)}`);
+    }
+}
+function buildTextMessage(data, opts) {
     const lines = [];
-    // Header
     const dateStr = todayISO();
-    if (format === "slack") {
-        lines.push(`📊 *pm standup* — ${dateStr}`);
-    }
-    else {
-        lines.push(`📊 pm standup — ${dateStr}`);
-    }
-    // Channel prefix (prepended at the very top when posting to Slack)
-    // It's added to the message body so dry-run also shows it.
-    if (opts.channel) {
-        lines.unshift(`> Channel: ${opts.channel}`);
-    }
+    if (opts.channel)
+        lines.push(`> Channel: ${opts.channel}`);
+    lines.push(opts.format === "slack" ? `📊 *pm standup* — ${dateStr}` : `📊 pm standup — ${dateStr}`);
     lines.push("");
-    // In Progress
-    if (format === "slack") {
-        lines.push(`🏃 *In Progress* (${wip.length})`);
-    }
-    else {
-        lines.push(`🏃 In Progress (${wip.length})`);
-    }
-    if (wip.length === 0) {
-        lines.push("• _nothing in progress_");
-    }
-    else {
-        for (const item of wip)
-            lines.push(itemLine(item, format));
-    }
+    renderSection(lines, "🏃", "In Progress", data.wip, "nothing in progress", opts);
     lines.push("");
-    // Blocked
-    if (format === "slack") {
-        lines.push(`🚫 *Blocked* (${blocked.length})`);
-    }
-    else {
-        lines.push(`🚫 Blocked (${blocked.length})`);
-    }
-    if (blocked.length === 0) {
-        lines.push("• _nothing blocked_");
-    }
-    else {
-        for (const item of blocked)
-            lines.push(itemLine(item, format));
-    }
-    // Done Today (optional)
-    if (done.length > 0) {
+    renderSection(lines, "🚫", "Blocked", data.blocked, "nothing blocked", opts);
+    if (data.done.length > 0) {
         lines.push("");
-        if (format === "slack") {
-            lines.push(`✅ *Done Today* (${done.length})`);
-        }
-        else {
-            lines.push(`✅ Done Today (${done.length})`);
-        }
-        for (const item of done)
-            lines.push(itemLine(item, format));
+        renderSection(lines, "✅", "Done", data.done, null, opts);
     }
-    // Up Next
-    if (upNext.length > 0) {
+    if (data.upNext.length > 0) {
         lines.push("");
-        if (format === "slack") {
-            lines.push(`📋 *Up Next* (${upNext.length})`);
-        }
-        else {
-            lines.push(`📋 Up Next (${upNext.length})`);
-        }
-        upNext.forEach((item) => {
-            const label = typeLabel(item);
-            const title = label ? `${label} ${item.title}` : item.title;
-            const prio = item.priority != null ? ` (priority ${item.priority})` : "";
-            lines.push(`• ${title}${prio}`);
-        });
+        renderSection(lines, "📋", "Up Next", data.upNext, null, opts, true);
     }
     return lines.join("\n");
 }
-function postToSlack(webhookUrl, text) {
+function mrkdwnList(items, opts, withPriority = false) {
+    if (items.length === 0)
+        return "_none_";
+    if (opts.groupBy === "assignee") {
+        const parts = [];
+        for (const [assignee, group] of groupByAssignee(items)) {
+            const name = assignee === "_unassigned" ? "Unassigned" : assignee;
+            parts.push(`*${name}*`);
+            for (const item of group)
+                parts.push(`• ${itemText(item, opts.mentionMap, withPriority)}`);
+        }
+        return parts.join("\n");
+    }
+    return items.map((item) => `• ${itemText(item, opts.mentionMap, withPriority)}`).join("\n");
+}
+/**
+ * Build a Slack Block Kit `blocks` array: a header, a section per standup
+ * bucket (In Progress / Blocked / Up Next / optional Done) and a context
+ * footer. Returns the blocks plus a plain-text `fallback` Slack renders in
+ * notifications and old clients.
+ */
+function buildBlockKit(data, opts) {
+    const blocks = [];
+    const dateStr = todayISO();
+    blocks.push({
+        type: "header",
+        text: { type: "plain_text", text: `📊 pm standup — ${dateStr}`, emoji: true },
+    });
+    if (opts.channel) {
+        blocks.push({
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `Channel: ${opts.channel}` }],
+        });
+    }
+    const section = (emoji, title, items, withPriority = false) => {
+        blocks.push({
+            type: "section",
+            text: {
+                type: "mrkdwn",
+                text: `${emoji} *${title}* (${items.length})\n${mrkdwnList(items, opts, withPriority)}`,
+            },
+        });
+    };
+    section("🏃", "In Progress", data.wip);
+    section("🚫", "Blocked", data.blocked);
+    section("📋", "Up Next", data.upNext, true);
+    if (data.done.length > 0)
+        section("✅", "Done", data.done);
+    blocks.push({ type: "divider" });
+    const footerBits = [
+        `${data.total} item(s) total`,
+        opts.since ? `since ${opts.since}` : null,
+        opts.groupBy === "assignee" ? "grouped by assignee" : null,
+    ].filter(Boolean);
+    blocks.push({
+        type: "context",
+        elements: [{ type: "mrkdwn", text: `🤖 pm-slack-standup · ${footerBits.join(" · ")}` }],
+    });
+    // Plain-text fallback mirrors the text message (slack mrkdwn variant).
+    const fallback = buildTextMessage(data, { ...opts, format: "slack" });
+    return { blocks, fallback };
+}
+// ---------------------------------------------------------------------------
+// Slack transport
+// ---------------------------------------------------------------------------
+function postToSlack(webhookUrl, payload) {
     return new Promise((resolve, reject) => {
-        const payload = JSON.stringify({ text, mrkdwn: true });
+        const body = JSON.stringify(payload);
         const url = new URL(webhookUrl);
         const options = {
             hostname: url.hostname,
@@ -170,30 +292,41 @@ function postToSlack(webhookUrl, text) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Content-Length": Buffer.byteLength(payload),
+                "Content-Length": Buffer.byteLength(body),
             },
         };
         const req = https.request(options, (res) => {
-            let body = "";
-            res.on("data", (chunk) => (body += chunk.toString()));
+            let respBody = "";
+            res.on("data", (chunk) => (respBody += chunk.toString()));
             res.on("end", () => {
                 if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                     resolve();
                 }
                 else {
-                    reject(new Error(`Slack webhook returned HTTP ${res.statusCode ?? "unknown"}: ${body}`));
+                    reject(new Error(`Slack webhook returned HTTP ${res.statusCode ?? "unknown"}: ${respBody}`));
                 }
             });
         });
-        req.on("error", (err) => {
-            reject(new Error(`Slack webhook request failed: ${err.message}`));
-        });
-        req.setTimeout(10_000, () => {
-            req.destroy(new Error("Slack webhook request timed out after 10s"));
-        });
-        req.write(payload);
+        req.on("error", (err) => reject(new Error(`Slack webhook request failed: ${err.message}`)));
+        req.setTimeout(10_000, () => req.destroy(new Error("Slack webhook request timed out after 10s")));
+        req.write(body);
         req.end();
     });
+}
+// ---------------------------------------------------------------------------
+// Shared option resolution
+// ---------------------------------------------------------------------------
+function resolveStandupOptions(options) {
+    const rawFormat = readStrOption(options, "format");
+    const rawGroup = readStrOption(options, "group-by");
+    return {
+        channel: readStrOption(options, "channel"),
+        format: rawFormat === "text" ? "text" : "slack",
+        includeDone: readBoolOption(options, "include-done"),
+        since: readStrOption(options, "since"),
+        groupBy: rawGroup === "assignee" ? "assignee" : "status",
+        mentionMap: parseMentionMap(readStrOption(options, "mention-map")),
+    };
 }
 // ---------------------------------------------------------------------------
 // Extension
@@ -204,96 +337,130 @@ export default defineExtension({
     activate(api) {
         api.registerCommand({
             name: "standup",
-            description: "Post pm context as a Slack standup message",
-            intent: "Share current work status (in-progress, blocked, up-next) to a Slack channel via webhook",
+            description: "Post pm context as a rich Slack standup (Block Kit) message",
+            intent: "Share current work status (in-progress, blocked, up-next, done) to a Slack channel via webhook",
             examples: [
                 "pm standup --webhook https://hooks.slack.com/services/...",
                 "pm standup --channel '#team-eng' --dry-run",
-                "pm standup --include-done --format text",
+                "pm standup --include-done --since 2026-06-01",
+                "pm standup --group-by assignee --mention-map 'alice=@alice.s,bob=@bob'",
                 "PM_SLACK_WEBHOOK=https://... pm standup --channel '#standups'",
             ],
             flags: [
-                {
-                    long: "--webhook",
-                    value_name: "url",
-                    description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)",
-                },
-                {
-                    long: "--channel",
-                    value_name: "name",
-                    description: "Channel name to prepend to the standup message (e.g. #team-eng)",
-                },
-                {
-                    long: "--dry-run",
-                    description: "Print the message without posting to Slack",
-                },
-                {
-                    long: "--include-done",
-                    description: "Include items with 'closed' status in a Done Today section",
-                },
-                {
-                    long: "--format",
-                    value_name: "fmt",
-                    description: "Output format: 'slack' uses mrkdwn bold/italic, 'text' is plain (default: slack)",
-                },
+                { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
+                { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
+                { long: "--dry-run", description: "Print the message without posting to Slack" },
+                { long: "--include-done", description: "Include recently-closed items in a Done section" },
+                { long: "--since", value_name: "iso", description: "ISO date/time window; filters the Done section to items updated since then" },
+                { long: "--group-by", value_name: "field", description: "Group section items by 'status' (default) or 'assignee'" },
+                { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
+                { long: "--format", value_name: "fmt", description: "Plain-text rendering: 'slack' uses mrkdwn, 'text' is plain (default: slack)" },
             ],
             async run(ctx) {
-                // Resolve options. pm normalizes flags to camelCase at runtime, so we
-                // read both kebab- and camelCase forms via the option helpers.
                 const webhookUrl = readStrOption(ctx.options, "webhook") ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
                 const dryRun = readBoolOption(ctx.options, "dry-run");
-                const includeDone = readBoolOption(ctx.options, "include-done");
-                const rawFormat = readStrOption(ctx.options, "format");
-                const format = rawFormat === "text" ? "text" : "slack";
-                const channel = readStrOption(ctx.options, "channel");
+                const opts = resolveStandupOptions(ctx.options);
                 if (!dryRun && !webhookUrl) {
-                    // Throw so pm reports a non-zero exit code; returning an error object
-                    // would let the command exit 0 and mask the failure.
-                    throw new CommandError("No webhook URL provided. Set --webhook or PM_SLACK_WEBHOOK env var, or use --dry-run.", EXIT_CODE.USAGE);
+                    // Graceful no-op when no webhook is configured: warn and exit 0 so the
+                    // command never blocks a workflow on a missing/unset webhook.
+                    console.error("PM_SLACK_WEBHOOK not set and no --webhook provided — Slack posting disabled. " +
+                        "Use --dry-run to preview the message.");
+                    return { posted: false, disabled: true, reason: "no-webhook" };
                 }
-                // Fetch items using pm subcommands
-                const wipItems = fetchItemsByStatus(ctx.pm_root, "list-in-progress");
-                const blockedItems = fetchItemsByStatus(ctx.pm_root, "list-blocked");
-                const todoItems = fetchItemsByStatus(ctx.pm_root, "list-open");
-                const doneItems = includeDone ? fetchItemsByStatus(ctx.pm_root, "list-closed") : [];
-                // Sort todo by priority (lower number = higher priority), take top 3
-                const upNext = [...todoItems]
-                    .sort((a, b) => {
-                    const pa = a.priority ?? 9999;
-                    const pb = b.priority ?? 9999;
-                    return pa - pb;
-                })
-                    .slice(0, 3);
-                const message = buildMessage(wipItems, blockedItems, doneItems, upNext, { channel, format, includeDate: true });
+                const items = fetchAllItems(ctx.pm_root);
+                const data = buildStandupData(items, opts);
+                const { blocks, fallback } = buildBlockKit(data, opts);
+                const textPreview = opts.format === "text" ? buildTextMessage(data, opts) : fallback;
                 if (dryRun) {
                     console.error("--- DRY RUN (message not posted) ---");
-                    process.stdout.write(message + "\n");
+                    process.stdout.write(textPreview + "\n");
+                    console.error("--- Block Kit payload ---");
+                    process.stdout.write(JSON.stringify({ blocks }, null, 2) + "\n");
                     console.error("--- END ---");
                     return {
                         dryRun: true,
-                        message,
-                        wip: wipItems.length,
-                        blocked: blockedItems.length,
-                        done: doneItems.length,
-                        upNext: upNext.length,
+                        blocks,
+                        fallback,
+                        wip: data.wip.length,
+                        blocked: data.blocked.length,
+                        done: data.done.length,
+                        upNext: data.upNext.length,
                     };
                 }
                 try {
-                    await postToSlack(webhookUrl, message);
+                    await postToSlack(webhookUrl, { text: fallback, blocks, mrkdwn: true });
                 }
                 catch (err) {
-                    // Rethrow with a numeric exitCode so the runtime exits non-zero and
-                    // runs the handler exactly once (a plain Error re-invokes it).
-                    throw new CommandError(err instanceof Error ? err.message : String(err));
+                    // Never throw on network failure: warn and exit 0 so a flaky Slack
+                    // endpoint doesn't break the caller's workflow.
+                    console.error(`Slack post failed (continuing): ${err instanceof Error ? err.message : String(err)}`);
+                    return { posted: false, error: err instanceof Error ? err.message : String(err) };
                 }
                 return {
                     posted: true,
-                    wip: wipItems.length,
-                    blocked: blockedItems.length,
-                    done: doneItems.length,
-                    upNext: upNext.length,
+                    wip: data.wip.length,
+                    blocked: data.blocked.length,
+                    done: data.done.length,
+                    upNext: data.upNext.length,
                 };
             },
+        });
+        // -----------------------------------------------------------------------
+        // Exporter: standup  →  `pm standup export`
+        // Writes the standup to a file (or stdout) as Markdown or JSON. JSON emits
+        // the full Block Kit payload so it can be POSTed elsewhere or archived.
+        // (No collision with the `pm standup` command — different invocation.)
+        // -----------------------------------------------------------------------
+        api.registerExporter("standup", async (ctx) => {
+            const opts = resolveStandupOptions(ctx.options);
+            const rawFormat = (readStrOption(ctx.options, "format") ?? "md").toLowerCase();
+            // For the exporter, --format selects the file format (md|json); the
+            // mrkdwn-vs-plain text choice is irrelevant here so default text to plain.
+            const fileFormat = rawFormat === "json" ? "json" : "md";
+            const exportOpts = { ...opts, format: "text" };
+            const items = fetchAllItems(ctx.pm_root);
+            const data = buildStandupData(items, exportOpts);
+            let output;
+            if (fileFormat === "json") {
+                const { blocks, fallback } = buildBlockKit(data, opts);
+                output = JSON.stringify({
+                    date: todayISO(),
+                    channel: opts.channel,
+                    since: opts.since,
+                    groupBy: opts.groupBy,
+                    counts: {
+                        wip: data.wip.length,
+                        blocked: data.blocked.length,
+                        done: data.done.length,
+                        upNext: data.upNext.length,
+                        total: data.total,
+                    },
+                    sections: {
+                        in_progress: data.wip,
+                        blocked: data.blocked,
+                        up_next: data.upNext,
+                        done: data.done,
+                    },
+                    slack: { text: fallback, blocks },
+                }, null, 2);
+            }
+            else {
+                // Markdown: reuse the plain-text renderer, upgrade headings to `##`.
+                const md = buildTextMessage(data, exportOpts)
+                    .replace(/^📊 pm standup — (.+)$/m, "# pm standup — $1")
+                    .replace(/^(🏃|🚫|✅|📋) (.+)$/gm, "## $1 $2");
+                output = md;
+            }
+            const outputPath = readStrOption(ctx.options, "output");
+            if (outputPath) {
+                const absolutePath = resolve(outputPath);
+                writeFileSync(absolutePath, output + "\n", "utf-8");
+                console.error(`standup export: wrote ${data.total} item(s) as ${fileFormat} to ${absolutePath}`);
+                return { exported: data.total, format: fileFormat, file: absolutePath };
+            }
+            console.log(output);
+            console.error(`standup export: rendered ${data.total} item(s) as ${fileFormat}.`);
+            return { exported: data.total, format: fileFormat, output };
         });
     },
 });

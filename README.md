@@ -4,12 +4,13 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 
 ## Features
 
-- Posts WIP, Blocked, and Up Next items to a Slack channel via incoming webhook
-- Optional Done Today section (`--include-done`)
-- Dry-run mode to preview the message without posting
-- Slack mrkdwn formatting or plain text output
-- Channel prefix support
-- Webhook URL configurable via flag or environment variable
+- Posts WIP, Blocked, Up Next (and optional Done) items to Slack as a rich **Block Kit** message (header, one section per bucket, context footer) with an automatic plain-text fallback
+- `pm standup export` — write the standup to a file as Markdown or JSON (the JSON form includes the full Block Kit payload for archiving or re-posting)
+- Group section items by `status` (default) or `assignee` (`--group-by`)
+- Map pm authors to Slack handles so they get mentioned (`--mention-map`)
+- Restrict the Done section to a recent window (`--since <iso>`, with `--include-done`)
+- Dry-run mode to preview both the rendered message and the Block Kit JSON
+- Webhook URL configurable via flag or environment variable; missing webhook is a graceful no-op (never blocks a workflow)
 
 ## Installation
 
@@ -56,10 +57,30 @@ pm standup [flags]
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--webhook <url>` | string | — | Slack incoming webhook URL (overrides `PM_SLACK_WEBHOOK`) |
-| `--channel <name>` | string | — | Channel name to prepend to the message (e.g. `#team-eng`) |
-| `--dry-run` | boolean | `false` | Print the message without posting to Slack |
-| `--include-done` | boolean | `false` | Include items with `done` status in a Done Today section |
-| `--format <slack\|text>` | string | `slack` | Output format: `slack` uses mrkdwn, `text` is plain |
+| `--channel <name>` | string | — | Channel name shown in the message (e.g. `#team-eng`) |
+| `--dry-run` | boolean | `false` | Print the rendered message and the Block Kit JSON without posting |
+| `--include-done` | boolean | `false` | Include recently-closed items in a Done section |
+| `--since <iso>` | string | — | ISO date/time window; filters the Done section to items updated since then |
+| `--group-by <status\|assignee>` | string | `status` | Group section items by status (default) or assignee |
+| `--mention-map <map>` | string | — | Map pm authors to Slack handles, e.g. `alice=@alice,bob=@bob` |
+| `--format <slack\|text>` | string | `slack` | Plain-text rendering used for the fallback / preview |
+
+## Export
+
+`pm standup export` writes the standup to a file (or stdout) instead of posting it to Slack:
+
+```bash
+pm standup export --format md   --output standup.md --include-done
+pm standup export --format json --output standup.json --group-by assignee
+pm standup export                       # Markdown to stdout
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format <md\|json>` | `md` | File format. `json` includes the full Block Kit payload under `slack.blocks` |
+| `--output <file>` | stdout | Output file path |
+
+The `--since`, `--group-by`, `--include-done`, `--channel` and `--mention-map` flags above also apply to the export.
 
 ### Examples
 
@@ -152,10 +173,10 @@ npm run dev   # watch mode
 
 ## How It Works
 
-1. Fetches items from pm-cli with statuses `wip`, `blocked`, `todo`, and optionally `done`.
-2. Sorts `todo` items by priority (ascending) and takes the top 3 as "Up Next".
-3. Formats a message using either Slack mrkdwn or plain text.
-4. Posts the message to the configured Slack webhook using Node.js native `https`.
+1. Reads every item once via `pm --path <root> list-all --json --include-body` and buckets them locally into In Progress, Blocked, open (Up Next) and optionally Done.
+2. Sorts open items by priority (ascending) and takes the top 3 as "Up Next".
+3. Builds a Slack Block Kit `blocks` array (header + a section per bucket + context footer) plus a plain-text `fallback`, optionally grouped by assignee and annotated with Slack mentions.
+4. Posts `{ text, blocks }` to the configured Slack webhook using Node.js native `https`. A missing webhook or a network failure is a non-blocking no-op (warns and exits 0).
 
 ## License
 
