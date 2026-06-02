@@ -1,0 +1,13 @@
+id: pm-slack-standup-uf4j
+title: "Export pure helpers + node:test unit suite (formatters/grouping/window)"
+description: ""
+type: Task
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:29:08.517Z"
+updated_at: "2026-06-02T22:29:24.372Z"
+author: codex
+parent: pm-slack-standup-h64p
+close_reason: "Exported 14 helpers; added test/units.test.ts with 20 node:test cases covering each formatter, grouping, sections, date-window, Block Kit validity+truncation; all pass"
+body: ""

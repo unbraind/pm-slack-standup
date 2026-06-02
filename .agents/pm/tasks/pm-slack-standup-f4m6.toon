@@ -1,0 +1,13 @@
+id: pm-slack-standup-f4m6
+title: Add --group-by sprint and type (extend assignee/status)
+description: ""
+type: Task
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:29:07.491Z"
+updated_at: "2026-06-02T22:29:23.508Z"
+author: codex
+parent: pm-slack-standup-h64p
+close_reason: parseGroupBy + groupItems now support status|assignee|sprint|type; verified group-by sprint buckets S1/S2/No sprint and assignee buckets alice/bob/Unassigned
+body: ""

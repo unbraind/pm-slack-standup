@@ -1,0 +1,13 @@
+id: pm-slack-standup-dgyy
+title: Add --format slack|blockkit|markdown|plain unified output
+description: ""
+type: Task
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:29:07.268Z"
+updated_at: "2026-06-02T22:29:23.270Z"
+author: codex
+parent: pm-slack-standup-h64p
+close_reason: "Implemented parseFormat + renderStandup; slack default byte-identical, blockkit emits {blocks} JSON, markdown/plain added; functionally verified all four in dry-run"
+body: ""

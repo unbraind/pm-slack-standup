@@ -1,0 +1,13 @@
+id: pm-slack-standup-rpty
+title: "Block Kit schema: single header (150ch), one mrkdwn section per bucket (3000ch truncation), divider + context footer"
+description: ""
+type: Decision
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:29:08.726Z"
+updated_at: "2026-06-02T22:29:24.585Z"
+author: codex
+parent: pm-slack-standup-h64p
+close_reason: "Decision recorded: header(150ch)/section-per-bucket(3000ch truncate)/divider/context footer; validated as well-formed JSON"
+body: ""

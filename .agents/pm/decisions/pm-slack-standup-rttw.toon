@@ -1,0 +1,13 @@
+id: pm-slack-standup-rttw
+title: Keep slack message text byte-identical; --format governs printed output only (blockkit JSON no longer always dumped in dry-run)
+description: ""
+type: Decision
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T22:29:08.984Z"
+updated_at: "2026-06-02T22:29:24.801Z"
+author: codex
+parent: pm-slack-standup-h64p
+close_reason: "Decision recorded: backward-compat preserved; diff confirms slack message text byte-identical to prior version"
+body: ""
