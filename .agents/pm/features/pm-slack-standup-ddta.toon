@@ -1,0 +1,14 @@
+id: pm-slack-standup-ddta
+title: Block Kit standup + standup export exporter + grouping/window/mention flags
+description: ""
+type: Feature
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-02T05:29:57.223Z"
+updated_at: "2026-06-02T05:33:21.358Z"
+author: codex
+notes[1]{created_at,author,text}:
+  "2026-06-02T05:33:21.358Z",codex,"Added registerExporter('standup') -> 'pm standup export' (--format md|json, --output). Upgraded Slack message to Block Kit (header + In Progress/Blocked/Up Next/Done sections + context footer) with plain-text fallback. New flags: --since, --group-by status|assignee, --include-done, --mention-map. Reads items via 'pm list-all --json --include-body'. Graceful no-op when webhook unset/network fails (exit 0). Verified: build, tsc --noEmit, npm test (2/2), functional doctor active=1 failed=0, Block Kit well-formed, export md+json valid."
+close_reason: "Shipped: Block Kit standup, standup export exporter, and grouping/window/mention flags. All verification passed."
+body: ""
