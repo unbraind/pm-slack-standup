@@ -37,6 +37,12 @@ export class CommandError extends Error {
 // Types
 // ---------------------------------------------------------------------------
 
+export interface PmDependency {
+  id?: string;
+  kind?: string;
+  [key: string]: unknown;
+}
+
 export interface PmItem {
   id: string;
   title: string;
@@ -52,6 +58,11 @@ export interface PmItem {
   body?: string;
   created_at?: string;
   updated_at?: string;
+  // A `blocked_by` dependency can surface either as a top-level string
+  // (item ID or free-text reason) or as one/more entries in `dependencies`
+  // with `kind: "blocked_by"`. We surface either under the Blocked section.
+  blocked_by?: string;
+  dependencies?: PmDependency[];
 }
 
 // The text/preview renderer: `slack` uses Slack mrkdwn (`*bold*`), `plain` is
@@ -74,6 +85,10 @@ export interface StandupData {
   done: PmItem[];
   upNext: PmItem[];
   total: number;
+  // When `--yesterday` is requested, `done` is split into items closed
+  // yesterday (local day) vs. today. Both subsets are subsets of `done`.
+  doneYesterday?: PmItem[];
+  doneToday?: PmItem[];
 }
 
 export interface StandupOptions {
@@ -84,6 +99,16 @@ export interface StandupOptions {
   groupBy: GroupBy;
   sections: SectionKey[];
   mentionMap: Record<string, string>;
+  // Split the Done section into "Done Yesterday" / "Done Today" by the local
+  // day boundary. Additive; off by default (single Done section).
+  splitYesterday: boolean;
+  // Override the default emoji/title for any section. Keyed by SectionKey.
+  sectionLabels: Partial<Record<SectionKey, SectionLabelOverride>>;
+}
+
+export interface SectionLabelOverride {
+  emoji?: string;
+  title?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +241,77 @@ export function parseSections(spec: string | undefined): SectionKey[] {
 }
 
 /**
+ * Parse a `--section-labels` spec overriding section titles (and optionally
+ * an emoji). Accepts `key=Label,other=Label2` (comma/semicolon separated).
+ * The label value may itself lead with an emoji + space, e.g.
+ * `blocked=🔥 On Fire` sets emoji "🔥" and title "On Fire"; a label with no
+ * leading emoji keeps the section's default emoji and only changes the title.
+ * Keys use the same aliases as `--sections` (wip→in_progress, etc.).
+ * Unknown keys are a USAGE error rather than a silent drop.
+ */
+export function parseSectionLabels(
+  spec: string | undefined
+): Partial<Record<SectionKey, SectionLabelOverride>> {
+  const out: Partial<Record<SectionKey, SectionLabelOverride>> = {};
+  if (!spec || !spec.trim()) return out;
+  for (const pair of spec.split(/[,;]/)) {
+    const eq = pair.indexOf("=");
+    if (eq < 0) continue;
+    const rawKey = pair.slice(0, eq).trim().toLowerCase();
+    const rawVal = pair.slice(eq + 1).trim();
+    if (!rawKey || !rawVal) continue;
+    const key = SECTION_ALIASES[rawKey];
+    if (!key) {
+      throw new CommandError(
+        `Unknown --section-labels key '${rawKey}'. Valid: in_progress | blocked | done | up_next.`,
+        EXIT_CODE.USAGE
+      );
+    }
+    // Split on the first space; treat the head as an emoji override only
+    // when it carries a non-ASCII codepoint (emoji/symbol). A plain ASCII
+    // word is part of the title, so the section keeps its default emoji.
+    const spaceIdx = rawVal.indexOf(" ");
+    const override: SectionLabelOverride = {};
+    if (spaceIdx > 0) {
+      const head = rawVal.slice(0, spaceIdx);
+      const tail = rawVal.slice(spaceIdx + 1).trim();
+      const headHasNonAscii = [...head].some((ch) => ch.codePointAt(0)! > 127);
+      if (tail && headHasNonAscii) {
+        override.emoji = head;
+        override.title = tail;
+      } else {
+        override.title = rawVal;
+      }
+    } else {
+      override.title = rawVal;
+    }
+    out[key] = override;
+  }
+  return out;
+}
+
+/**
+ * Parse a `--channels` spec (comma/semicolon list) into an ordered, de-duped
+ * list of channel targets. Each target is either a Slack channel name
+ * (e.g. `#team-eng`) or a full webhook URL — multi-channel posting accepts
+ * both (a name is shown in the message; a URL is POSTed to). Empty → [].
+ */
+export function parseChannels(spec: string | undefined): string[] {
+  if (!spec || !spec.trim()) return [];
+  const out: string[] = [];
+  for (const raw of spec.split(/[,;]/)) {
+    const token = raw.trim();
+    if (token && !out.includes(token)) out.push(token);
+  }
+  return out;
+}
+
+/** True when a channel token is a full webhook URL rather than a name. */
+export function isWebhookUrl(token: string): boolean {
+  return /^https?:\/\//i.test(token.trim());
+}
+
+/**
  * Resolve the "recently closed" window start (ms epoch) from `--since` and/or
  * `--days`. `--since` is an explicit ISO date/time; `--days <n>` is N days
  * before now. If both are given the *later* (more restrictive) bound wins.
@@ -300,6 +396,51 @@ export function withinWindow(item: PmItem, sinceMs: number): boolean {
 }
 
 /**
+ * True when an item carries a `blocked_by` dependency, regardless of its
+ * status. pm surfaces this either as a top-level `blocked_by` string (item ID
+ * or free-text reason) or as one/more `dependencies` entries with
+ * `kind: "blocked_by"`. Used to surface impediments that are NOT explicitly
+ * status=blocked under the Blocked section.
+ */
+export function hasBlockedByDep(item: PmItem): boolean {
+  const top = item.blocked_by;
+  if (typeof top === "string" && top.trim().length > 0) return true;
+  const deps = item.dependencies;
+  if (Array.isArray(deps)) {
+    for (const d of deps) {
+      if (d && typeof d.kind === "string" && d.kind.trim().toLowerCase() === "blocked_by") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Local-day key (YYYY-MM-DD in the host's local timezone) for an item's last
+ * activity. Used by the `--yesterday` split. Falls back to created_at, then
+ * to the empty string when no timestamp is parseable.
+ */
+export function localDayKey(item: PmItem): string {
+  const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
+  if (isNaN(ts)) return "";
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Local-day key (YYYY-MM-DD) for a given epoch-ms instant. */
+export function localDayKeyOf(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
  * Bucket items into standup sections.
  * `sinceMs` (epoch ms, NaN = no window) filters the Done section to items
  * updated within the window; WIP/blocked/up-next always reflect current state.
@@ -307,20 +448,37 @@ export function withinWindow(item: PmItem, sinceMs: number): boolean {
 export function buildStandupData(
   items: PmItem[],
   opts: StandupOptions,
-  sinceMs: number = NaN
+  sinceMs: number = NaN,
+  now: number = Date.now()
 ): StandupData {
-  const wip = items.filter((i) => WIP_STATUSES.has(statusOf(i)));
-  const blocked = items.filter((i) => BLOCKED_STATUSES.has(statusOf(i)));
-  const open = items.filter((i) => OPEN_STATUSES.has(statusOf(i)));
+  const isDone = (i: PmItem) => DONE_STATUSES.has(statusOf(i));
+  // An item is "blocked" for standup purposes when its status is blocked/
+  // on_hold OR it carries a blocked_by dependency — but a done item is never
+  // re-surfaced as blocked (a closed impediment is no longer an impediment).
+  const isBlocked = (i: PmItem) =>
+    !isDone(i) && (BLOCKED_STATUSES.has(statusOf(i)) || hasBlockedByDep(i));
+
+  const wip = items.filter((i) => WIP_STATUSES.has(statusOf(i)) && !isBlocked(i));
+  const blocked = items.filter(isBlocked);
+  const open = items.filter((i) => OPEN_STATUSES.has(statusOf(i)) && !isBlocked(i));
   const done = opts.includeDone
-    ? items.filter((i) => DONE_STATUSES.has(statusOf(i)) && withinWindow(i, sinceMs))
+    ? items.filter((i) => isDone(i) && withinWindow(i, sinceMs))
     : [];
 
   const upNext = [...open]
     .sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999))
     .slice(0, 3);
 
-  return { wip, blocked, done, upNext, total: items.length };
+  const data: StandupData = { wip, blocked, done, upNext, total: items.length };
+
+  if (opts.splitYesterday && done.length > 0) {
+    const todayKey = localDayKeyOf(now);
+    const yesterdayKey = localDayKeyOf(now - 86_400_000);
+    data.doneToday = done.filter((i) => localDayKey(i) === todayKey);
+    data.doneYesterday = done.filter((i) => localDayKey(i) === yesterdayKey);
+  }
+
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -347,10 +505,28 @@ const SECTION_META: Record<
 };
 
 /**
+ * Apply any `--section-labels` override for `key` to the given emoji/title.
+ */
+function labeled(
+  key: SectionKey,
+  emoji: string,
+  title: string,
+  opts: StandupOptions
+): { emoji: string; title: string } {
+  const ov = opts.sectionLabels[key];
+  if (!ov) return { emoji, title };
+  return { emoji: ov.emoji ?? emoji, title: ov.title ?? title };
+}
+
+/**
  * Resolve the ordered, selected section definitions for the given data.
  * `in_progress` and `blocked` always render (even empty, with their note);
  * `done` and `up_next` only render when they hold items — preserving the
  * historical message shape. `--sections` filters which keys are eligible.
+ *
+ * When `--yesterday` is active and Done has items, the single Done section is
+ * expanded into "Done Yesterday" + "Done Today" (only the non-empty subsets
+ * render), preserving the section's position in the ordering.
  */
 export function resolveSections(data: StandupData, opts: StandupOptions): SectionDef[] {
   const itemsFor: Record<SectionKey, PmItem[]> = {
@@ -368,9 +544,26 @@ export function resolveSections(data: StandupData, opts: StandupOptions): Sectio
   const out: SectionDef[] = [];
   for (const key of opts.sections) {
     const items = itemsFor[key];
-    if (!alwaysShow[key] && items.length === 0) continue;
     const meta = SECTION_META[key];
-    out.push({ key, emoji: meta.emoji, title: meta.title, items, emptyNote: meta.emptyNote, withPriority: meta.withPriority });
+
+    if (key === "done" && opts.splitYesterday && data.doneYesterday && data.doneToday) {
+      const subsets: Array<[string, PmItem[]]> = [
+        ["Done Yesterday", data.doneYesterday],
+        ["Done Today", data.doneToday],
+      ];
+      // The day distinction owns the title here, so a --section-labels
+      // override for `done` contributes only its emoji (not its title).
+      const doneEmoji = opts.sectionLabels.done?.emoji ?? meta.emoji;
+      for (const [subTitle, subItems] of subsets) {
+        if (subItems.length === 0) continue;
+        out.push({ key, emoji: doneEmoji, title: subTitle, items: subItems, emptyNote: meta.emptyNote, withPriority: meta.withPriority });
+      }
+      continue;
+    }
+
+    if (!alwaysShow[key] && items.length === 0) continue;
+    const { emoji, title } = labeled(key, meta.emoji, meta.title, opts);
+    out.push({ key, emoji, title, items, emptyNote: meta.emptyNote, withPriority: meta.withPriority });
   }
   return out;
 }
@@ -642,6 +835,81 @@ function postToSlack(webhookUrl: string, payload: Record<string, unknown>): Prom
   });
 }
 
+/** One resolved post target: the webhook URL to POST to + the channel name. */
+export interface PostTarget {
+  webhookUrl: string;
+  /** Channel name shown in the message (may differ per target). */
+  channel?: string;
+}
+
+export interface PostResultEntry {
+  channel?: string;
+  ok: boolean;
+  error?: string;
+}
+
+/** A poster sends one payload to one webhook. Injectable for testing. */
+export type Poster = (webhookUrl: string, payload: Record<string, unknown>) => Promise<void>;
+
+/**
+ * Resolve the ordered list of post targets from `--webhook`/env + `--channel`
+ * + `--channels`. Each `--channels` token is either a `#name` (posted to the
+ * base webhook, just changing the displayed channel) or a full webhook URL
+ * (posted to that URL). When no `--channels` is given, a single target using
+ * the base webhook + `--channel` is returned. De-dupes (webhook,channel) pairs.
+ */
+export function resolvePostTargets(
+  baseWebhook: string,
+  baseChannel: string | undefined,
+  channels: string[]
+): PostTarget[] {
+  if (channels.length === 0) {
+    return [{ webhookUrl: baseWebhook, channel: baseChannel }];
+  }
+  const out: PostTarget[] = [];
+  const seen = new Set<string>();
+  for (const token of channels) {
+    const target: PostTarget = isWebhookUrl(token)
+      ? { webhookUrl: token, channel: baseChannel }
+      : { webhookUrl: baseWebhook, channel: token };
+    const dedupeKey = `${target.webhookUrl} ${target.channel ?? ""}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    out.push(target);
+  }
+  return out;
+}
+
+/**
+ * Post the standup to every resolved target, re-rendering per target so each
+ * channel's message shows its own channel name. Returns a per-target result;
+ * never throws — the caller decides how to treat failures (e.g. fallback to
+ * stdout). The `poster` is injectable so this is testable without a network.
+ */
+export async function postStandupTargets(
+  targets: PostTarget[],
+  data: StandupData,
+  baseOpts: StandupOptions,
+  poster: Poster
+): Promise<PostResultEntry[]> {
+  const results: PostResultEntry[] = [];
+  for (const target of targets) {
+    const opts: StandupOptions = { ...baseOpts, channel: target.channel };
+    const { blocks, fallback } = buildBlockKit(data, opts);
+    try {
+      await poster(target.webhookUrl, { text: fallback, blocks, mrkdwn: true });
+      results.push({ channel: target.channel, ok: true });
+    } catch (err: unknown) {
+      results.push({
+        channel: target.channel,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return results;
+}
+
 // ---------------------------------------------------------------------------
 // Shared option resolution
 // ---------------------------------------------------------------------------
@@ -660,14 +928,19 @@ export function resolveStandupOptions(
 } {
   const since = readStrOption(options, "since");
   const days = parseDays(readStrOption(options, "days"));
+  const splitYesterday = readBoolOption(options, "yesterday");
   const opts: StandupOptions = {
     channel: readStrOption(options, "channel"),
     format,
-    includeDone: readBoolOption(options, "include-done"),
+    // `--yesterday` is meaningless without a Done section, so it implies
+    // `--include-done` (additive: passing only `--include-done` is unchanged).
+    includeDone: readBoolOption(options, "include-done") || splitYesterday,
     since,
     groupBy: parseGroupBy(readStrOption(options, "group-by")),
     sections: parseSections(readStrOption(options, "sections")),
     mentionMap: parseMentionMap(readStrOption(options, "mention-map")),
+    splitYesterday,
+    sectionLabels: parseSectionLabels(readStrOption(options, "section-labels")),
   };
   // `--days` implies windowing the Done section; surface it even without
   // `--include-done` being set so the footer/window stays accurate.
@@ -695,6 +968,9 @@ export default defineExtension({
         "pm standup --dry-run --format markdown --include-done --days 7",
         "pm standup --group-by assignee --mention-map 'alice=@alice.s,bob=@bob'",
         "pm standup --group-by sprint --sections in_progress,blocked",
+        "pm standup --dry-run --yesterday --format plain",
+        "pm standup --channels '#team-eng,#standups' --dry-run",
+        "pm standup --section-labels 'in_progress=Rolling,blocked=🔥 On Fire' --dry-run",
         "PM_SLACK_WEBHOOK=https://... pm standup --channel '#standups'",
       ],
       flags: [
@@ -708,6 +984,10 @@ export default defineExtension({
         { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type" },
         { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
         { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
+        { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+        { long: "--channels", value_name: "list", description: "Post the same standup to multiple targets: comma list of #channel names and/or webhook URLs" },
+        { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
+        { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
       ],
 
       async run(ctx) {
@@ -742,9 +1022,15 @@ export default defineExtension({
           };
         }
 
+        const channels = parseChannels(readStrOption(ctx.options, "channels"));
+        const fallbackToStdout = readBoolOption(ctx.options, "fallback-to-stdout");
+
         // Real post path: a missing webhook is a hard, structured error (exit 1)
-        // rather than a crash or silent success. Use --dry-run to preview.
-        if (!webhookUrl) {
+        // rather than a crash or silent success. `--channels` entries that are
+        // bare #names still need a base webhook to post to. Use --dry-run to
+        // preview, or --fallback-to-stdout to print instead of erroring.
+        const needsBaseWebhook = channels.length === 0 || channels.some((c) => !isWebhookUrl(c));
+        if (!webhookUrl && needsBaseWebhook) {
           throw new CommandError(
             "No Slack webhook configured. Set PM_SLACK_WEBHOOK or pass --webhook <url>, " +
               "or use --dry-run to preview the message without posting.",
@@ -752,12 +1038,35 @@ export default defineExtension({
           );
         }
 
-        const { blocks, fallback } = buildBlockKit(data, opts);
-        try {
-          await postToSlack(webhookUrl, { text: fallback, blocks, mrkdwn: true });
-        } catch (err: unknown) {
+        const targets = resolvePostTargets(webhookUrl, opts.channel, channels);
+        const results = await postStandupTargets(targets, data, opts, postToSlack);
+        const failures = results.filter((r) => !r.ok);
+
+        if (failures.length > 0 && fallbackToStdout) {
+          // Print the rendered standup so the work isn't lost on a transport
+          // failure. We exit 0 here: stdout delivery is the requested fallback.
+          for (const f of failures) {
+            console.error(
+              `Slack post to ${f.channel ?? "(default channel)"} failed: ${f.error ?? "unknown error"} — falling back to stdout.`
+            );
+          }
+          const rendered = renderStandup(data, opts);
+          process.stdout.write(rendered + "\n");
+          return {
+            posted: results.some((r) => r.ok),
+            fallbackToStdout: true,
+            results,
+            wip: data.wip.length,
+            blocked: data.blocked.length,
+            done: data.done.length,
+            upNext: data.upNext.length,
+          };
+        }
+
+        if (failures.length > 0) {
           throw new CommandError(
-            `Slack post failed: ${err instanceof Error ? err.message : String(err)}`,
+            `Slack post failed for ${failures.length} of ${targets.length} target(s): ` +
+              failures.map((f) => `${f.channel ?? "(default)"}: ${f.error ?? "unknown"}`).join("; "),
             EXIT_CODE.GENERIC_FAILURE
           );
         }
@@ -765,6 +1074,7 @@ export default defineExtension({
         return {
           posted: true,
           channel: opts.channel,
+          channels: targets.length > 1 ? targets.map((t) => t.channel) : undefined,
           wip: data.wip.length,
           blocked: data.blocked.length,
           done: data.done.length,

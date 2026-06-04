@@ -1,6 +1,12 @@
 # Changelog
 
-## 2026.6.3 - 2026-06-02
+## Unreleased
+
+### Added
+
+- Blocker inference, yesterday/today split, multi-channel, fallback-to-stdout, custom section labels ([pm-slack-standup-8s6b](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-8s6b.toon))
+
+## 2026.06.03 - 2026-06-02
 
 ### Added
 
