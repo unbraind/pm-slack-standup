@@ -16,8 +16,16 @@ import {
   renderStandup,
   itemText,
   ALL_SECTIONS,
+  hasBlockedByDep,
+  localDayKey,
+  parseSectionLabels,
+  parseChannels,
+  isWebhookUrl,
+  resolvePostTargets,
+  postStandupTargets,
   type PmItem,
   type StandupOptions,
+  type Poster,
 } from "../dist/index.js";
 
 const baseOpts: StandupOptions = {
@@ -26,6 +34,8 @@ const baseOpts: StandupOptions = {
   groupBy: "status",
   sections: [...ALL_SECTIONS],
   mentionMap: {},
+  splitYesterday: false,
+  sectionLabels: {},
 };
 
 function item(p: Partial<PmItem>): PmItem {
@@ -224,4 +234,157 @@ test("itemText adds type label, priority, and mention", () => {
   const it = item({ title: "Ship", type: "feature", priority: 1, assignee: "alice" });
   assert.equal(itemText(it, { alice: "@a" }, true), "[Feature] Ship (priority 1) (@a)");
   assert.equal(itemText(it, {}, false), "[Feature] Ship");
+});
+
+// --- blocked_by inference --------------------------------------------------
+test("hasBlockedByDep detects top-level string and dependencies[].kind", () => {
+  assert.equal(hasBlockedByDep(item({})), false);
+  assert.equal(hasBlockedByDep(item({ blocked_by: "pm-123" })), true);
+  assert.equal(hasBlockedByDep(item({ blocked_by: "   " })), false);
+  assert.equal(
+    hasBlockedByDep(item({ dependencies: [{ id: "pm-9", kind: "blocked_by" }] })),
+    true
+  );
+  assert.equal(
+    hasBlockedByDep(item({ dependencies: [{ id: "pm-9", kind: "relates_to" }] })),
+    false
+  );
+});
+
+test("buildStandupData surfaces blocked_by items under Blocked even when not status=blocked", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "Plain WIP" }),
+    item({ id: "2", status: "in_progress", title: "WIP w/ dep", blocked_by: "pm-x" }),
+    item({ id: "3", status: "open", title: "Open w/ dep", dependencies: [{ kind: "blocked_by" }] }),
+    item({ id: "4", status: "blocked", title: "Hard blocked" }),
+    // A closed item with a stale blocked_by must NOT re-surface as blocked.
+    item({ id: "5", status: "closed", title: "Done", blocked_by: "pm-y" }),
+  ];
+  const data = buildStandupData(items, { ...baseOpts, includeDone: true });
+  const blockedIds = data.blocked.map((i) => i.id).sort();
+  assert.deepEqual(blockedIds, ["2", "3", "4"]);
+  // re-bucketed: the blocked_by WIP item left the wip bucket
+  assert.deepEqual(data.wip.map((i) => i.id), ["1"]);
+  // the blocked_by open item left the up-next pool
+  assert.ok(!data.upNext.some((i) => i.id === "3"));
+  // closed item stays in Done, not Blocked
+  assert.ok(data.done.some((i) => i.id === "5"));
+});
+
+// --- yesterday/today split -------------------------------------------------
+test("localDayKey renders a local YYYY-MM-DD", () => {
+  const it = item({ updated_at: "2026-06-04T12:00:00Z" });
+  assert.match(localDayKey(it), /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(localDayKey(item({})), "");
+});
+
+test("buildStandupData splits Done into yesterday/today by local day", () => {
+  const now = Date.parse("2026-06-04T18:00:00Z");
+  const yest = new Date(now - 86_400_000).toISOString();
+  const tod = new Date(now - 3_600_000).toISOString();
+  const items = [
+    item({ id: "y", status: "closed", title: "Closed yesterday", updated_at: yest }),
+    item({ id: "t", status: "closed", title: "Closed today", updated_at: tod }),
+    item({ id: "old", status: "closed", title: "Closed long ago", updated_at: "2026-05-01T00:00:00Z" }),
+  ];
+  const data = buildStandupData(items, { ...baseOpts, includeDone: true, splitYesterday: true }, NaN, now);
+  assert.deepEqual(data.doneYesterday!.map((i) => i.id), ["y"]);
+  assert.deepEqual(data.doneToday!.map((i) => i.id), ["t"]);
+  // split is off by default → no subsets
+  const noSplit = buildStandupData(items, { ...baseOpts, includeDone: true }, NaN, now);
+  assert.equal(noSplit.doneYesterday, undefined);
+});
+
+test("yesterday split renders distinct Done Yesterday / Done Today headings", () => {
+  const now = Date.parse("2026-06-04T18:00:00Z");
+  const yest = new Date(now - 86_400_000).toISOString();
+  const tod = new Date(now - 3_600_000).toISOString();
+  const items = [
+    item({ id: "y", status: "closed", title: "Yfix", updated_at: yest }),
+    item({ id: "t", status: "closed", title: "Tfix", updated_at: tod }),
+  ];
+  const data = buildStandupData(items, { ...baseOpts, includeDone: true, splitYesterday: true }, NaN, now);
+  const msg = buildTextMessage(data, { ...baseOpts, includeDone: true, splitYesterday: true });
+  assert.match(msg, /Done Yesterday/);
+  assert.match(msg, /Done Today/);
+});
+
+// --- section label overrides -----------------------------------------------
+test("parseSectionLabels parses title-only and emoji+title, rejects unknown keys", () => {
+  assert.deepEqual(parseSectionLabels(undefined), {});
+  assert.deepEqual(parseSectionLabels("in_progress=Rolling"), {
+    in_progress: { title: "Rolling" },
+  });
+  assert.deepEqual(parseSectionLabels("blocked=🔥 On Fire"), {
+    blocked: { emoji: "🔥", title: "On Fire" },
+  });
+  // alias keys (wip) resolve to canonical
+  assert.deepEqual(parseSectionLabels("wip=Doing"), { in_progress: { title: "Doing" } });
+  assert.throws(() => parseSectionLabels("nope=X"), (e: any) => e.exitCode === 2);
+});
+
+test("section label overrides apply to rendered headings", () => {
+  const data = buildStandupData([item({ status: "blocked", title: "B" })], baseOpts);
+  const msg = buildTextMessage(data, {
+    ...baseOpts,
+    sectionLabels: parseSectionLabels("blocked=🔥 On Fire,in_progress=Rolling"),
+  });
+  assert.match(msg, /🔥 \*On Fire\* \(1\)/);
+  assert.match(msg, /🏃 \*Rolling\* \(0\)/); // emoji kept, title overridden
+});
+
+// --- multi-channel ---------------------------------------------------------
+test("parseChannels splits, trims, de-dupes", () => {
+  assert.deepEqual(parseChannels(undefined), []);
+  assert.deepEqual(parseChannels("#a, #b ;#a"), ["#a", "#b"]);
+});
+
+test("isWebhookUrl distinguishes URLs from channel names", () => {
+  assert.equal(isWebhookUrl("#team"), false);
+  assert.equal(isWebhookUrl("https://hooks.slack.com/x"), true);
+});
+
+test("resolvePostTargets: default single target, #names reuse base webhook, URLs override", () => {
+  assert.deepEqual(resolvePostTargets("https://hook", "#base", []), [
+    { webhookUrl: "https://hook", channel: "#base" },
+  ]);
+  assert.deepEqual(resolvePostTargets("https://hook", undefined, ["#a", "#b"]), [
+    { webhookUrl: "https://hook", channel: "#a" },
+    { webhookUrl: "https://hook", channel: "#b" },
+  ]);
+  assert.deepEqual(resolvePostTargets("https://base", "#base", ["https://other"]), [
+    { webhookUrl: "https://other", channel: "#base" },
+  ]);
+});
+
+test("postStandupTargets posts to each target and reports per-target results", async () => {
+  const data = buildStandupData([item({ status: "in_progress" })], baseOpts);
+  const calls: Array<{ url: string; text: unknown }> = [];
+  const poster: Poster = async (url, payload) => {
+    calls.push({ url, text: (payload as any).text });
+  };
+  const targets = resolvePostTargets("https://hook", undefined, ["#a", "#b"]);
+  const results = await postStandupTargets(targets, data, baseOpts, poster);
+  assert.equal(calls.length, 2);
+  assert.ok(results.every((r) => r.ok));
+  assert.deepEqual(results.map((r) => r.channel), ["#a", "#b"]);
+  // each rendered message shows its own channel name
+  assert.ok(calls[0].text!.toString().includes("#a"));
+  assert.ok(calls[1].text!.toString().includes("#b"));
+});
+
+// --- fallback-to-stdout (simulated transport failure) ----------------------
+test("postStandupTargets captures a failing poster without throwing", async () => {
+  const data = buildStandupData([item({ status: "in_progress" })], baseOpts);
+  const failing: Poster = async () => {
+    throw new Error("HTTP 500: boom");
+  };
+  const targets = resolvePostTargets("https://hook", "#x", []);
+  const results = await postStandupTargets(targets, data, baseOpts, failing);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].ok, false);
+  assert.match(results[0].error ?? "", /HTTP 500/);
+  // The caller (run handler) would then render to stdout on this signal.
+  const rendered = buildTextMessage(data, baseOpts);
+  assert.ok(rendered.includes("pm standup"));
 });

@@ -1,0 +1,14 @@
+id: pm-slack-standup-8s6b
+title: "Blocker inference, yesterday/today split, multi-channel, fallback-to-stdout, custom section labels"
+description: ""
+type: Feature
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-04T05:30:41.225Z"
+updated_at: "2026-06-04T05:31:01.798Z"
+author: codex
+comments[1]{created_at,author,text}:
+  "2026-06-04T05:30:56.334Z",codex,"Five additive enhancements: (1) Blocked section now infers impediments from blocked_by deps (top-level string or dependencies[].kind=blocked_by) and re-buckets open/in-progress items into Blocked; closed items are never re-surfaced. (2) --yesterday splits Done into Done Yesterday/Done Today by local-day boundary (implies --include-done). (3) --channels #a,#b posts the same standup to multiple channel names and/or webhook URLs, each labelled with its own channel. (4) --fallback-to-stdout prints the rendered standup to stdout (exit 0) on a failed post instead of erroring. (5) --section-labels overrides section titles/emoji. All backward-compatible; 4 output formats + grouping + windowing + sections unchanged. Verified: typecheck clean, 32/32 unit tests (12 new), functional test in scratch workspace with real pm items."
+close_reason: "Shipped: blocked_by inference, --yesterday split, --channels multi-channel, --fallback-to-stdout, --section-labels. All additive/backward-compatible; 32/32 tests pass."
+body: ""
