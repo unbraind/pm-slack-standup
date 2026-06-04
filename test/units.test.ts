@@ -23,6 +23,9 @@ import {
   isWebhookUrl,
   resolvePostTargets,
   postStandupTargets,
+  isPostRequested,
+  needsBaseWebhook,
+  preflightSlackCredentials,
   type PmItem,
   type StandupOptions,
   type Poster,
@@ -371,6 +374,70 @@ test("postStandupTargets posts to each target and reports per-target results", a
   // each rendered message shows its own channel name
   assert.ok(calls[0].text!.toString().includes("#a"));
   assert.ok(calls[1].text!.toString().includes("#b"));
+});
+
+// --- preflight credential gate ---------------------------------------------
+test("isPostRequested is true unless --dry-run", () => {
+  assert.equal(isPostRequested({}), true);
+  assert.equal(isPostRequested({ channel: "#x" }), true);
+  // --fallback-to-stdout still posts (it only changes failure handling)
+  assert.equal(isPostRequested({ "fallback-to-stdout": true }), true);
+  assert.equal(isPostRequested({ "dry-run": true }), false);
+  assert.equal(isPostRequested({ dryRun: true }), false); // camelCase form
+});
+
+test("needsBaseWebhook: empty channels or any bare #name requires base webhook", () => {
+  assert.equal(needsBaseWebhook([]), true);
+  assert.equal(needsBaseWebhook(["#a"]), true);
+  assert.equal(needsBaseWebhook(["https://hooks.slack.com/x"]), false);
+  // mixed: a bare name still needs the base webhook
+  assert.equal(needsBaseWebhook(["https://hooks.slack.com/x", "#b"]), true);
+});
+
+test("preflightSlackCredentials aborts (USAGE) when a post is requested but no webhook is set", () => {
+  const saved = process.env["PM_SLACK_WEBHOOK"];
+  delete process.env["PM_SLACK_WEBHOOK"];
+  try {
+    assert.throws(
+      () => preflightSlackCredentials({}),
+      (e: any) => e.exitCode === 2 && /no webhook is configured/i.test(e.message)
+    );
+    // bare #name channel still requires the base webhook → aborts
+    assert.throws(
+      () => preflightSlackCredentials({ channels: "#team" }),
+      (e: any) => e.exitCode === 2
+    );
+  } finally {
+    if (saved !== undefined) process.env["PM_SLACK_WEBHOOK"] = saved;
+  }
+});
+
+test("preflightSlackCredentials does NOT block --dry-run even with no webhook", () => {
+  const saved = process.env["PM_SLACK_WEBHOOK"];
+  delete process.env["PM_SLACK_WEBHOOK"];
+  try {
+    assert.doesNotThrow(() => preflightSlackCredentials({ "dry-run": true }));
+  } finally {
+    if (saved !== undefined) process.env["PM_SLACK_WEBHOOK"] = saved;
+  }
+});
+
+test("preflightSlackCredentials passes when --webhook is provided", () => {
+  assert.doesNotThrow(() =>
+    preflightSlackCredentials({ webhook: "https://hooks.slack.com/services/x" })
+  );
+});
+
+test("preflightSlackCredentials passes when --channels carries only full webhook URLs", () => {
+  const saved = process.env["PM_SLACK_WEBHOOK"];
+  delete process.env["PM_SLACK_WEBHOOK"];
+  try {
+    assert.doesNotThrow(() =>
+      preflightSlackCredentials({ channels: "https://hooks.slack.com/services/a" })
+    );
+  } finally {
+    if (saved !== undefined) process.env["PM_SLACK_WEBHOOK"] = saved;
+  }
 });
 
 // --- fallback-to-stdout (simulated transport failure) ----------------------

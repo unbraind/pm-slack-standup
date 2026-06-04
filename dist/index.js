@@ -736,6 +736,62 @@ export async function postStandupTargets(targets, data, baseOpts, poster) {
     return results;
 }
 // ---------------------------------------------------------------------------
+// Preflight credential gate
+// ---------------------------------------------------------------------------
+/**
+ * Decide whether the `standup` invocation is actually going to *post* to Slack.
+ *
+ * The command has two non-posting shapes that must NOT be gated:
+ *   - `--dry-run`           : build + print the message, never touches Slack.
+ * Every other shape is a real post attempt (the default), including
+ * `--fallback-to-stdout` — that flag only means "print instead of erroring *if
+ * the network post fails*", it still REQUIRES a webhook to attempt the post.
+ */
+export function isPostRequested(options) {
+    return !readBoolOption(options, "dry-run");
+}
+/**
+ * Resolve whether a *base* Slack webhook is required for this post. `--channels`
+ * may carry full webhook URLs that are self-sufficient targets; but if there is
+ * no `--channels` at all, or any `--channels` entry is a bare `#name`, the base
+ * webhook (`--webhook` / `PM_SLACK_WEBHOOK`) is needed to actually deliver.
+ */
+export function needsBaseWebhook(channels) {
+    return channels.length === 0 || channels.some((c) => !isWebhookUrl(c));
+}
+/**
+ * Fail-fast credential preflight for the standup *post* path.
+ *
+ * Fires ONLY when a Slack post is actually requested (not `--dry-run`) AND the
+ * credentials needed to deliver it are missing. In that case it throws a
+ * structured {@link CommandError} (USAGE / exit 2) BEFORE any pm data is read
+ * or any message is rendered — a clean, actionable, non-zero abort.
+ *
+ * It deliberately does NOT block the legitimate non-posting shapes:
+ *   - `--dry-run` (preview to stdout) is never gated.
+ * This keeps the existing stdout-fallback behaviour intact while turning a
+ * "we got all the way to the transport layer and then discovered there's no
+ * webhook" failure into an immediate, obvious one.
+ *
+ * NOTE: this is invoked from the command HANDLER (not from `registerPreflight`)
+ * on purpose. pm's runtime wraps `registerPreflight` overrides in a try/catch
+ * and downgrades any thrown error to a non-fatal warning, so a throw there does
+ * NOT abort the command. Throwing from the handler is the only reliable way to
+ * fail-fast with a non-zero exit. The `registerPreflight` registration below is
+ * a scoped pass-through that exists to surface the `preflight` capability.
+ */
+export function preflightSlackCredentials(options) {
+    if (!isPostRequested(options))
+        return;
+    const webhookUrl = readStrOption(options, "webhook") ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
+    const channels = parseChannels(readStrOption(options, "channels"));
+    if (!webhookUrl && needsBaseWebhook(channels)) {
+        throw new CommandError("Slack post requested but no webhook is configured. " +
+            "Set PM_SLACK_WEBHOOK or pass --webhook <url> (or provide full webhook " +
+            "URLs via --channels). To preview without posting, use --dry-run.", EXIT_CODE.USAGE);
+    }
+}
+// ---------------------------------------------------------------------------
 // Shared option resolution
 // ---------------------------------------------------------------------------
 /**
@@ -805,6 +861,12 @@ export default defineExtension({
                 { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
             ],
             async run(ctx) {
+                // Fail-fast credential gate: if a Slack post is actually requested
+                // (i.e. NOT --dry-run) but no webhook is configured, abort immediately
+                // with a clear, actionable, non-zero error — before reading any pm data
+                // or rendering anything. The non-posting --dry-run preview path is never
+                // gated, so the legitimate stdout-fallback shape keeps working.
+                preflightSlackCredentials(ctx.options);
                 const webhookUrl = readStrOption(ctx.options, "webhook") ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
                 const dryRun = readBoolOption(ctx.options, "dry-run");
                 const { opts, sinceMs } = resolveStandupOptions(ctx.options, parseFormat(readStrOption(ctx.options, "format")));
@@ -831,14 +893,13 @@ export default defineExtension({
                 }
                 const channels = parseChannels(readStrOption(ctx.options, "channels"));
                 const fallbackToStdout = readBoolOption(ctx.options, "fallback-to-stdout");
-                // Real post path: a missing webhook is a hard, structured error (exit 1)
-                // rather than a crash or silent success. `--channels` entries that are
-                // bare #names still need a base webhook to post to. Use --dry-run to
-                // preview, or --fallback-to-stdout to print instead of erroring.
-                const needsBaseWebhook = channels.length === 0 || channels.some((c) => !isWebhookUrl(c));
-                if (!webhookUrl && needsBaseWebhook) {
-                    throw new CommandError("No Slack webhook configured. Set PM_SLACK_WEBHOOK or pass --webhook <url>, " +
-                        "or use --dry-run to preview the message without posting.", EXIT_CODE.GENERIC_FAILURE);
+                // Defense-in-depth: the credential preflight above already aborted any
+                // post with a missing base webhook. Re-assert here so this branch is
+                // never reached with an unusable webhook even if the gate is bypassed.
+                if (!webhookUrl && needsBaseWebhook(channels)) {
+                    throw new CommandError("Slack post requested but no webhook is configured. " +
+                        "Set PM_SLACK_WEBHOOK or pass --webhook <url>, " +
+                        "or use --dry-run to preview the message without posting.", EXIT_CODE.USAGE);
                 }
                 const targets = resolvePostTargets(webhookUrl, opts.channel, channels);
                 const results = await postStandupTargets(targets, data, opts, postToSlack);
@@ -875,6 +936,28 @@ export default defineExtension({
                     upNext: data.upNext.length,
                 };
             },
+        });
+        // -----------------------------------------------------------------------
+        // Scoped preflight registration.
+        //
+        // The authoritative fail-fast credential gate lives in the `standup`
+        // command handler (see preflightSlackCredentials) because pm's runtime
+        // swallows errors thrown from a registerPreflight override (try/catch →
+        // non-fatal warning), so a throw here would NOT abort the command. This
+        // registration is therefore a scoped PASS-THROUGH: it surfaces the
+        // `preflight` capability and gives the standup command a place to assert
+        // credential readiness on the runtime preflight pass, while leaving the
+        // runtime's preflight decision untouched (empty delta) for every other
+        // command. The hard abort is enforced in the handler.
+        // -----------------------------------------------------------------------
+        api.registerPreflight((pctx) => {
+            if (pctx.command === "standup") {
+                // Mirror the handler's contract without aborting here (the runtime
+                // swallows throws from preflight). Returning an empty delta is an
+                // explicit, scoped pass-through.
+                return {};
+            }
+            return {};
         });
         // -----------------------------------------------------------------------
         // Exporter: standup  →  `pm standup export`

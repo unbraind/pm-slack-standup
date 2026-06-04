@@ -1,6 +1,12 @@
 # Changelog
 
-## 2026.6.4 - 2026-06-04
+## Unreleased
+
+### Added
+
+- preflight: fail-fast Slack-credential gate for standup post path ([pm-slack-standup-qnkp](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-qnkp.toon))
+
+## 2026.06.04 - 2026-06-04
 
 ### Added
 

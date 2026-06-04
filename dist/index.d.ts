@@ -219,6 +219,45 @@ export declare function resolvePostTargets(baseWebhook: string, baseChannel: str
  */
 export declare function postStandupTargets(targets: PostTarget[], data: StandupData, baseOpts: StandupOptions, poster: Poster): Promise<PostResultEntry[]>;
 /**
+ * Decide whether the `standup` invocation is actually going to *post* to Slack.
+ *
+ * The command has two non-posting shapes that must NOT be gated:
+ *   - `--dry-run`           : build + print the message, never touches Slack.
+ * Every other shape is a real post attempt (the default), including
+ * `--fallback-to-stdout` — that flag only means "print instead of erroring *if
+ * the network post fails*", it still REQUIRES a webhook to attempt the post.
+ */
+export declare function isPostRequested(options: Record<string, unknown>): boolean;
+/**
+ * Resolve whether a *base* Slack webhook is required for this post. `--channels`
+ * may carry full webhook URLs that are self-sufficient targets; but if there is
+ * no `--channels` at all, or any `--channels` entry is a bare `#name`, the base
+ * webhook (`--webhook` / `PM_SLACK_WEBHOOK`) is needed to actually deliver.
+ */
+export declare function needsBaseWebhook(channels: string[]): boolean;
+/**
+ * Fail-fast credential preflight for the standup *post* path.
+ *
+ * Fires ONLY when a Slack post is actually requested (not `--dry-run`) AND the
+ * credentials needed to deliver it are missing. In that case it throws a
+ * structured {@link CommandError} (USAGE / exit 2) BEFORE any pm data is read
+ * or any message is rendered — a clean, actionable, non-zero abort.
+ *
+ * It deliberately does NOT block the legitimate non-posting shapes:
+ *   - `--dry-run` (preview to stdout) is never gated.
+ * This keeps the existing stdout-fallback behaviour intact while turning a
+ * "we got all the way to the transport layer and then discovered there's no
+ * webhook" failure into an immediate, obvious one.
+ *
+ * NOTE: this is invoked from the command HANDLER (not from `registerPreflight`)
+ * on purpose. pm's runtime wraps `registerPreflight` overrides in a try/catch
+ * and downgrades any thrown error to a non-fatal warning, so a throw there does
+ * NOT abort the command. Throwing from the handler is the only reliable way to
+ * fail-fast with a non-zero exit. The `registerPreflight` registration below is
+ * a scoped pass-through that exists to surface the `preflight` capability.
+ */
+export declare function preflightSlackCredentials(options: Record<string, unknown>): void;
+/**
  * Resolve every standup option except the render `format`, which differs
  * between the command (slack|blockkit|markdown|plain) and the exporter
  * (md|json file format). Callers supply the format they want.
