@@ -17,7 +17,8 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 - Scope the "recently closed / Done" window with `--since <iso>` **or** `--days <n>` (relative)
 - Map pm authors to Slack handles so they get mentioned (`--mention-map`)
 - `pm standup export` — write the standup to a file as Markdown or JSON (the JSON form includes the full Block Kit payload for archiving or re-posting)
-- `--channel` override; webhook URL configurable via flag or environment variable. A real post with **no webhook configured** fails with a clear, structured error (exit 1) rather than crashing — use `--dry-run` to preview without credentials
+- `--channel` override; webhook URL configurable via flag or environment variable
+- **Fail-fast credential preflight** — when you actually request a Slack post (anything other than `--dry-run`) but no webhook is configured, the command aborts **immediately** with a clear, actionable, non-zero error (exit 2) **before** reading any pm data or rendering anything — no half-built message, no crash. The non-posting `--dry-run` preview path is never gated, so previewing without credentials keeps working. See [Credential preflight](#credential-preflight).
 
 ## Installation
 
@@ -205,6 +206,31 @@ pm standup \
 • [Task] Write API tests (priority 2)
 • [Chore] Update dependencies (priority 3)
 ```
+
+## Credential preflight
+
+Before any post is attempted, `pm standup` runs a **fail-fast credential gate**:
+
+- **A post is "requested"** whenever you do *not* pass `--dry-run`. (`--fallback-to-stdout` still counts as a post — it only changes how a *transport* failure is handled; it still needs a webhook to attempt delivery.)
+- **The gate fires only when** a post is requested **and** no usable webhook is configured. A webhook is "configured" if `--webhook` or `PM_SLACK_WEBHOOK` is set, **or** every `--channels` target is a full webhook URL (bare `#name` channels still need the base webhook).
+- **When it fires**, the command aborts **immediately** — before reading any pm items or rendering anything — with a clear, actionable error and a **non-zero exit (2 / usage)**. Nothing is posted.
+- **When it does not fire** (a webhook is present, *or* you used `--dry-run`), the command proceeds exactly as before.
+
+```bash
+# Post requested, no webhook → immediate abort (exit 2), nothing posted:
+pm standup --channel '#team-eng'
+#   Slack post requested but no webhook is configured. Set PM_SLACK_WEBHOOK or
+#   pass --webhook <url> (or provide full webhook URLs via --channels).
+#   To preview without posting, use --dry-run.
+
+# Preview without credentials → always allowed (exit 0):
+pm standup --dry-run
+
+# With a webhook → preflight passes, the post proceeds:
+PM_SLACK_WEBHOOK=https://hooks.slack.com/services/... pm standup --channel '#team-eng'
+```
+
+This is implemented in the `standup` command handler (where a thrown error reliably aborts with a non-zero exit); the package also declares the `preflight` capability and registers a scoped pass-through preflight hook for the standup command.
 
 ## Environment Variables
 
