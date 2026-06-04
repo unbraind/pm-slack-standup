@@ -826,7 +826,7 @@ export function resolveStandupOptions(options, format) {
 // ---------------------------------------------------------------------------
 export default defineExtension({
     name: "pm-slack-standup",
-    version: "2026.6.4",
+    version: "2026.6.4-1",
     activate(api) {
         api.registerCommand({
             name: "standup",
