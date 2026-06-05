@@ -69,7 +69,7 @@ export interface PmItem {
 // punctuation-free plain text, `markdown` is GitHub/CommonMark (`**bold**`,
 // `#` headings), and `blockkit` emits the Slack Block Kit `blocks` array JSON.
 export type Format = "slack" | "blockkit" | "markdown" | "plain";
-export type GroupBy = "status" | "assignee" | "sprint" | "type";
+export type GroupBy = "status" | "assignee" | "sprint" | "type" | "milestone";
 export type SectionKey = "in_progress" | "blocked" | "done" | "up_next";
 
 export const ALL_SECTIONS: readonly SectionKey[] = [
@@ -104,7 +104,14 @@ export interface StandupOptions {
   splitYesterday: boolean;
   // Override the default emoji/title for any section. Keyed by SectionKey.
   sectionLabels: Partial<Record<SectionKey, SectionLabelOverride>>;
+  // How many open items the "Up Next" section shows (top-N by priority).
+  // Defaults to DEFAULT_UP_NEXT (3). `--all-open` sets this to Infinity so the
+  // whole open backlog is shown rather than being silently truncated.
+  upNextCount: number;
 }
+
+/** Default number of items shown in the "Up Next" section. */
+export const DEFAULT_UP_NEXT = 3;
 
 export interface SectionLabelOverride {
   emoji?: string;
@@ -197,8 +204,9 @@ export function parseGroupBy(raw: string | undefined): GroupBy {
   if (v === "assignee" || v === "owner") return "assignee";
   if (v === "sprint") return "sprint";
   if (v === "type") return "type";
+  if (v === "milestone") return "milestone";
   throw new CommandError(
-    `Unknown --group-by '${raw}'. Valid: status | assignee | sprint | type.`,
+    `Unknown --group-by '${raw}'. Valid: status | assignee | sprint | type | milestone.`,
     EXIT_CODE.USAGE
   );
 }
@@ -315,20 +323,29 @@ export function isWebhookUrl(token: string): boolean {
  * Resolve the "recently closed" window start (ms epoch) from `--since` and/or
  * `--days`. `--since` is an explicit ISO date/time; `--days <n>` is N days
  * before now. If both are given the *later* (more restrictive) bound wins.
- * Returns NaN when neither is set (no windowing). Invalid input → USAGE error.
+ * Returns NaN when neither is set (no windowing). An invalid `--days` is a
+ * USAGE error; an unparseable `--since` is NOT fatal — it emits a warning and
+ * is ignored (no window from `--since`), so a typo surfaces loudly instead of
+ * silently scoping the Done section to nothing. A `warn` sink is injectable
+ * for testing.
  */
 export function resolveSinceMs(
   since: string | undefined,
   days: number | undefined,
-  now: number = Date.now()
+  now: number = Date.now(),
+  warn: (msg: string) => void = (m) => console.error(m)
 ): number {
   let bound = NaN;
-  if (since != null) {
+  if (since != null && since.trim() !== "") {
     const ms = Date.parse(since);
     if (isNaN(ms)) {
-      throw new CommandError(`Invalid --since value '${since}' (expected an ISO date/time).`, EXIT_CODE.USAGE);
+      warn(
+        `warning: ignoring unparseable --since '${since}' (expected an ISO date/time, e.g. 2026-06-01). ` +
+          `The Done window from --since is not applied.`
+      );
+    } else {
+      bound = ms;
     }
-    bound = ms;
   }
   if (days != null) {
     if (!Number.isFinite(days) || days < 0) {
@@ -340,6 +357,29 @@ export function resolveSinceMs(
   return bound;
 }
 
+/**
+ * Resolve how many "Up Next" items to show. `--all-open` (boolean) wins and
+ * returns Infinity (show the whole open backlog). Otherwise `--up-next <n>` is
+ * a positive integer count; an absent value uses the default. A non-positive
+ * or non-integer `--up-next` is a USAGE error rather than a silent fallback.
+ */
+export function resolveUpNextCount(
+  upNextRaw: string | undefined,
+  allOpen: boolean,
+  fallback: number = DEFAULT_UP_NEXT
+): number {
+  if (allOpen) return Infinity;
+  if (upNextRaw == null || upNextRaw.trim() === "") return fallback;
+  const n = Number(upNextRaw.trim());
+  if (!Number.isInteger(n) || n < 1) {
+    throw new CommandError(
+      `Invalid --up-next value '${upNextRaw}' (expected a positive integer, or use --all-open).`,
+      EXIT_CODE.USAGE
+    );
+  }
+  return n;
+}
+
 export function parseDays(raw: string | undefined): number | undefined {
   if (raw == null || raw.trim() === "") return undefined;
   const n = Number(raw.trim());
@@ -347,6 +387,32 @@ export function parseDays(raw: string | undefined): number | undefined {
     throw new CommandError(`Invalid --days value '${raw}' (expected a number).`, EXIT_CODE.USAGE);
   }
   return n;
+}
+
+/**
+ * Translate a raw `writeFileSync` failure into a friendly {@link CommandError}
+ * (so the exporter aborts with a clean exit 1 + actionable message rather than
+ * leaking a Node fs stack trace). Recognizes the common errno cases (missing
+ * directory, permission, is-a-directory) and falls back to the raw message.
+ */
+export function writeError(path: string, err: unknown): CommandError {
+  const code = (err as { code?: string } | null)?.code;
+  const detail =
+    err instanceof Error ? err.message : typeof err === "string" ? err : String(err);
+  let hint: string;
+  if (code === "ENOENT") {
+    hint = `the parent directory does not exist — create it first or choose an existing path`;
+  } else if (code === "EACCES" || code === "EPERM") {
+    hint = `permission denied — check write access to that location`;
+  } else if (code === "EISDIR") {
+    hint = `that path is a directory, not a file`;
+  } else {
+    hint = detail;
+  }
+  return new CommandError(
+    `standup export: could not write to '${path}': ${hint}.`,
+    EXIT_CODE.GENERIC_FAILURE
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -465,9 +531,9 @@ export function buildStandupData(
     ? items.filter((i) => isDone(i) && withinWindow(i, sinceMs))
     : [];
 
-  const upNext = [...open]
-    .sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999))
-    .slice(0, 3);
+  const sortedOpen = [...open].sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
+  const upNextCount = opts.upNextCount ?? DEFAULT_UP_NEXT;
+  const upNext = upNextCount === Infinity ? sortedOpen : sortedOpen.slice(0, upNextCount);
 
   const data: StandupData = { wip, blocked, done, upNext, total: items.length };
 
@@ -596,9 +662,10 @@ function todayISO(): string {
 }
 
 /**
- * Group a list of items by the configured field (assignee, sprint or type).
- * Items missing the field bucket under a synthetic "_none" key (rendered as a
- * friendly label). Returns entries sorted by group key for stable output.
+ * Group a list of items by the configured field (assignee, sprint, type or
+ * milestone). Items missing the field bucket under a synthetic "_none" key
+ * (rendered as a friendly label). Returns entries sorted by group key for
+ * stable output.
  */
 export function groupItems(items: PmItem[], groupBy: GroupBy): Array<[string, PmItem[]]> {
   const groups = new Map<string, PmItem[]>();
@@ -607,6 +674,7 @@ export function groupItems(items: PmItem[], groupBy: GroupBy): Array<[string, Pm
     if (groupBy === "assignee") key = item.assignee ?? "_none";
     else if (groupBy === "sprint") key = item.sprint ?? "_none";
     else if (groupBy === "type") key = item.type ?? "_none";
+    else if (groupBy === "milestone") key = item.milestone ?? "_none";
     else key = "_none";
     const bucket = groups.get(key);
     if (bucket) bucket.push(item);
@@ -620,6 +688,7 @@ function groupLabel(key: string, groupBy: GroupBy): string {
   if (groupBy === "assignee") return "Unassigned";
   if (groupBy === "sprint") return "No sprint";
   if (groupBy === "type") return "Untyped";
+  if (groupBy === "milestone") return "(no milestone)";
   return key;
 }
 
@@ -768,6 +837,7 @@ export function buildBlockKit(data: StandupData, opts: StandupOptions): { blocks
     assignee: "grouped by assignee",
     sprint: "grouped by sprint",
     type: "grouped by type",
+    milestone: "grouped by milestone",
   };
   const footerBits = [
     `${data.total} item(s) total`,
@@ -1006,6 +1076,10 @@ export function resolveStandupOptions(
     mentionMap: parseMentionMap(readStrOption(options, "mention-map")),
     splitYesterday,
     sectionLabels: parseSectionLabels(readStrOption(options, "section-labels")),
+    upNextCount: resolveUpNextCount(
+      readStrOption(options, "up-next"),
+      readBoolOption(options, "all-open")
+    ),
   };
   // `--days` implies windowing the Done section; surface it even without
   // `--include-done` being set so the footer/window stays accurate.
@@ -1033,6 +1107,9 @@ export default defineExtension({
         "pm standup --dry-run --format markdown --include-done --days 7",
         "pm standup --group-by assignee --mention-map 'alice=@alice.s,bob=@bob'",
         "pm standup --group-by sprint --sections in_progress,blocked",
+        "pm standup --dry-run --group-by milestone",
+        "pm standup --dry-run --up-next 5",
+        "pm standup --dry-run --all-open",
         "pm standup --dry-run --yesterday --format plain",
         "pm standup --channels '#team-eng,#standups' --dry-run",
         "pm standup --section-labels 'in_progress=Rolling,blocked=🔥 On Fire' --dry-run",
@@ -1046,7 +1123,9 @@ export default defineExtension({
         { long: "--include-done", description: "Include recently-closed items in a Done section" },
         { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
         { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
-        { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type" },
+        { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
+        { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
+        { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
         { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
         { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
         { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
@@ -1231,7 +1310,11 @@ export default defineExtension({
       const outputPath = readStrOption(ctx.options, "output");
       if (outputPath) {
         const absolutePath = resolve(outputPath);
-        writeFileSync(absolutePath, output + "\n", "utf-8");
+        try {
+          writeFileSync(absolutePath, output + "\n", "utf-8");
+        } catch (err: unknown) {
+          throw writeError(absolutePath, err);
+        }
         console.error(`standup export: wrote ${data.total} item(s) as ${fileFormat} to ${absolutePath}`);
         return { exported: data.total, format: fileFormat, file: absolutePath };
       }

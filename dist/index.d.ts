@@ -26,7 +26,7 @@ export interface PmItem {
     dependencies?: PmDependency[];
 }
 export type Format = "slack" | "blockkit" | "markdown" | "plain";
-export type GroupBy = "status" | "assignee" | "sprint" | "type";
+export type GroupBy = "status" | "assignee" | "sprint" | "type" | "milestone";
 export type SectionKey = "in_progress" | "blocked" | "done" | "up_next";
 export declare const ALL_SECTIONS: readonly SectionKey[];
 export interface StandupData {
@@ -48,7 +48,10 @@ export interface StandupOptions {
     mentionMap: Record<string, string>;
     splitYesterday: boolean;
     sectionLabels: Partial<Record<SectionKey, SectionLabelOverride>>;
+    upNextCount: number;
 }
+/** Default number of items shown in the "Up Next" section. */
+export declare const DEFAULT_UP_NEXT = 3;
 export interface SectionLabelOverride {
     emoji?: string;
     title?: string;
@@ -96,10 +99,28 @@ export declare function isWebhookUrl(token: string): boolean;
  * Resolve the "recently closed" window start (ms epoch) from `--since` and/or
  * `--days`. `--since` is an explicit ISO date/time; `--days <n>` is N days
  * before now. If both are given the *later* (more restrictive) bound wins.
- * Returns NaN when neither is set (no windowing). Invalid input → USAGE error.
+ * Returns NaN when neither is set (no windowing). An invalid `--days` is a
+ * USAGE error; an unparseable `--since` is NOT fatal — it emits a warning and
+ * is ignored (no window from `--since`), so a typo surfaces loudly instead of
+ * silently scoping the Done section to nothing. A `warn` sink is injectable
+ * for testing.
  */
-export declare function resolveSinceMs(since: string | undefined, days: number | undefined, now?: number): number;
+export declare function resolveSinceMs(since: string | undefined, days: number | undefined, now?: number, warn?: (msg: string) => void): number;
+/**
+ * Resolve how many "Up Next" items to show. `--all-open` (boolean) wins and
+ * returns Infinity (show the whole open backlog). Otherwise `--up-next <n>` is
+ * a positive integer count; an absent value uses the default. A non-positive
+ * or non-integer `--up-next` is a USAGE error rather than a silent fallback.
+ */
+export declare function resolveUpNextCount(upNextRaw: string | undefined, allOpen: boolean, fallback?: number): number;
 export declare function parseDays(raw: string | undefined): number | undefined;
+/**
+ * Translate a raw `writeFileSync` failure into a friendly {@link CommandError}
+ * (so the exporter aborts with a clean exit 1 + actionable message rather than
+ * leaking a Node fs stack trace). Recognizes the common errno cases (missing
+ * directory, permission, is-a-directory) and falls back to the raw message.
+ */
+export declare function writeError(path: string, err: unknown): CommandError;
 /**
  * Read every item once via `list-all --json --include-body`, then bucket by
  * status locally. This is a single pm invocation (vs. four list-by-status
@@ -154,9 +175,10 @@ interface SectionDef {
 export declare function resolveSections(data: StandupData, opts: StandupOptions): SectionDef[];
 export declare function itemText(item: PmItem, mentionMap: Record<string, string>, withPriority?: boolean): string;
 /**
- * Group a list of items by the configured field (assignee, sprint or type).
- * Items missing the field bucket under a synthetic "_none" key (rendered as a
- * friendly label). Returns entries sorted by group key for stable output.
+ * Group a list of items by the configured field (assignee, sprint, type or
+ * milestone). Items missing the field bucket under a synthetic "_none" key
+ * (rendered as a friendly label). Returns entries sorted by group key for
+ * stable output.
  */
 export declare function groupItems(items: PmItem[], groupBy: GroupBy): Array<[string, PmItem[]]>;
 /**
