@@ -8,6 +8,9 @@ import {
   parseDays,
   parseMentionMap,
   resolveSinceMs,
+  resolveUpNextCount,
+  writeError,
+  DEFAULT_UP_NEXT,
   withinWindow,
   groupItems,
   buildStandupData,
@@ -39,6 +42,7 @@ const baseOpts: StandupOptions = {
   mentionMap: {},
   splitYesterday: false,
   sectionLabels: {},
+  upNextCount: 3,
 };
 
 function item(p: Partial<PmItem>): PmItem {
@@ -92,8 +96,115 @@ test("resolveSinceMs: --since, --days, and the more-restrictive combination", ()
   assert.equal(resolveSinceMs(undefined, 3, now), now - 3 * 86_400_000);
   // since=June 1 vs days=3 (June 7) -> June 7 is later/more restrictive
   assert.equal(resolveSinceMs("2026-06-01T00:00:00Z", 3, now), now - 3 * 86_400_000);
-  assert.throws(() => resolveSinceMs("not-a-date", undefined, now), (e: any) => e.exitCode === 2);
+  // an invalid --days is still a hard USAGE error
   assert.throws(() => resolveSinceMs(undefined, -1, now), (e: any) => e.exitCode === 2);
+});
+
+test("resolveSinceMs warns (does not throw) on an unparseable --since and ignores it", () => {
+  const now = Date.parse("2026-06-10T00:00:00Z");
+  const warnings: string[] = [];
+  const warn = (m: string) => warnings.push(m);
+  // unparseable --since: warns + falls back to no-window (NaN), does NOT throw
+  const result = resolveSinceMs("not-a-date", undefined, now, warn);
+  assert.ok(isNaN(result), "invalid --since should yield NaN (no window)");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /ignoring unparseable --since/i);
+  // a valid --since still wins even when --since was the only field
+  warnings.length = 0;
+  assert.equal(resolveSinceMs("2026-06-01T00:00:00Z", undefined, now, warn), Date.parse("2026-06-01T00:00:00Z"));
+  assert.equal(warnings.length, 0);
+  // invalid --since but a valid --days: the days bound still applies, with a warning
+  warnings.length = 0;
+  assert.equal(resolveSinceMs("nope", 3, now, warn), now - 3 * 86_400_000);
+  assert.equal(warnings.length, 1);
+});
+
+// --- resolveUpNextCount ----------------------------------------------------
+test("resolveUpNextCount: default 3, explicit N, --all-open => Infinity, invalid => USAGE", () => {
+  assert.equal(resolveUpNextCount(undefined, false), DEFAULT_UP_NEXT);
+  assert.equal(resolveUpNextCount("", false), DEFAULT_UP_NEXT);
+  assert.equal(resolveUpNextCount("5", false), 5);
+  assert.equal(resolveUpNextCount("1", false), 1);
+  // --all-open wins over any --up-next value
+  assert.equal(resolveUpNextCount("5", true), Infinity);
+  assert.equal(resolveUpNextCount(undefined, true), Infinity);
+  assert.throws(() => resolveUpNextCount("0", false), (e: any) => e.exitCode === 2);
+  assert.throws(() => resolveUpNextCount("-2", false), (e: any) => e.exitCode === 2);
+  assert.throws(() => resolveUpNextCount("2.5", false), (e: any) => e.exitCode === 2);
+  assert.throws(() => resolveUpNextCount("abc", false), (e: any) => e.exitCode === 2);
+});
+
+test("buildStandupData honors upNextCount and --all-open shows the whole backlog", () => {
+  const open = Array.from({ length: 8 }, (_, i) =>
+    item({ id: `o-${i}`, status: "open", priority: i + 1, title: `Open ${i}` })
+  );
+  // default 3
+  assert.equal(buildStandupData(open, baseOpts).upNext.length, 3);
+  // explicit 5
+  assert.equal(buildStandupData(open, { ...baseOpts, upNextCount: 5 }).upNext.length, 5);
+  // --all-open (Infinity) shows all 8
+  assert.equal(buildStandupData(open, { ...baseOpts, upNextCount: Infinity }).upNext.length, 8);
+  // still sorted by priority ascending
+  const five = buildStandupData(open, { ...baseOpts, upNextCount: 5 }).upNext;
+  assert.deepEqual(five.map((i) => i.priority), [1, 2, 3, 4, 5]);
+});
+
+// --- group-by milestone ----------------------------------------------------
+test("parseGroupBy accepts milestone", () => {
+  assert.equal(parseGroupBy("milestone"), "milestone");
+  assert.equal(parseGroupBy("MILESTONE"), "milestone");
+});
+
+test("groupItems groups by milestone with (no milestone) fallback, sorted", () => {
+  const items = [
+    item({ id: "1", milestone: "v2" }),
+    item({ id: "2", milestone: "v1" }),
+    item({ id: "3" }), // no milestone
+    item({ id: "4", milestone: "v1" }),
+  ];
+  const byMilestone = groupItems(items, "milestone");
+  assert.deepEqual(byMilestone.map(([k]) => k), ["_none", "v1", "v2"]);
+  assert.equal(byMilestone.find(([k]) => k === "v1")![1].length, 2);
+});
+
+test("milestone grouping renders milestone buckets + (no milestone) label in text", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "Alpha", milestone: "v1" }),
+    item({ id: "2", status: "in_progress", title: "Beta" }), // no milestone
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, { ...baseOpts, groupBy: "milestone" });
+  assert.match(msg, /v1/);
+  assert.match(msg, /\(no milestone\)/);
+  // both items appear under their buckets
+  assert.match(msg, /Alpha/);
+  assert.match(msg, /Beta/);
+});
+
+test("Block Kit footer notes milestone grouping", () => {
+  const data = buildStandupData([item({ status: "in_progress", milestone: "v1" })], baseOpts);
+  const { blocks } = buildBlockKit(data, { ...baseOpts, groupBy: "milestone" });
+  const footer = blocks[blocks.length - 1] as any;
+  assert.match(footer.elements[0].text, /grouped by milestone/);
+});
+
+// --- writeError (friendly export output errors) ----------------------------
+test("writeError maps fs errno codes to friendly CommandError messages", () => {
+  const enoent = writeError("/nope/x.md", Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+  assert.equal(enoent.exitCode, 1);
+  assert.match(enoent.message, /could not write to '\/nope\/x\.md'/);
+  assert.match(enoent.message, /parent directory does not exist/);
+
+  const eacces = writeError("/root/x.md", Object.assign(new Error("EACCES"), { code: "EACCES" }));
+  assert.match(eacces.message, /permission denied/);
+
+  const eisdir = writeError("/tmp", Object.assign(new Error("EISDIR"), { code: "EISDIR" }));
+  assert.match(eisdir.message, /is a directory/);
+
+  // unknown errno falls back to the raw message, still a clean CommandError
+  const other = writeError("/x", new Error("disk on fire"));
+  assert.equal(other.exitCode, 1);
+  assert.match(other.message, /disk on fire/);
 });
 
 test("withinWindow honors the bound and treats NaN as no-window", () => {

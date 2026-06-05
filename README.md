@@ -7,14 +7,16 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 - Posts WIP, Blocked, Up Next (and optional Done) items to Slack as a rich **Block Kit** message (header, one section per bucket, context footer) with an automatic plain-text fallback
 - **Four output formats** (`--format`): `slack` (Slack mrkdwn, the default), `blockkit` (the raw Block Kit `blocks` JSON), `markdown` (GitHub/CommonMark), and `plain` text
 - **`--dry-run`** — build and print the message in the chosen format **without** posting to Slack (no network call is made)
-- Group section items by `status` (default), `assignee`, `sprint`, or `type` (`--group-by`)
+- Group section items by `status` (default), `assignee`, `sprint`, `type`, or `milestone` (`--group-by`); items without the field bucket under a friendly fallback label (e.g. `(no milestone)`)
+- **Configurable "Up Next" size** — `--up-next <n>` sets how many open items the Up Next section shows (default 3), or `--all-open` shows the **entire** open backlog so nothing is silently truncated
 - Choose which sections to render and in what order with `--sections` (`in_progress`, `blocked`, `done`, `up_next`); a dedicated **Blocked** section always surfaces blocked items
 - **Impediment inference** — the Blocked section surfaces not only `status=blocked` items but any open/in-progress item carrying a `blocked_by` dependency (top-level or in `dependencies[]`), so dependency-blocked work is never hidden
 - **Yesterday/Today split** (`--yesterday`) — split the Done section into **Done Yesterday** / **Done Today** by the local-day boundary (implies `--include-done`)
 - **Multi-channel posting** (`--channels #a,#b`) — post the same standup to several channel names and/or webhook URLs in one run, each message labelled with its own channel
 - **`--fallback-to-stdout`** — if a Slack post fails, print the rendered standup to stdout (exit 0) instead of erroring out, so the work isn't lost on a transport failure
 - **Custom section labels** (`--section-labels`) — override any section's title and/or emoji, e.g. `in_progress=Rolling,blocked=🔥 On Fire`
-- Scope the "recently closed / Done" window with `--since <iso>` **or** `--days <n>` (relative)
+- Scope the "recently closed / Done" window with `--since <iso>` **or** `--days <n>` (relative). An **unparseable `--since`** (e.g. a typo) is not silently ignored — it emits a warning and the `--since` window is dropped, so the mistake surfaces loudly
+- **Friendly export errors** — `pm standup export --output <path>` that cannot be written (missing directory, permission denied, etc.) aborts with a clear, actionable message and a clean non-zero exit instead of leaking a raw Node fs stack trace
 - Map pm authors to Slack handles so they get mentioned (`--mention-map`)
 - `pm standup export` — write the standup to a file as Markdown or JSON (the JSON form includes the full Block Kit payload for archiving or re-posting)
 - `--channel` override; webhook URL configurable via flag or environment variable
@@ -71,7 +73,9 @@ pm standup [flags]
 | `--include-done` | boolean | `false` | Include recently-closed items in a Done section |
 | `--since <iso>` | string | — | ISO date/time window; scopes the Done section to items updated since then |
 | `--days <n>` | number | — | Relative window: scope Done to items updated in the last N days (combines with `--since`, more restrictive bound wins) |
-| `--group-by <field>` | string | `status` | Group section items by `status` \| `assignee` \| `sprint` \| `type` |
+| `--group-by <field>` | string | `status` | Group section items by `status` \| `assignee` \| `sprint` \| `type` \| `milestone` |
+| `--up-next <n>` | number | `3` | How many open items the **Up Next** section shows (top-N by priority) |
+| `--all-open` | boolean | `false` | Show **all** open items in Up Next (no truncation); overrides `--up-next` |
 | `--sections <list>` | string | all | Comma list of sections to render/order: `in_progress`, `blocked`, `done`, `up_next` |
 | `--mention-map <map>` | string | — | Map pm authors to Slack handles, e.g. `alice=@alice,bob=@bob` |
 | `--yesterday` | boolean | `false` | Split Done into **Done Yesterday** / **Done Today** by local day (implies `--include-done`) |
@@ -133,6 +137,17 @@ pm standup --include-done --format plain
 **Group by sprint, only In Progress + Blocked:**
 ```bash
 pm standup --dry-run --group-by sprint --sections in_progress,blocked
+```
+
+**Group by milestone:**
+```bash
+pm standup --dry-run --group-by milestone
+```
+
+**Show more (or all) Up Next items:**
+```bash
+pm standup --dry-run --up-next 5     # top 5 open items instead of 3
+pm standup --dry-run --all-open      # the entire open backlog, no truncation
 ```
 
 **Split Done by yesterday/today:**
@@ -256,7 +271,7 @@ npm run dev   # watch mode
 ## How It Works
 
 1. Reads every item once via `pm --path <root> list-all --json --include-body` and buckets them locally into In Progress, Blocked, open (Up Next) and optionally Done. Any open/in-progress item with a `blocked_by` dependency (top-level or in `dependencies[]`) is re-bucketed into Blocked; closed items are never re-surfaced as blocked.
-2. Sorts open items by priority (ascending) and takes the top 3 as "Up Next".
+2. Sorts open items by priority (ascending) and takes the top N as "Up Next" (default 3; set with `--up-next <n>`, or `--all-open` to show the entire open backlog).
 3. Builds a Slack Block Kit `blocks` array (header + a section per bucket + context footer) plus a plain-text `fallback`, optionally grouped by assignee and annotated with Slack mentions. Section titles/emoji can be overridden with `--section-labels`, and `--yesterday` expands Done into Done Yesterday / Done Today.
 4. In `--dry-run`, prints the message in the chosen `--format` and exits without any network call. Otherwise posts `{ text, blocks }` to each target (the base webhook plus any `--channels`) using Node.js native `https`. A missing webhook (on a real post) raises a structured `CommandError`; a failed post does too **unless** `--fallback-to-stdout` is set, in which case the rendered standup is printed to stdout and the command exits 0.
 
