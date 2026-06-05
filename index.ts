@@ -1093,7 +1093,7 @@ export function resolveStandupOptions(
 
 export default defineExtension({
   name: "pm-slack-standup",
-  version: "2026.6.4-1",
+  version: "2026.6.5",
 
   activate(api) {
     api.registerCommand({
