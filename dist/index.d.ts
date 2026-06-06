@@ -140,6 +140,7 @@ export declare function withinWindow(item: PmItem, sinceMs: number): boolean;
  * status=blocked under the Blocked section.
  */
 export declare function hasBlockedByDep(item: PmItem): boolean;
+export declare function blockedAgeDays(item: PmItem, now?: number): number | undefined;
 /**
  * Local-day key (YYYY-MM-DD in the host's local timezone) for an item's last
  * activity. Used by the `--yesterday` split. Falls back to created_at, then
