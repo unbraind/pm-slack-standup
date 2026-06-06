@@ -482,6 +482,13 @@ export function hasBlockedByDep(item: PmItem): boolean {
   return false;
 }
 
+export function blockedAgeDays(item: PmItem, now: number = Date.now()): number | undefined {
+  if (!BLOCKED_STATUSES.has(statusOf(item)) && !hasBlockedByDep(item)) return undefined;
+  const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
+  if (isNaN(ts)) return undefined;
+  return Math.max(0, Math.floor((now - ts) / 86_400_000));
+}
+
 /**
  * Local-day key (YYYY-MM-DD in the host's local timezone) for an item's last
  * activity. Used by the `--yesterday` split. Falls back to created_at, then
@@ -654,7 +661,20 @@ export function itemText(item: PmItem, mentionMap: Record<string, string>, withP
   const label = typeLabel(item);
   const title = label ? `${label} ${item.title}` : item.title;
   const prio = withPriority && item.priority != null ? ` (priority ${item.priority})` : "";
-  return `${title}${prio}${mentionFor(item, mentionMap)}`;
+  const context: string[] = [];
+  if (typeof item.blocked_by === "string" && item.blocked_by.trim()) {
+    context.push(`blocked by ${item.blocked_by.trim()}`);
+  } else if (Array.isArray(item.dependencies)) {
+    const blockers = item.dependencies
+      .filter((d) => d?.kind?.trim().toLowerCase() === "blocked_by")
+      .map((d) => d.id?.trim())
+      .filter((id): id is string => Boolean(id));
+    if (blockers.length > 0) context.push(`blocked by ${blockers.join(", ")}`);
+  }
+  const ageDays = blockedAgeDays(item);
+  if (ageDays !== undefined && ageDays >= 3) context.push(`stale ${ageDays}d`);
+  const blockedContext = context.length > 0 ? ` (${context.join("; ")})` : "";
+  return `${title}${prio}${blockedContext}${mentionFor(item, mentionMap)}`;
 }
 
 function todayISO(): string {

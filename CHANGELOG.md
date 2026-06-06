@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Render blocker context and stale blocked work in standups ([pm-slack-standup-nspi](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-nspi.toon))
+
+### Other
+
+- Align package dependencies to pm CLI/SDK 2026.6.6 ([pm-slack-standup-iv4f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-iv4f.toon))
+
 ## 2026.06.04-1 - 2026-06-04
 
 ### Added
