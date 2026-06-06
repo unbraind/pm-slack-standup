@@ -11,6 +11,7 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 - **Configurable "Up Next" size** — `--up-next <n>` sets how many open items the Up Next section shows (default 3), or `--all-open` shows the **entire** open backlog so nothing is silently truncated
 - Choose which sections to render and in what order with `--sections` (`in_progress`, `blocked`, `done`, `up_next`); a dedicated **Blocked** section always surfaces blocked items
 - **Impediment inference** — the Blocked section surfaces not only `status=blocked` items but any open/in-progress item carrying a `blocked_by` dependency (top-level or in `dependencies[]`), so dependency-blocked work is never hidden
+- **Blocked-work context** — blocked/dependency-blocked rows include the blocker id/reason and mark blockers stale after 3+ days since last activity
 - **Yesterday/Today split** (`--yesterday`) — split the Done section into **Done Yesterday** / **Done Today** by the local-day boundary (implies `--include-done`)
 - **Multi-channel posting** (`--channels #a,#b`) — post the same standup to several channel names and/or webhook URLs in one run, each message labelled with its own channel
 - **`--fallback-to-stdout`** — if a Slack post fails, print the rendered standup to stdout (exit 0) instead of erroring out, so the work isn't lost on a transport failure

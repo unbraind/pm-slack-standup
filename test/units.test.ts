@@ -20,6 +20,7 @@ import {
   itemText,
   ALL_SECTIONS,
   hasBlockedByDep,
+  blockedAgeDays,
   localDayKey,
   parseSectionLabels,
   parseChannels,
@@ -348,6 +349,21 @@ test("itemText adds type label, priority, and mention", () => {
   const it = item({ title: "Ship", type: "feature", priority: 1, assignee: "alice" });
   assert.equal(itemText(it, { alice: "@a" }, true), "[Feature] Ship (priority 1) (@a)");
   assert.equal(itemText(it, {}, false), "[Feature] Ship");
+});
+
+test("itemText includes blocker context and stale age for blocked work", () => {
+  const now = Date.parse("2026-06-10T00:00:00Z");
+  const it = item({
+    title: "Waiting on API",
+    type: "task",
+    status: "in_progress",
+    blocked_by: "pm-api",
+    updated_at: "2000-01-01T00:00:00Z",
+  });
+  assert.equal(blockedAgeDays(it, now), 9657);
+  const text = itemText(it, {}, false);
+  assert.match(text, /blocked by pm-api/);
+  assert.match(text, /stale \d+d/);
 });
 
 // --- blocked_by inference --------------------------------------------------
