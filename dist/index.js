@@ -911,6 +911,100 @@ export default defineExtension({
     name: "pm-slack-standup",
     version: "2026.6.5",
     activate(api) {
+        const standupFlags = [
+            { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
+            { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
+            { long: "--dry-run", description: "Build and print the message in the chosen format WITHOUT posting to Slack" },
+            { long: "--format", value_name: "fmt", description: "Output format: slack (mrkdwn, default) | blockkit (JSON) | markdown | plain" },
+            { long: "--include-done", description: "Include recently-closed items in a Done section" },
+            { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
+            { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
+            { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
+            { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
+            { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
+            { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
+            { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
+            { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+            { long: "--channels", value_name: "list", description: "Post the same standup to multiple targets: comma list of #channel names and/or webhook URLs" },
+            { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
+            { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
+        ];
+        const runStandupCommand = async (ctx) => {
+            // Fail-fast credential gate: if a Slack post is actually requested
+            // (i.e. NOT --dry-run) but no webhook is configured, abort immediately
+            // with a clear, actionable, non-zero error — before reading any pm data
+            // or rendering anything. The non-posting --dry-run preview path is never
+            // gated, so the legitimate stdout-fallback shape keeps working.
+            preflightSlackCredentials(ctx.options);
+            const webhookUrl = readStrOption(ctx.options, "webhook") ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
+            const dryRun = readBoolOption(ctx.options, "dry-run");
+            const { opts, sinceMs } = resolveStandupOptions(ctx.options, parseFormat(readStrOption(ctx.options, "format")));
+            const items = fetchAllItems(ctx.pm_root);
+            const data = buildStandupData(items, opts, sinceMs);
+            if (dryRun) {
+                // No network call happens on this path.
+                const rendered = renderStandup(data, opts);
+                console.error(`--- DRY RUN (${opts.format}, message not posted) ---`);
+                process.stdout.write(rendered + "\n");
+                console.error("--- END ---");
+                const { blocks, fallback } = buildBlockKit(data, opts);
+                return {
+                    dryRun: true,
+                    format: opts.format,
+                    rendered,
+                    blocks,
+                    fallback,
+                    wip: data.wip.length,
+                    blocked: data.blocked.length,
+                    done: data.done.length,
+                    upNext: data.upNext.length,
+                };
+            }
+            const channels = parseChannels(readStrOption(ctx.options, "channels"));
+            const fallbackToStdout = readBoolOption(ctx.options, "fallback-to-stdout");
+            // Defense-in-depth: the credential preflight above already aborted any
+            // post with a missing base webhook. Re-assert here so this branch is
+            // never reached with an unusable webhook even if the gate is bypassed.
+            if (!webhookUrl && needsBaseWebhook(channels)) {
+                throw new CommandError("Slack post requested but no webhook is configured. " +
+                    "Set PM_SLACK_WEBHOOK or pass --webhook <url>, " +
+                    "or use --dry-run to preview the message without posting.", EXIT_CODE.USAGE);
+            }
+            const targets = resolvePostTargets(webhookUrl, opts.channel, channels);
+            const results = await postStandupTargets(targets, data, opts, postToSlack);
+            const failures = results.filter((r) => !r.ok);
+            if (failures.length > 0 && fallbackToStdout) {
+                // Print the rendered standup so the work isn't lost on a transport
+                // failure. We exit 0 here: stdout delivery is the requested fallback.
+                for (const f of failures) {
+                    console.error(`Slack post to ${f.channel ?? "(default channel)"} failed: ${f.error ?? "unknown error"} — falling back to stdout.`);
+                }
+                const rendered = renderStandup(data, opts);
+                process.stdout.write(rendered + "\n");
+                return {
+                    posted: results.some((r) => r.ok),
+                    fallbackToStdout: true,
+                    results,
+                    wip: data.wip.length,
+                    blocked: data.blocked.length,
+                    done: data.done.length,
+                    upNext: data.upNext.length,
+                };
+            }
+            if (failures.length > 0) {
+                throw new CommandError(`Slack post failed for ${failures.length} of ${targets.length} target(s): ` +
+                    failures.map((f) => `${f.channel ?? "(default)"}: ${f.error ?? "unknown"}`).join("; "), EXIT_CODE.GENERIC_FAILURE);
+            }
+            return {
+                posted: true,
+                channel: opts.channel,
+                channels: targets.length > 1 ? targets.map((t) => t.channel) : undefined,
+                wip: data.wip.length,
+                blocked: data.blocked.length,
+                done: data.done.length,
+                upNext: data.upNext.length,
+            };
+        };
         api.registerCommand({
             name: "standup",
             description: "Post pm context as a rich Slack standup (Block Kit) message",
@@ -930,100 +1024,19 @@ export default defineExtension({
                 "pm standup --section-labels 'in_progress=Rolling,blocked=🔥 On Fire' --dry-run",
                 "PM_SLACK_WEBHOOK=https://... pm standup --channel '#standups'",
             ],
-            flags: [
-                { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
-                { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
-                { long: "--dry-run", description: "Build and print the message in the chosen format WITHOUT posting to Slack" },
-                { long: "--format", value_name: "fmt", description: "Output format: slack (mrkdwn, default) | blockkit (JSON) | markdown | plain" },
-                { long: "--include-done", description: "Include recently-closed items in a Done section" },
-                { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
-                { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
-                { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
-                { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
-                { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
-                { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
-                { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
-                { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
-                { long: "--channels", value_name: "list", description: "Post the same standup to multiple targets: comma list of #channel names and/or webhook URLs" },
-                { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
-                { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
+            flags: standupFlags,
+            run: runStandupCommand,
+        });
+        api.registerCommand({
+            name: "slack-standup",
+            description: "Alias for `pm standup` (same behavior and flags)",
+            intent: "Run the standup workflow using a package-name-aligned command path for agent discoverability",
+            examples: [
+                "pm slack-standup --dry-run",
+                "pm slack-standup --channel '#team-eng' --include-done",
             ],
-            async run(ctx) {
-                // Fail-fast credential gate: if a Slack post is actually requested
-                // (i.e. NOT --dry-run) but no webhook is configured, abort immediately
-                // with a clear, actionable, non-zero error — before reading any pm data
-                // or rendering anything. The non-posting --dry-run preview path is never
-                // gated, so the legitimate stdout-fallback shape keeps working.
-                preflightSlackCredentials(ctx.options);
-                const webhookUrl = readStrOption(ctx.options, "webhook") ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
-                const dryRun = readBoolOption(ctx.options, "dry-run");
-                const { opts, sinceMs } = resolveStandupOptions(ctx.options, parseFormat(readStrOption(ctx.options, "format")));
-                const items = fetchAllItems(ctx.pm_root);
-                const data = buildStandupData(items, opts, sinceMs);
-                if (dryRun) {
-                    // No network call happens on this path.
-                    const rendered = renderStandup(data, opts);
-                    console.error(`--- DRY RUN (${opts.format}, message not posted) ---`);
-                    process.stdout.write(rendered + "\n");
-                    console.error("--- END ---");
-                    const { blocks, fallback } = buildBlockKit(data, opts);
-                    return {
-                        dryRun: true,
-                        format: opts.format,
-                        rendered,
-                        blocks,
-                        fallback,
-                        wip: data.wip.length,
-                        blocked: data.blocked.length,
-                        done: data.done.length,
-                        upNext: data.upNext.length,
-                    };
-                }
-                const channels = parseChannels(readStrOption(ctx.options, "channels"));
-                const fallbackToStdout = readBoolOption(ctx.options, "fallback-to-stdout");
-                // Defense-in-depth: the credential preflight above already aborted any
-                // post with a missing base webhook. Re-assert here so this branch is
-                // never reached with an unusable webhook even if the gate is bypassed.
-                if (!webhookUrl && needsBaseWebhook(channels)) {
-                    throw new CommandError("Slack post requested but no webhook is configured. " +
-                        "Set PM_SLACK_WEBHOOK or pass --webhook <url>, " +
-                        "or use --dry-run to preview the message without posting.", EXIT_CODE.USAGE);
-                }
-                const targets = resolvePostTargets(webhookUrl, opts.channel, channels);
-                const results = await postStandupTargets(targets, data, opts, postToSlack);
-                const failures = results.filter((r) => !r.ok);
-                if (failures.length > 0 && fallbackToStdout) {
-                    // Print the rendered standup so the work isn't lost on a transport
-                    // failure. We exit 0 here: stdout delivery is the requested fallback.
-                    for (const f of failures) {
-                        console.error(`Slack post to ${f.channel ?? "(default channel)"} failed: ${f.error ?? "unknown error"} — falling back to stdout.`);
-                    }
-                    const rendered = renderStandup(data, opts);
-                    process.stdout.write(rendered + "\n");
-                    return {
-                        posted: results.some((r) => r.ok),
-                        fallbackToStdout: true,
-                        results,
-                        wip: data.wip.length,
-                        blocked: data.blocked.length,
-                        done: data.done.length,
-                        upNext: data.upNext.length,
-                    };
-                }
-                if (failures.length > 0) {
-                    throw new CommandError(`Slack post failed for ${failures.length} of ${targets.length} target(s): ` +
-                        failures.map((f) => `${f.channel ?? "(default)"}: ${f.error ?? "unknown"}`).join("; "), EXIT_CODE.GENERIC_FAILURE);
-                }
-                return {
-                    posted: true,
-                    channel: opts.channel,
-                    channels: targets.length > 1 ? targets.map((t) => t.channel) : undefined,
-                    wip: data.wip.length,
-                    blocked: data.blocked.length,
-                    done: data.done.length,
-                    upNext: data.upNext.length,
-                };
-            },
+            flags: standupFlags,
+            run: runStandupCommand,
         });
         // -----------------------------------------------------------------------
         // Scoped preflight registration.

@@ -61,6 +61,7 @@ export PM_SLACK_WEBHOOK=<slack-webhook-url>
 
 ```
 pm standup [flags]
+pm slack-standup [flags]   # alias with identical behavior
 ```
 
 ### Flags
