@@ -17,7 +17,9 @@ test("extension registers at least one capability", () => {
   // Mirror the full ExtensionApi surface so activate() can register every
   // capability the extension uses (command + standup exporter).
   const api = {
-    registerCommand: () => { registered.push("command"); },
+    registerCommand: (command: { name?: string }) => {
+      registered.push(`command:${command?.name ?? "unknown"}`);
+    },
     registerParser: noop, registerPreflight: noop, registerService: noop,
     registerFlags: noop, registerItemFields: noop, registerItemTypes: noop,
     registerMigration: noop, registerRenderer: noop,
@@ -27,6 +29,7 @@ test("extension registers at least one capability", () => {
     hooks: { beforeCommand: noop, afterCommand: noop, onWrite: noop, onRead: noop, onIndex: noop },
   };
   extension.activate(api as any);
-  assert.ok(registered.includes("command"), "should register the standup command");
+  assert.ok(registered.includes("command:standup"), "should register the standup command");
+  assert.ok(registered.includes("command:slack-standup"), "should register the alias command");
   assert.ok(registered.includes("exporter"), "should register the standup exporter");
 });
