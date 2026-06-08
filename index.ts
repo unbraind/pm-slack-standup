@@ -1113,7 +1113,7 @@ export function resolveStandupOptions(
 
 export default defineExtension({
   name: "pm-slack-standup",
-  version: "2026.6.7",
+  version: "2026.6.8",
 
   activate(api) {
     const standupFlags = [
