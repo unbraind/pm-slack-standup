@@ -30,10 +30,21 @@ import {
   isPostRequested,
   needsBaseWebhook,
   preflightSlackCredentials,
+  currentCounts,
+  extractPriorCounts,
+  readPriorCounts,
+  computeDeltas,
+  formatDelta,
+  renderTrendLine,
   type PmItem,
   type StandupOptions,
+  type SectionCounts,
   type Poster,
 } from "../dist/index.js";
+
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const baseOpts: StandupOptions = {
   format: "slack",
@@ -581,4 +592,227 @@ test("postStandupTargets captures a failing poster without throwing", async () =
   // The caller (run handler) would then render to stdout on this signal.
   const rendered = buildTextMessage(data, baseOpts);
   assert.ok(rendered.includes("pm standup"));
+});
+
+// --- trend comparison (--compare) ------------------------------------------
+test("currentCounts maps standup data to per-section counts", () => {
+  const data = buildStandupData(
+    [
+      item({ id: "1", status: "in_progress" }),
+      item({ id: "2", status: "blocked" }),
+      item({ id: "3", status: "open", priority: 1 }),
+      item({ id: "4", status: "closed", updated_at: "2026-06-05T00:00:00Z" }),
+    ],
+    { ...baseOpts, includeDone: true }
+  );
+  assert.deepEqual(currentCounts(data), {
+    in_progress: 1,
+    blocked: 1,
+    done: 1,
+    up_next: 1,
+  });
+});
+
+test("computeDeltas reports up / down / flat with signed deltas", () => {
+  const prior: SectionCounts = { in_progress: 2, blocked: 3, done: 1, up_next: 4 };
+  const current: SectionCounts = { in_progress: 4, blocked: 1, done: 1, up_next: 4 };
+  const deltas = computeDeltas(prior, current);
+  // ordering follows ALL_SECTIONS
+  assert.deepEqual(deltas.map((d) => d.key), [...ALL_SECTIONS]);
+  const byKey = Object.fromEntries(deltas.map((d) => [d.key, d]));
+  assert.deepEqual(
+    { d: byKey.in_progress.delta, dir: byKey.in_progress.direction },
+    { d: 2, dir: "up" }
+  );
+  assert.deepEqual(
+    { d: byKey.blocked.delta, dir: byKey.blocked.direction },
+    { d: -2, dir: "down" }
+  );
+  assert.deepEqual({ d: byKey.done.delta, dir: byKey.done.direction }, { d: 0, dir: "flat" });
+  assert.deepEqual({ d: byKey.up_next.delta, dir: byKey.up_next.direction }, { d: 0, dir: "flat" });
+});
+
+test("formatDelta renders directional glyph + signed number with section title", () => {
+  assert.equal(
+    formatDelta({ key: "in_progress", prior: 2, current: 4, delta: 2, direction: "up" }),
+    "In Progress ▲+2"
+  );
+  assert.equal(
+    formatDelta({ key: "blocked", prior: 3, current: 1, delta: -2, direction: "down" }),
+    "Blocked ▼-2"
+  );
+  assert.equal(
+    formatDelta({ key: "done", prior: 1, current: 1, delta: 0, direction: "flat" }),
+    "Done →0"
+  );
+});
+
+test("renderTrendLine joins per-section deltas into one summary", () => {
+  const prior: SectionCounts = { in_progress: 2, blocked: 3, done: 1, up_next: 4 };
+  const current: SectionCounts = { in_progress: 4, blocked: 1, done: 1, up_next: 5 };
+  const line = renderTrendLine(computeDeltas(prior, current));
+  assert.match(line, /^Trend vs prior: /);
+  assert.match(line, /In Progress ▲\+2/);
+  assert.match(line, /Blocked ▼-2/);
+  assert.match(line, /Done →0/);
+  assert.match(line, /Up Next ▲\+1/);
+  assert.equal(renderTrendLine([]), "");
+});
+
+test("extractPriorCounts reads the exporter's `counts` object (wip/upNext keys)", () => {
+  // exactly the shape `standup export --format json` writes
+  const exported = {
+    counts: { wip: 2, blocked: 1, done: 3, upNext: 4, total: 10 },
+  };
+  assert.deepEqual(extractPriorCounts(exported), {
+    in_progress: 2,
+    blocked: 1,
+    done: 3,
+    up_next: 4,
+  });
+  // canonical SectionKey spellings also accepted
+  assert.deepEqual(
+    extractPriorCounts({ counts: { in_progress: 5, blocked: 0, done: 0, up_next: 1 } }),
+    { in_progress: 5, blocked: 0, done: 0, up_next: 1 }
+  );
+});
+
+test("extractPriorCounts falls back to counting sections_data arrays", () => {
+  const exported = {
+    sections_data: {
+      in_progress: [{ id: "a" }, { id: "b" }],
+      blocked: [],
+      up_next: [{ id: "c" }],
+      done: [{ id: "d" }, { id: "e" }, { id: "f" }],
+    },
+  };
+  assert.deepEqual(extractPriorCounts(exported), {
+    in_progress: 2,
+    blocked: 0,
+    done: 3,
+    up_next: 1,
+  });
+});
+
+test("extractPriorCounts returns undefined for unrecognizable shapes", () => {
+  assert.equal(extractPriorCounts(null), undefined);
+  assert.equal(extractPriorCounts(42 as unknown), undefined);
+  assert.equal(extractPriorCounts({ nope: true }), undefined);
+  assert.equal(extractPriorCounts({ counts: { total: 5 } }), undefined); // no per-section keys
+});
+
+test("exporter JSON round-trips through extractPriorCounts (shape contract)", () => {
+  // Mirror exactly what the exporter writes (see registerExporter): a top-level
+  // `counts` object with wip/blocked/done/upNext/total. Build it from real data.
+  const data = buildStandupData(
+    [
+      item({ id: "1", status: "in_progress" }),
+      item({ id: "2", status: "in_progress" }),
+      item({ id: "3", status: "blocked" }),
+      item({ id: "4", status: "open", priority: 1 }),
+      item({ id: "5", status: "closed", updated_at: "2026-06-05T00:00:00Z" }),
+    ],
+    { ...baseOpts, includeDone: true }
+  );
+  const exporterJson = JSON.stringify({
+    date: "2026-06-09",
+    counts: {
+      wip: data.wip.length,
+      blocked: data.blocked.length,
+      done: data.done.length,
+      upNext: data.upNext.length,
+      total: data.total,
+    },
+  });
+  const recovered = extractPriorCounts(JSON.parse(exporterJson));
+  assert.deepEqual(recovered, currentCounts(data));
+});
+
+test("readPriorCounts reads a real exporter-shaped JSON file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-compare-"));
+  try {
+    const p = join(dir, "prev.json");
+    writeFileSync(p, JSON.stringify({ counts: { wip: 1, blocked: 2, done: 0, upNext: 3, total: 6 } }));
+    const warnings: string[] = [];
+    const counts = readPriorCounts(p, (m) => warnings.push(m));
+    assert.deepEqual(counts, { in_progress: 1, blocked: 2, done: 0, up_next: 3 });
+    assert.equal(warnings.length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readPriorCounts warns + returns undefined for a missing file (no throw)", () => {
+  const warnings: string[] = [];
+  let result: SectionCounts | undefined;
+  assert.doesNotThrow(() => {
+    result = readPriorCounts("/no/such/standup-prev.json", (m) => warnings.push(m));
+  });
+  assert.equal(result, undefined);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /could not be read/i);
+});
+
+test("readPriorCounts warns + returns undefined for malformed JSON / wrong shape", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-compare-"));
+  try {
+    const bad = join(dir, "bad.json");
+    writeFileSync(bad, "{ not valid json ");
+    const w1: string[] = [];
+    assert.equal(readPriorCounts(bad, (m) => w1.push(m)), undefined);
+    assert.equal(w1.length, 1);
+    assert.match(w1[0], /not valid JSON/i);
+
+    const wrong = join(dir, "wrong.json");
+    writeFileSync(wrong, JSON.stringify({ hello: "world" }));
+    const w2: string[] = [];
+    assert.equal(readPriorCounts(wrong, (m) => w2.push(m)), undefined);
+    assert.equal(w2.length, 1);
+    assert.match(w2[0], /no recognizable standup counts/i);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("trend renders directional indicators in markdown + plain text output", () => {
+  const data = buildStandupData([item({ status: "in_progress", title: "A" })], baseOpts);
+  const trend = computeDeltas(
+    { in_progress: 0, blocked: 2, done: 0, up_next: 1 },
+    currentCounts(data)
+  );
+  const md = buildTextMessage(data, { ...baseOpts, format: "markdown", trend });
+  assert.match(md, /Trend vs prior:/);
+  assert.match(md, /In Progress ▲\+1/);
+  assert.match(md, /Blocked ▼-2/);
+  // markdown wraps the trend line in italics
+  assert.match(md, /_Trend vs prior:.*_/);
+
+  const slack = buildTextMessage(data, { ...baseOpts, trend });
+  assert.match(slack, /Trend vs prior:/);
+  assert.match(slack, /In Progress ▲\+1/);
+
+  // no trend attached → no trend line (backward compatible)
+  const plain = buildTextMessage(data, baseOpts);
+  assert.ok(!/Trend vs prior/.test(plain));
+});
+
+test("trend renders as a second context element in Block Kit footer", () => {
+  const data = buildStandupData([item({ status: "blocked", title: "B" })], baseOpts);
+  const trend = computeDeltas(
+    { in_progress: 1, blocked: 0, done: 0, up_next: 0 },
+    currentCounts(data)
+  );
+  const { blocks } = buildBlockKit(data, { ...baseOpts, trend });
+  const footer = blocks[blocks.length - 1] as any;
+  assert.equal(footer.type, "context");
+  assert.equal(footer.elements.length, 2);
+  assert.match(footer.elements[0].text, /pm-slack-standup/);
+  assert.match(footer.elements[1].text, /Trend vs prior:/);
+  assert.match(footer.elements[1].text, /Blocked ▲\+1/);
+  assert.match(footer.elements[1].text, /In Progress ▼-1/);
+
+  // no trend → single footer element (backward compatible)
+  const { blocks: plainBlocks } = buildBlockKit(data, baseOpts);
+  const plainFooter = plainBlocks[plainBlocks.length - 1] as any;
+  assert.equal(plainFooter.elements.length, 1);
 });
