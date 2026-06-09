@@ -1296,7 +1296,7 @@ export function renderTrendLine(deltas: SectionDelta[]): string {
 
 export default defineExtension({
   name: "pm-slack-standup",
-  version: "2026.6.9",
+  version: "2026.6.10",
 
   activate(api) {
     const standupFlags = [
