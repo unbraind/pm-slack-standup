@@ -16,6 +16,7 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 - **Multi-channel posting** (`--channels #a,#b`) — post the same standup to several channel names and/or webhook URLs in one run, each message labelled with its own channel
 - **`--fallback-to-stdout`** — if a Slack post fails, print the rendered standup to stdout (exit 0) instead of erroring out, so the work isn't lost on a transport failure
 - **Custom section labels** (`--section-labels`) — override any section's title and/or emoji, e.g. `in_progress=Rolling,blocked=🔥 On Fire`
+- **Trend deltas** (`--compare <path>`) — show momentum vs. a **prior** standup. Point `--compare` at a JSON file previously written by `pm standup export --format json`; the footer gains a one-line summary with directional indicators per section (`▲` up / `▼` down / `→` flat) and the numeric delta, e.g. `Trend vs prior: In Progress ▲+2 · Blocked ▼-1 · Done →0 · Up Next →0`. It is a **purely local file read** (no extra network), and a missing/unreadable/wrong-shape file degrades gracefully — a one-line stderr warning, then the standup renders normally **without** deltas (never crashes)
 - Scope the "recently closed / Done" window with `--since <iso>` **or** `--days <n>` (relative). An **unparseable `--since`** (e.g. a typo) is not silently ignored — it emits a warning and the `--since` window is dropped, so the mistake surfaces loudly
 - **Friendly export errors** — `pm standup export --output <path>` that cannot be written (missing directory, permission denied, etc.) aborts with a clear, actionable message and a clean non-zero exit instead of leaking a raw Node fs stack trace
 - Map pm authors to Slack handles so they get mentioned (`--mention-map`)
@@ -84,6 +85,7 @@ pm slack-standup [flags]   # alias with identical behavior
 | `--channels <list>` | string | — | Post the same standup to multiple targets: comma list of `#channel` names and/or full webhook URLs |
 | `--fallback-to-stdout` | boolean | `false` | If the Slack post fails, print the rendered standup to stdout (exit 0) instead of erroring |
 | `--section-labels <map>` | string | — | Override section titles/emoji, e.g. `in_progress=Rolling,blocked=🔥 On Fire` |
+| `--compare <path>` | string | — | Show trend deltas vs a **prior** standup JSON file (from `standup export --format json`); local file read, never posts. Missing/malformed → warn + render without deltas |
 
 > **Note on `text`:** the legacy `--format text` value is still accepted as an alias for `plain`.
 
@@ -118,6 +120,8 @@ pm standup export                       # Markdown to stdout
 | `--output <file>` | stdout | Output file path |
 
 The `--since`, `--group-by`, `--include-done`, `--channel` and `--mention-map` flags above also apply to the export.
+
+The JSON export also carries a top-level `counts` object (`{ wip, blocked, done, upNext, total }`) — this is the exact shape `standup --compare <path>` reads, so a JSON export from one day can be diffed against the next day's standup (see [Trend deltas](#trend-deltas-vs-a-prior-standup)).
 
 ### Examples
 
@@ -168,6 +172,17 @@ pm standup --channels 'https://hooks.slack.com/services/AAA,https://hooks.slack.
 pm standup --fallback-to-stdout   # prints the message to stdout (exit 0) if the post fails
 ```
 
+**Show momentum vs a prior standup (trend deltas):**
+```bash
+# Yesterday: snapshot the standup as JSON
+pm standup export --format json --include-done --output prev.json
+
+# Today: render the standup with directional deltas vs that snapshot
+pm standup --dry-run --compare prev.json
+# footer gains: "Trend vs prior: In Progress ▲+2 · Blocked ▼-1 · Done →0 · Up Next →0"
+```
+A missing/unreadable/wrong-shape `--compare` file is **not** fatal: it emits a one-line stderr warning and the standup renders normally without deltas. `--compare` only reads the local file — it makes no extra network call.
+
 **Rename sections / change emoji:**
 ```bash
 pm standup --dry-run --section-labels 'in_progress=Rolling,blocked=🔥 On Fire'
@@ -180,6 +195,27 @@ pm standup \
   --channel '#standups' \
   --include-done
 ```
+
+## Trend deltas (vs a prior standup)
+
+`--compare <path>` makes a single standup show **momentum** instead of just a static snapshot. Without it, a reader can't tell whether WIP is climbing, whether the blocked pile is growing, or how much got done since the last report.
+
+How it works:
+
+1. **Snapshot** a standup as JSON — `pm standup export --format json --output prev.json`. The export carries a top-level `counts` object (`wip`/`blocked`/`done`/`upNext`/`total`).
+2. **Compare** the next standup against it — `pm standup --compare prev.json`. The footer gains one line of directional indicators:
+
+   ```
+   Trend vs prior: In Progress ▲+2 · Blocked ▼-1 · Done →0 · Up Next →0
+   ```
+
+   `▲` = section grew, `▼` = section shrank, `→` = unchanged; the signed number is the exact delta (`current − prior`).
+
+The trend line appears in the footer of every text format (`slack`, `markdown` — italicised —, `plain`) and as a second element in the Block Kit `context` footer.
+
+**Graceful degradation:** if the `--compare` file is missing, unreadable, not valid JSON, or doesn't contain recognizable standup counts, the command emits a single `warning:` line to stderr and renders the standup **normally without deltas** — it never crashes. The read is purely local: `--compare` adds **no** network call.
+
+**Round-trip contract:** the `counts` object the exporter writes is exactly what `--compare` consumes, so `standup export --format json > prev.json` today and `standup --compare prev.json` tomorrow always line up. `--compare` also tolerates the canonical `in_progress`/`up_next` key spellings and falls back to counting the exporter's `sections_data` arrays if `counts` is absent.
 
 ## Message Format
 

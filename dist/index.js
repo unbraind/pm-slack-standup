@@ -1,6 +1,6 @@
 import https from "node:https";
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const defineExtension = ((extension) => extension);
 // ---------------------------------------------------------------------------
@@ -34,6 +34,12 @@ export const ALL_SECTIONS = [
 ];
 /** Default number of items shown in the "Up Next" section. */
 export const DEFAULT_UP_NEXT = 3;
+/** Direction → indicator glyph used in trend output. */
+export const TREND_GLYPH = {
+    up: "▲",
+    down: "▼",
+    flat: "→",
+};
 // ---------------------------------------------------------------------------
 // Option helpers
 // ---------------------------------------------------------------------------
@@ -649,6 +655,14 @@ export function buildTextMessage(data, opts) {
             lines.push("");
         renderSection(lines, def, opts);
     });
+    // Trend footer (from `--compare`): a single directional summary line.
+    if (opts.trend && opts.trend.length > 0) {
+        const trendLine = renderTrendLine(opts.trend);
+        if (trendLine) {
+            lines.push("");
+            lines.push(opts.format === "markdown" ? `_${trendLine}_` : trendLine);
+        }
+    }
     return lines.join("\n");
 }
 function mrkdwnList(items, opts, withPriority = false) {
@@ -713,9 +727,19 @@ export function buildBlockKit(data, opts) {
         opts.since ? `since ${opts.since}` : null,
         groupNote[opts.groupBy],
     ].filter(Boolean);
+    const footerElements = [
+        { type: "mrkdwn", text: `🤖 pm-slack-standup · ${footerBits.join(" · ")}` },
+    ];
+    // Trend footer (from `--compare`): a second context element so the
+    // directional summary stays visually distinct from the meta line.
+    if (opts.trend && opts.trend.length > 0) {
+        const trendLine = renderTrendLine(opts.trend);
+        if (trendLine)
+            footerElements.push({ type: "mrkdwn", text: trendLine });
+    }
     blocks.push({
         type: "context",
-        elements: [{ type: "mrkdwn", text: `🤖 pm-slack-standup · ${footerBits.join(" · ")}` }],
+        elements: footerElements,
     });
     // Plain-text fallback mirrors the slack-mrkdwn text message.
     const fallback = buildTextMessage(data, { ...opts, format: "slack" });
@@ -905,6 +929,134 @@ export function resolveStandupOptions(options, format) {
     return { opts, sinceMs };
 }
 // ---------------------------------------------------------------------------
+// Trend comparison: read a prior standup, compute per-section deltas
+// ---------------------------------------------------------------------------
+/** Extract the current per-section counts from computed standup data. */
+export function currentCounts(data) {
+    return {
+        in_progress: data.wip.length,
+        blocked: data.blocked.length,
+        done: data.done.length,
+        up_next: data.upNext.length,
+    };
+}
+/** A safe non-negative integer count, or undefined when not a usable number. */
+function coerceCount(value) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+        return undefined;
+    return Math.floor(value);
+}
+/**
+ * Parse per-section counts out of a prior standup JSON object. The exporter
+ * (`standup export --format json`) writes a top-level `counts` object keyed
+ * `wip/blocked/done/upNext`; we also accept the canonical SectionKey spellings
+ * (`in_progress`/`up_next`) and a fallback of counting `sections_data`/
+ * `sections` arrays. Returns the counts (every section present, missing → 0)
+ * or undefined when nothing usable is found, so the caller can warn + skip.
+ */
+export function extractPriorCounts(parsed) {
+    if (!parsed || typeof parsed !== "object")
+        return undefined;
+    const root = parsed;
+    const fromCountsObject = (obj) => {
+        if (!obj || typeof obj !== "object")
+            return undefined;
+        const c = obj;
+        const inProg = coerceCount(c["in_progress"]) ?? coerceCount(c["wip"]);
+        const blocked = coerceCount(c["blocked"]);
+        const done = coerceCount(c["done"]);
+        const upNext = coerceCount(c["up_next"]) ?? coerceCount(c["upNext"]);
+        if (inProg === undefined && blocked === undefined && done === undefined && upNext === undefined) {
+            return undefined;
+        }
+        return { in_progress: inProg ?? 0, blocked: blocked ?? 0, done: done ?? 0, up_next: upNext ?? 0 };
+    };
+    // Preferred: the exporter's top-level `counts` object.
+    const fromCounts = fromCountsObject(root["counts"]);
+    if (fromCounts)
+        return fromCounts;
+    // Fallback: count the per-section item arrays the exporter also writes.
+    const sd = root["sections_data"] ?? root["sections"];
+    if (sd && typeof sd === "object" && !Array.isArray(sd)) {
+        const s = sd;
+        const len = (k, alt) => {
+            const v = Array.isArray(s[k]) ? s[k].length : alt && Array.isArray(s[alt]) ? s[alt].length : undefined;
+            return v;
+        };
+        const inProg = len("in_progress", "wip");
+        const blocked = len("blocked");
+        const done = len("done");
+        const upNext = len("up_next", "upNext");
+        if (inProg !== undefined || blocked !== undefined || done !== undefined || upNext !== undefined) {
+            return { in_progress: inProg ?? 0, blocked: blocked ?? 0, done: done ?? 0, up_next: upNext ?? 0 };
+        }
+    }
+    return undefined;
+}
+/**
+ * Read a prior standup's per-section counts from a local file at `path`.
+ * Purely a local file read (no network). Any failure — missing/unreadable
+ * file, invalid JSON, or a shape without recognizable counts — emits a single
+ * stderr warning via `warn` and returns undefined so the caller renders the
+ * standup normally WITHOUT deltas (never throws).
+ */
+export function readPriorCounts(path, warn = (m) => console.error(m)) {
+    let raw;
+    try {
+        raw = readFileSync(resolve(path), "utf-8");
+    }
+    catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        warn(`warning: --compare '${path}' could not be read (${detail}); rendering standup without trend deltas.`);
+        return undefined;
+    }
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    }
+    catch {
+        warn(`warning: --compare '${path}' is not valid JSON; rendering standup without trend deltas.`);
+        return undefined;
+    }
+    const counts = extractPriorCounts(parsed);
+    if (!counts) {
+        warn(`warning: --compare '${path}' has no recognizable standup counts ` +
+            `(expected a 'counts' object from 'standup export --format json'); rendering standup without trend deltas.`);
+        return undefined;
+    }
+    return counts;
+}
+/**
+ * Compute per-section deltas (current − prior) for every standup section.
+ * A positive delta is "up", negative "down", zero "flat". The ordering
+ * follows ALL_SECTIONS so output is stable.
+ */
+export function computeDeltas(prior, current) {
+    return ALL_SECTIONS.map((key) => {
+        const p = prior[key] ?? 0;
+        const c = current[key] ?? 0;
+        const delta = c - p;
+        const direction = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+        return { key, prior: p, current: c, delta, direction };
+    });
+}
+/** Render one section delta as e.g. "In Progress ▲+2" / "Blocked ▼-1" / "Done →0". */
+export function formatDelta(d) {
+    const glyph = TREND_GLYPH[d.direction];
+    const num = d.delta > 0 ? `+${d.delta}` : `${d.delta}`;
+    return `${SECTION_META[d.key].title} ${glyph}${num}`;
+}
+/**
+ * Build the one-line trend summary shown in the standup footer, e.g.
+ * "Trend vs prior: In Progress ▲+2 · Blocked ▼-1 · Done →0 · Up Next →0".
+ * Returns the empty string when there are no deltas to show.
+ */
+export function renderTrendLine(deltas) {
+    if (deltas.length === 0)
+        return "";
+    return `Trend vs prior: ${deltas.map(formatDelta).join(" · ")}`;
+}
+// ---------------------------------------------------------------------------
 // Extension
 // ---------------------------------------------------------------------------
 export default defineExtension({
@@ -928,6 +1080,7 @@ export default defineExtension({
             { long: "--channels", value_name: "list", description: "Post the same standup to multiple targets: comma list of #channel names and/or webhook URLs" },
             { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
             { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
+            { long: "--compare", value_name: "path", description: "Show trend deltas vs a PRIOR standup JSON (from 'standup export --format json'); local file read, never posts" },
         ];
         const runStandupCommand = async (ctx) => {
             // Fail-fast credential gate: if a Slack post is actually requested
@@ -941,6 +1094,15 @@ export default defineExtension({
             const { opts, sinceMs } = resolveStandupOptions(ctx.options, parseFormat(readStrOption(ctx.options, "format")));
             const items = fetchAllItems(ctx.pm_root);
             const data = buildStandupData(items, opts, sinceMs);
+            // `--compare <path>`: read a PRIOR standup JSON and attach per-section
+            // trend deltas. Pure local file read; a missing/malformed/wrong-shape
+            // file warns to stderr and leaves `opts.trend` unset (normal render).
+            const comparePath = readStrOption(ctx.options, "compare");
+            if (comparePath) {
+                const prior = readPriorCounts(comparePath);
+                if (prior)
+                    opts.trend = computeDeltas(prior, currentCounts(data));
+            }
             if (dryRun) {
                 // No network call happens on this path.
                 const rendered = renderStandup(data, opts);
