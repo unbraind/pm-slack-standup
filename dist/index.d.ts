@@ -49,6 +49,7 @@ export interface StandupOptions {
     splitYesterday: boolean;
     sectionLabels: Partial<Record<SectionKey, SectionLabelOverride>>;
     upNextCount: number;
+    trend?: SectionDelta[];
 }
 /** Default number of items shown in the "Up Next" section. */
 export declare const DEFAULT_UP_NEXT = 3;
@@ -56,6 +57,18 @@ export interface SectionLabelOverride {
     emoji?: string;
     title?: string;
 }
+/** Per-section item counts, keyed by the canonical SectionKey. */
+export type SectionCounts = Record<SectionKey, number>;
+/** One section's delta vs. a prior standup: signed numeric change + direction. */
+export interface SectionDelta {
+    key: SectionKey;
+    prior: number;
+    current: number;
+    delta: number;
+    direction: "up" | "down" | "flat";
+}
+/** Direction → indicator glyph used in trend output. */
+export declare const TREND_GLYPH: Record<SectionDelta["direction"], string>;
 export declare function readBoolOption(options: Record<string, unknown>, key: string): boolean;
 export declare function readStrOption(options: Record<string, unknown>, key: string): string | undefined;
 /**
@@ -289,6 +302,39 @@ export declare function resolveStandupOptions(options: Record<string, unknown>, 
     opts: StandupOptions;
     sinceMs: number;
 };
+/** Extract the current per-section counts from computed standup data. */
+export declare function currentCounts(data: StandupData): SectionCounts;
+/**
+ * Parse per-section counts out of a prior standup JSON object. The exporter
+ * (`standup export --format json`) writes a top-level `counts` object keyed
+ * `wip/blocked/done/upNext`; we also accept the canonical SectionKey spellings
+ * (`in_progress`/`up_next`) and a fallback of counting `sections_data`/
+ * `sections` arrays. Returns the counts (every section present, missing → 0)
+ * or undefined when nothing usable is found, so the caller can warn + skip.
+ */
+export declare function extractPriorCounts(parsed: unknown): SectionCounts | undefined;
+/**
+ * Read a prior standup's per-section counts from a local file at `path`.
+ * Purely a local file read (no network). Any failure — missing/unreadable
+ * file, invalid JSON, or a shape without recognizable counts — emits a single
+ * stderr warning via `warn` and returns undefined so the caller renders the
+ * standup normally WITHOUT deltas (never throws).
+ */
+export declare function readPriorCounts(path: string, warn?: (msg: string) => void): SectionCounts | undefined;
+/**
+ * Compute per-section deltas (current − prior) for every standup section.
+ * A positive delta is "up", negative "down", zero "flat". The ordering
+ * follows ALL_SECTIONS so output is stable.
+ */
+export declare function computeDeltas(prior: SectionCounts, current: SectionCounts): SectionDelta[];
+/** Render one section delta as e.g. "In Progress ▲+2" / "Blocked ▼-1" / "Done →0". */
+export declare function formatDelta(d: SectionDelta): string;
+/**
+ * Build the one-line trend summary shown in the standup footer, e.g.
+ * "Trend vs prior: In Progress ▲+2 · Blocked ▼-1 · Done →0 · Up Next →0".
+ * Returns the empty string when there are no deltas to show.
+ */
+export declare function renderTrendLine(deltas: SectionDelta[]): string;
 declare const _default: {
     name: string;
     version: string;
