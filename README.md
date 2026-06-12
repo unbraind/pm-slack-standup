@@ -20,7 +20,8 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 - Scope the "recently closed / Done" window with `--since <iso>` **or** `--days <n>` (relative). An **unparseable `--since`** (e.g. a typo) is not silently ignored — it emits a warning and the `--since` window is dropped, so the mistake surfaces loudly
 - **Friendly export errors** — `pm standup export --output <path>` that cannot be written (missing directory, permission denied, etc.) aborts with a clear, actionable message and a clean non-zero exit instead of leaking a raw Node fs stack trace
 - Map pm authors to Slack handles so they get mentioned (`--mention-map`)
-- `pm standup export` — write the standup to a file as Markdown or JSON (the JSON form includes the full Block Kit payload for archiving or re-posting)
+- `pm standup export` — write the standup to a file as Markdown or JSON (the JSON form includes the full Block Kit payload for archiving or re-posting). **Stdout export is round-trip safe**: with no `--output`, stdout carries only the exported document (valid JSON/Markdown, no pm result envelope), so `pm standup export --format json > prev.json` pipes cleanly into `--compare` or `jq`
+- **Multi-snapshot history** — `pm standup export --history-dir <dir>` accumulates one dated JSON snapshot per day, and `pm standup --compare <dir>` renders the whole window as per-section count sequences (e.g. `History (3 snapshots → now): In Progress 0→1→2→2 · …`) in addition to the trend deltas vs the newest snapshot. See [Multi-snapshot history](#multi-snapshot-history)
 - `--channel` override; webhook URL configurable via flag or environment variable
 - **Fail-fast credential preflight** — when you actually request a Slack post (anything other than `--dry-run`) but no webhook is configured, the command aborts **immediately** with a clear, actionable, non-zero error (exit 2) **before** reading any pm data or rendering anything — no half-built message, no crash. The non-posting `--dry-run` preview path is never gated, so previewing without credentials keeps working. See [Credential preflight](#credential-preflight).
 
@@ -85,7 +86,7 @@ pm slack-standup [flags]   # alias with identical behavior
 | `--channels <list>` | string | — | Post the same standup to multiple targets: comma list of `#channel` names and/or full webhook URLs |
 | `--fallback-to-stdout` | boolean | `false` | If the Slack post fails, print the rendered standup to stdout (exit 0) instead of erroring |
 | `--section-labels <map>` | string | — | Override section titles/emoji, e.g. `in_progress=Rolling,blocked=🔥 On Fire` |
-| `--compare <path>` | string | — | Show trend deltas vs a **prior** standup JSON file (from `standup export --format json`); local file read, never posts. Missing/malformed → warn + render without deltas |
+| `--compare <path>` | string | — | Show trend deltas vs a **prior** standup JSON file (from `standup export --format json`), or vs a snapshot **directory** (from `standup export --history-dir`) for [multi-snapshot history](#multi-snapshot-history); local read, never posts. Missing/malformed → warn + render without deltas |
 
 > **Note on `text`:** the legacy `--format text` value is still accepted as an alias for `plain`.
 
@@ -118,8 +119,11 @@ pm standup export                       # Markdown to stdout
 |------|---------|-------------|
 | `--format <md\|json>` | `md` | File format. `json` includes the full Block Kit payload under `slack.blocks` |
 | `--output <file>` | stdout | Output file path |
+| `--history-dir <dir>` | — | Additionally write a dated JSON snapshot to `<dir>/standup-YYYY-MM-DD.json` (one per local day, overwritten on re-export) for [multi-snapshot history](#multi-snapshot-history) |
 
-The `--since`, `--group-by`, `--include-done`, `--channel` and `--mention-map` flags above also apply to the export.
+The `--since`, `--group-by`, `--include-done`, `--channel` and `--mention-map` flags above also apply to the export, and `pm standup export --help` documents the full flag set.
+
+**Stdout is round-trip safe:** when no `--output` is given, stdout carries **only** the exported document — `pm standup export --format json > prev.json` produces valid JSON with no pm result envelope appended, so it can be piped straight into `--compare`, `jq`, or an archive. (Status lines go to stderr.)
 
 The JSON export also carries a top-level `counts` object (`{ wip, blocked, done, upNext, total }`) — this is the exact shape `standup --compare <path>` reads, so a JSON export from one day can be diffed against the next day's standup (see [Trend deltas](#trend-deltas-vs-a-prior-standup)).
 
@@ -216,6 +220,32 @@ The trend line appears in the footer of every text format (`slack`, `markdown` �
 **Graceful degradation:** if the `--compare` file is missing, unreadable, not valid JSON, or doesn't contain recognizable standup counts, the command emits a single `warning:` line to stderr and renders the standup **normally without deltas** — it never crashes. The read is purely local: `--compare` adds **no** network call.
 
 **Round-trip contract:** the `counts` object the exporter writes is exactly what `--compare` consumes, so `standup export --format json > prev.json` today and `standup --compare prev.json` tomorrow always line up. `--compare` also tolerates the canonical `in_progress`/`up_next` key spellings and falls back to counting the exporter's `sections_data` arrays if `counts` is absent.
+
+## Multi-snapshot history
+
+A single prior snapshot shows yesterday-vs-today; a **snapshot directory** shows the whole week's trajectory.
+
+1. **Accumulate** dated snapshots, e.g. from a daily cron or CI job:
+
+   ```bash
+   pm standup export --history-dir .standup-history        # writes .standup-history/standup-2026-06-12.json
+   ```
+
+   `--history-dir` always writes the JSON snapshot shape regardless of the primary `--format`, one file per local day (re-exporting the same day overwrites it).
+
+2. **Compare against the directory** — `--compare` accepts a directory as well as a file:
+
+   ```bash
+   pm standup --dry-run --compare .standup-history
+   ```
+
+   The newest snapshot provides the trend baseline (same `Trend vs prior:` line as a file compare), and with 2+ snapshots the footer gains a per-section count sequence across the window, ending at the current standup:
+
+   ```
+   History (3 snapshots → now): In Progress 0→1→2→2 · Blocked 1→0→0→0 · Done 0→0→0→0 · Up Next 3→2→1→1
+   ```
+
+Snapshot files are read oldest-first by filename (the exporter's `standup-YYYY-MM-DD.json` naming makes lexicographic order chronological); at most the newest 8 snapshots are rendered. Unreadable or unrecognizable snapshot files are skipped with one stderr warning each, and a directory with no usable snapshots degrades exactly like a missing `--compare` file: warn once, render normally. Like the file form, a directory compare is a purely local read — no network.
 
 ## Message Format
 

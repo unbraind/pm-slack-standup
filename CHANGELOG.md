@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Round-trip-safe stdout export, documented export flags, multi-snapshot history \(--history-dir / --compare <dir\>\) ([pm-slack-standup-39h9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-39h9.toon))
+- Configurable Up Next count, milestone grouping, --since warning + friendly export errors ([pm-slack-standup-dc4i](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-dc4i.toon))
+
 ## 2026.06.09 - 2026-06-09
 
 ### Added

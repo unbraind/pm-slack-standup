@@ -1,0 +1,14 @@
+id: pm-slack-standup-7ikg
+title: Align pm-slack-standup with pm CLI 2026.6.12 release readiness
+description: June 12 2026 package-readiness pass for pm-slack-standup.
+type: Task
+status: in_progress
+priority: 1
+tags[3]: agent-context,dependency-alignment,release-readiness
+created_at: "2026-06-12T11:53:40.410Z"
+updated_at: "2026-06-12T14:23:00.334Z"
+author: codex
+acceptance_criteria: Latest pm CLI/SDK dependency is used; pm-changelog release scripts are present where applicable; package tests and release checks pass or blockers are recorded; no private data is introduced; results are captured in pm history.
+notes[1]{created_at,author,text}:
+  "2026-06-12T14:01:40.602Z",codex,"Verified release readiness after moving @unbrained/pm-cli to runtime dependencies: npm release:check completed for the fleet on 2026-06-12; npm audit retries for pm-beads and pm-jira returned 0 vulnerabilities after transient advisory endpoint failures."
+body: "Align to latest published @unbrained/pm-cli, align pm-changelog where applicable, verify changelog/release commands, run tests with real package data, and record upstream pm CLI/SDK UX issues separately in unbraind/pm-cli.\n\n2026-06-12 PR #15 review/CI fix: GitHub CI failure was Verify generated changelog; local changelog:check is now up to date. Addressed Sourcery/Gemini portability feedback by using node:path basename for snapshot labels and tests, and computing one snapshotDate for JSON payload date plus --history-dir filename so midnight boundary cannot split them. Verification: npm run build, npm run build:test, npm test (67 passing), npm run check, npm run changelog:check.\n\n2026-06-12 Gemini follow-up: tightened history snapshots to local-day semantics and explicit standup-YYYY-MM-DD.json discovery. Replaced snapshotDate=todayISO() with localDayKeyOf(Date.now()) for local daily snapshot files, limited listSnapshotFiles to dated standup JSON names so unrelated JSON is ignored, and updated tests to cover that contract. Verification: npm run build, npm run build:test, npm test (67 passing), npm run check, npm run changelog:check, npm run audit:prod (0 vulnerabilities)."

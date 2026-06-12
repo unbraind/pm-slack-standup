@@ -1,7 +1,7 @@
 import https from "node:https";
 import { spawnSync } from "node:child_process";
-import { writeFileSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
+import { basename, resolve, join } from "node:path";
 const defineExtension = ((extension) => extension);
 // ---------------------------------------------------------------------------
 // Error contract
@@ -40,6 +40,8 @@ export const TREND_GLYPH = {
     down: "▼",
     flat: "→",
 };
+/** How many snapshots the history footer shows at most (newest last). */
+export const HISTORY_MAX_SNAPSHOTS = 8;
 // ---------------------------------------------------------------------------
 // Option helpers
 // ---------------------------------------------------------------------------
@@ -663,6 +665,16 @@ export function buildTextMessage(data, opts) {
             lines.push(opts.format === "markdown" ? `_${trendLine}_` : trendLine);
         }
     }
+    // History footer (from `--compare <dir>` with 2+ snapshots): per-section
+    // count sequences across snapshots, ending at the current standup.
+    if (opts.history && opts.history.length >= 2) {
+        const historyLine = renderHistoryLine(opts.history, currentCounts(data));
+        if (historyLine) {
+            if (!(opts.trend && opts.trend.length > 0))
+                lines.push("");
+            lines.push(opts.format === "markdown" ? `_${historyLine}_` : historyLine);
+        }
+    }
     return lines.join("\n");
 }
 function mrkdwnList(items, opts, withPriority = false) {
@@ -736,6 +748,13 @@ export function buildBlockKit(data, opts) {
         const trendLine = renderTrendLine(opts.trend);
         if (trendLine)
             footerElements.push({ type: "mrkdwn", text: trendLine });
+    }
+    // History footer (from `--compare <dir>`): per-section count sequences
+    // across snapshots, ending at the current standup.
+    if (opts.history && opts.history.length >= 2) {
+        const historyLine = renderHistoryLine(opts.history, currentCounts(data));
+        if (historyLine)
+            footerElements.push({ type: "mrkdwn", text: historyLine });
     }
     blocks.push({
         type: "context",
@@ -1027,6 +1046,85 @@ export function readPriorCounts(path, warn = (m) => console.error(m)) {
     return counts;
 }
 /**
+ * True when `path` exists and is a directory (a snapshot history directory
+ * written by `standup export --history-dir`). Never throws.
+ */
+export function isDirectory(path) {
+    try {
+        return statSync(resolve(path)).isDirectory();
+    }
+    catch {
+        return false;
+    }
+}
+/**
+ * List the standup snapshot JSON files inside a history directory, oldest
+ * first. Snapshot files are sorted by filename (the exporter writes
+ * `standup-YYYY-MM-DD.json`, so lexicographic order IS chronological order);
+ * unrelated JSON entries are ignored. Returns absolute paths.
+ */
+export function listSnapshotFiles(dir) {
+    const root = resolve(dir);
+    let entries;
+    try {
+        entries = readdirSync(root);
+    }
+    catch {
+        return [];
+    }
+    return entries
+        .filter((name) => /^standup-\d{4}-\d{2}-\d{2}\.json$/i.test(name))
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => join(root, name));
+}
+/**
+ * Read a multi-snapshot history from a `--compare <dir>` directory. Each
+ * `*.json` file is parsed with the same tolerant count extraction as a single
+ * `--compare <file>`; unreadable/unrecognizable snapshots are skipped with one
+ * stderr warning each. At most {@link HISTORY_MAX_SNAPSHOTS} newest snapshots
+ * are kept (oldest first). Labels prefer the snapshot's own `date` field and
+ * fall back to the file name. Returns an empty array when nothing is usable.
+ */
+export function readSnapshotHistory(dir, warn = (m) => console.error(m)) {
+    const files = listSnapshotFiles(dir).slice(-HISTORY_MAX_SNAPSHOTS);
+    const out = [];
+    for (const file of files) {
+        let parsed;
+        try {
+            parsed = JSON.parse(readFileSync(file, "utf-8"));
+        }
+        catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            warn(`warning: skipping snapshot '${file}' (${detail}).`);
+            continue;
+        }
+        const counts = extractPriorCounts(parsed);
+        if (!counts) {
+            warn(`warning: skipping snapshot '${file}' (no recognizable standup counts).`);
+            continue;
+        }
+        const date = parsed && typeof parsed === "object" && typeof parsed["date"] === "string"
+            ? parsed["date"]
+            : basename(file).replace(/\.json$/i, "");
+        out.push({ label: date, counts });
+    }
+    return out;
+}
+/**
+ * Build the one-line history summary shown below the trend footer when
+ * `--compare` points at a snapshot directory with 2+ snapshots, e.g.
+ * "History (3 snapshots → today): In Progress 2→3→1 · Done 4→6→9".
+ * Sections whose counts never change across the window are still shown so the
+ * line stays positionally stable. Returns "" for fewer than 2 snapshots.
+ */
+export function renderHistoryLine(history, current) {
+    if (history.length < 2)
+        return "";
+    const seq = (key) => [...history.map((s) => s.counts[key] ?? 0), current[key] ?? 0].join("→");
+    const parts = ALL_SECTIONS.map((key) => `${SECTION_META[key].title} ${seq(key)}`);
+    return `History (${history.length} snapshots → now): ${parts.join(" · ")}`;
+}
+/**
  * Compute per-section deltas (current − prior) for every standup section.
  * A positive delta is "up", negative "down", zero "flat". The ordering
  * follows ALL_SECTIONS so output is stable.
@@ -1059,6 +1157,10 @@ export function renderTrendLine(deltas) {
 // ---------------------------------------------------------------------------
 // Extension
 // ---------------------------------------------------------------------------
+// True once the scoped `output_format` service override is registered. When
+// the host runtime lacks `registerService`, the exporter falls back to writing
+// stdout directly (legacy behavior, envelope included).
+let exportStdoutViaService = false;
 export default defineExtension({
     name: "pm-slack-standup",
     version: "2026.6.10-1",
@@ -1080,7 +1182,7 @@ export default defineExtension({
             { long: "--channels", value_name: "list", description: "Post the same standup to multiple targets: comma list of #channel names and/or webhook URLs" },
             { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
             { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
-            { long: "--compare", value_name: "path", description: "Show trend deltas vs a PRIOR standup JSON (from 'standup export --format json'); local file read, never posts" },
+            { long: "--compare", value_name: "path", description: "Show trend deltas vs a PRIOR standup JSON file, or vs a snapshot DIRECTORY (from 'standup export --history-dir') for multi-snapshot history; local read, never posts" },
         ];
         const runStandupCommand = async (ctx) => {
             // Fail-fast credential gate: if a Slack post is actually requested
@@ -1097,11 +1199,28 @@ export default defineExtension({
             // `--compare <path>`: read a PRIOR standup JSON and attach per-section
             // trend deltas. Pure local file read; a missing/malformed/wrong-shape
             // file warns to stderr and leaves `opts.trend` unset (normal render).
+            // When <path> is a DIRECTORY (a snapshot history written by
+            // `standup export --history-dir`), the newest snapshot provides the
+            // trend baseline and the full window renders a multi-snapshot history
+            // line (count sequences per section).
             const comparePath = readStrOption(ctx.options, "compare");
             if (comparePath) {
-                const prior = readPriorCounts(comparePath);
-                if (prior)
-                    opts.trend = computeDeltas(prior, currentCounts(data));
+                if (isDirectory(comparePath)) {
+                    const history = readSnapshotHistory(comparePath);
+                    if (history.length === 0) {
+                        console.error(`warning: --compare '${comparePath}' is a directory with no usable standup snapshots; rendering standup without trend deltas.`);
+                    }
+                    else {
+                        opts.trend = computeDeltas(history[history.length - 1].counts, currentCounts(data));
+                        if (history.length >= 2)
+                            opts.history = history;
+                    }
+                }
+                else {
+                    const prior = readPriorCounts(comparePath);
+                    if (prior)
+                        opts.trend = computeDeltas(prior, currentCounts(data));
+                }
             }
             if (dryRun) {
                 // No network call happens on this path.
@@ -1184,6 +1303,8 @@ export default defineExtension({
                 "pm standup --dry-run --yesterday --format plain",
                 "pm standup --channels '#team-eng,#standups' --dry-run",
                 "pm standup --section-labels 'in_progress=Rolling,blocked=🔥 On Fire' --dry-run",
+                "pm standup --dry-run --compare standup.json",
+                "pm standup --dry-run --compare .standup-history",
                 "PM_SLACK_WEBHOOK=https://... pm standup --channel '#standups'",
             ],
             flags: standupFlags,
@@ -1223,11 +1344,54 @@ export default defineExtension({
             return {};
         });
         // -----------------------------------------------------------------------
+        // Output-format service override (scoped to `standup export`).
+        //
+        // pm renders every extension command's RETURN VALUE to stdout as a result
+        // envelope (TOON by default, JSON with --json). The exporter's stdout mode
+        // must emit ONLY the exported document — `standup export --format json >
+        // f.json` has to produce valid JSON for the documented `--compare`
+        // round-trip. The sanctioned SDK mechanism is an `output_format` service
+        // override: when the active command is `standup export` and the handler
+        // result carries our raw-stdout marker, return the export string verbatim
+        // (pm prints exactly that string); for every other command/result return
+        // `context.payload` untouched, which the runtime treats as "not handled".
+        // -----------------------------------------------------------------------
+        if (typeof api.registerService === "function") {
+            api.registerService("output_format", (sctx) => {
+                const payload = sctx?.payload;
+                const command = (sctx?.command ?? payload?.["command"] ?? "").trim();
+                if (command === "standup export") {
+                    const result = payload?.["result"];
+                    if (result && result["raw_stdout"] === true && typeof result["output"] === "string") {
+                        return result["output"];
+                    }
+                }
+                return sctx?.payload;
+            });
+            exportStdoutViaService = true;
+        }
+        // -----------------------------------------------------------------------
         // Exporter: standup  →  `pm standup export`
         // Writes the standup to a file (or stdout) as Markdown or JSON. JSON emits
         // the full Block Kit payload so it can be POSTed elsewhere or archived.
         // (No collision with the `pm standup` command — different invocation.)
         // -----------------------------------------------------------------------
+        const exporterFlags = [
+            { long: "--format", value_name: "fmt", description: "Export format: md (markdown, default) | json (counts + sections + Block Kit payload)" },
+            { long: "--output", value_name: "file", description: "Write the export to this file instead of stdout" },
+            { long: "--history-dir", value_name: "dir", description: "Also write a dated JSON snapshot to <dir>/standup-YYYY-MM-DD.json (for 'pm standup --compare <dir>' trends)" },
+            { long: "--include-done", description: "Include recently-closed items in a Done section" },
+            { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
+            { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
+            { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
+            { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
+            { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
+            { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
+            { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
+            { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+            { long: "--channel", value_name: "name", description: "Channel name recorded in the exported document" },
+            { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
+        ];
         api.registerExporter("standup", async (ctx) => {
             const rawFormat = (readStrOption(ctx.options, "format") ?? "md").toLowerCase();
             // For the exporter, --format selects the file format (md|json); the text
@@ -1237,13 +1401,14 @@ export default defineExtension({
             const fileFormat = rawFormat === "json" ? "json" : "md";
             const { opts, sinceMs } = resolveStandupOptions(ctx.options, "markdown");
             const exportOpts = opts;
+            const historyDir = readStrOption(ctx.options, "history-dir");
             const items = fetchAllItems(ctx.pm_root);
             const data = buildStandupData(items, exportOpts, sinceMs);
-            let output;
-            if (fileFormat === "json") {
+            const snapshotDate = localDayKeyOf(Date.now());
+            const buildJsonSnapshot = () => {
                 const { blocks, fallback } = buildBlockKit(data, opts);
-                output = JSON.stringify({
-                    date: todayISO(),
+                return JSON.stringify({
+                    date: snapshotDate,
                     channel: opts.channel,
                     since: opts.since,
                     groupBy: opts.groupBy,
@@ -1263,9 +1428,24 @@ export default defineExtension({
                     },
                     slack: { text: fallback, blocks },
                 }, null, 2);
-            }
-            else {
-                output = buildTextMessage(data, exportOpts);
+            };
+            const output = fileFormat === "json" ? buildJsonSnapshot() : buildTextMessage(data, exportOpts);
+            // `--history-dir <dir>`: additionally write a dated JSON snapshot
+            // (one per local day, overwritten on re-export) so `pm standup
+            // --compare <dir>` can render multi-snapshot trends. Always JSON,
+            // regardless of the primary --format.
+            let historyFile;
+            if (historyDir) {
+                const dirAbs = resolve(historyDir);
+                historyFile = join(dirAbs, `standup-${snapshotDate}.json`);
+                try {
+                    mkdirSync(dirAbs, { recursive: true });
+                    writeFileSync(historyFile, (fileFormat === "json" ? output : buildJsonSnapshot()) + "\n", "utf-8");
+                }
+                catch (err) {
+                    throw writeError(historyFile, err);
+                }
+                console.error(`standup export: wrote history snapshot to ${historyFile}`);
             }
             const outputPath = readStrOption(ctx.options, "output");
             if (outputPath) {
@@ -1277,11 +1457,34 @@ export default defineExtension({
                     throw writeError(absolutePath, err);
                 }
                 console.error(`standup export: wrote ${data.total} item(s) as ${fileFormat} to ${absolutePath}`);
-                return { exported: data.total, format: fileFormat, file: absolutePath };
+                return { exported: data.total, format: fileFormat, file: absolutePath, history_file: historyFile };
             }
-            console.log(output);
             console.error(`standup export: rendered ${data.total} item(s) as ${fileFormat}.`);
-            return { exported: data.total, format: fileFormat, output };
+            if (exportStdoutViaService) {
+                // The scoped `output_format` service prints `output` verbatim, so
+                // stdout carries ONLY the exported document (valid JSON / markdown).
+                return { exported: data.total, format: fileFormat, output, history_file: historyFile, raw_stdout: true };
+            }
+            // Fallback for runtimes without service overrides: write the document
+            // ourselves (stdout will additionally carry pm's result envelope).
+            console.log(output);
+            return { exported: data.total, format: fileFormat, output, history_file: historyFile };
+        }, {
+            action: "standup-export",
+            description: "Export the standup to a file or stdout as Markdown or JSON (counts, sections, Block Kit payload)",
+            intent: "Archive a standup snapshot or feed another tool (stdout JSON is round-trip safe for --compare)",
+            examples: [
+                "pm standup export",
+                "pm standup export --format json --output standup.json",
+                "pm standup export --format json > standup.json",
+                "pm standup export --include-done --days 7 --output standup.md",
+                "pm standup export --format json --history-dir .standup-history",
+            ],
+            failure_hints: [
+                "If the output path fails, ensure the parent directory exists and is writable.",
+                "Run pm package doctor --project --detail deep --trace on activation failures.",
+            ],
+            flags: exporterFlags,
         });
     },
 });

@@ -2,11 +2,12 @@ id: pm-slack-standup-dc4i
 title: "Configurable Up Next count, milestone grouping, --since warning + friendly export errors"
 description: ""
 type: Feature
-status: open
+status: closed
 priority: 2
 tags: []
 created_at: "2026-06-05T04:42:12.592Z"
-updated_at: "2026-06-05T04:42:12.592Z"
+updated_at: "2026-06-12T10:32:51.936Z"
 author: codex
 acceptance_criteria: "--up-next <n> and --all-open control Up Next size (default 3); --group-by milestone buckets by milestone with (no milestone) fallback; unparseable --since warns instead of silently dropping the window; standup export --output to an unwritable path raises a friendly CommandError not a raw fs stack."
+close_reason: "Verified shipped on main (hands-on 2026-06-12, CLI 2026.6.11): --up-next/--all-open, --group-by milestone w/ (no milestone) fallback, unparseable --since warns instead of silently dropping, export --output unwritable path raises friendly CommandError. All acceptance criteria pass; no code change needed."
 body: ""
