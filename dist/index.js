@@ -1,7 +1,7 @@
 import https from "node:https";
 import { spawnSync } from "node:child_process";
 import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { basename, resolve, join } from "node:path";
 const defineExtension = ((extension) => extension);
 // ---------------------------------------------------------------------------
 // Error contract
@@ -1105,7 +1105,7 @@ export function readSnapshotHistory(dir, warn = (m) => console.error(m)) {
         }
         const date = parsed && typeof parsed === "object" && typeof parsed["date"] === "string"
             ? parsed["date"]
-            : file.replace(/^.*\//, "").replace(/\.json$/i, "");
+            : basename(file).replace(/\.json$/i, "");
         out.push({ label: date, counts });
     }
     return out;
@@ -1404,10 +1404,11 @@ export default defineExtension({
             const historyDir = readStrOption(ctx.options, "history-dir");
             const items = fetchAllItems(ctx.pm_root);
             const data = buildStandupData(items, exportOpts, sinceMs);
+            const snapshotDate = todayISO();
             const buildJsonSnapshot = () => {
                 const { blocks, fallback } = buildBlockKit(data, opts);
                 return JSON.stringify({
-                    date: todayISO(),
+                    date: snapshotDate,
                     channel: opts.channel,
                     since: opts.since,
                     groupBy: opts.groupBy,
@@ -1436,7 +1437,7 @@ export default defineExtension({
             let historyFile;
             if (historyDir) {
                 const dirAbs = resolve(historyDir);
-                historyFile = join(dirAbs, `standup-${todayISO()}.json`);
+                historyFile = join(dirAbs, `standup-${snapshotDate}.json`);
                 try {
                     mkdirSync(dirAbs, { recursive: true });
                     writeFileSync(historyFile, (fileFormat === "json" ? output : buildJsonSnapshot()) + "\n", "utf-8");

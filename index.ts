@@ -1,7 +1,7 @@
 import https from "node:https";
 import { spawnSync } from "node:child_process";
 import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { basename, resolve, join } from "node:path";
 
 import type { defineExtension as defineExtensionType } from "@unbrained/pm-cli/sdk";
 
@@ -1352,7 +1352,7 @@ export function readSnapshotHistory(
     const date =
       parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>)["date"] === "string"
         ? ((parsed as Record<string, unknown>)["date"] as string)
-        : file.replace(/^.*\//, "").replace(/\.json$/i, "");
+        : basename(file).replace(/\.json$/i, "");
     out.push({ label: date, counts });
   }
   return out;
@@ -1688,12 +1688,13 @@ export default defineExtension({
 
       const items = fetchAllItems(ctx.pm_root);
       const data = buildStandupData(items, exportOpts, sinceMs);
+      const snapshotDate = todayISO();
 
       const buildJsonSnapshot = (): string => {
         const { blocks, fallback } = buildBlockKit(data, opts);
         return JSON.stringify(
           {
-            date: todayISO(),
+            date: snapshotDate,
             channel: opts.channel,
             since: opts.since,
             groupBy: opts.groupBy,
@@ -1727,7 +1728,7 @@ export default defineExtension({
       let historyFile: string | undefined;
       if (historyDir) {
         const dirAbs = resolve(historyDir);
-        historyFile = join(dirAbs, `standup-${todayISO()}.json`);
+        historyFile = join(dirAbs, `standup-${snapshotDate}.json`);
         try {
           mkdirSync(dirAbs, { recursive: true });
           writeFileSync(historyFile, (fileFormat === "json" ? output : buildJsonSnapshot()) + "\n", "utf-8");

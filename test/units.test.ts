@@ -50,7 +50,7 @@ import {
 
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const baseOpts: StandupOptions = {
   format: "slack",
@@ -850,7 +850,7 @@ test("listSnapshotFiles returns *.json sorted lexicographically (oldest first), 
     mkdirSync(join(dir, "subdir.notjson"));
     const files = listSnapshotFiles(dir);
     assert.deepEqual(
-      files.map((f) => f.split("/").pop()),
+      files.map((f) => basename(f)),
       ["standup-2026-06-09.json", "standup-2026-06-10.JSON", "standup-2026-06-11.json"]
     );
     // missing directory → empty list, no throw
