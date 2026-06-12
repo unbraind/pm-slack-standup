@@ -339,7 +339,7 @@ export declare function isDirectory(path: string): boolean;
  * List the standup snapshot JSON files inside a history directory, oldest
  * first. Snapshot files are sorted by filename (the exporter writes
  * `standup-YYYY-MM-DD.json`, so lexicographic order IS chronological order);
- * non-JSON entries are ignored. Returns absolute paths.
+ * unrelated JSON entries are ignored. Returns absolute paths.
  */
 export declare function listSnapshotFiles(dir: string): string[];
 /**

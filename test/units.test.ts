@@ -840,12 +840,14 @@ test("isDirectory is true for directories, false for files and missing paths", (
   }
 });
 
-test("listSnapshotFiles returns *.json sorted lexicographically (oldest first), ignores non-JSON", () => {
+test("listSnapshotFiles returns dated standup JSON sorted lexicographically and ignores unrelated JSON", () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-hist-"));
   try {
     writeFileSync(join(dir, "standup-2026-06-11.json"), "{}");
     writeFileSync(join(dir, "standup-2026-06-09.json"), "{}");
     writeFileSync(join(dir, "standup-2026-06-10.JSON"), "{}");
+    writeFileSync(join(dir, "other-2026-06-08.json"), "{}");
+    writeFileSync(join(dir, "standup-latest.json"), "{}");
     writeFileSync(join(dir, "notes.md"), "ignore me");
     mkdirSync(join(dir, "subdir.notjson"));
     const files = listSnapshotFiles(dir);
@@ -888,12 +890,13 @@ test("readSnapshotHistory reads snapshots oldest-first, labels by date field wit
 test("readSnapshotHistory skips malformed/unrecognizable snapshots with one warning each", () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-hist-"));
   try {
-    writeFileSync(join(dir, "a-bad.json"), "{ nope ");
-    writeFileSync(join(dir, "b-wrong.json"), JSON.stringify({ hello: "world" }));
+    writeFileSync(join(dir, "standup-2026-06-09.json"), "{ nope ");
+    writeFileSync(join(dir, "standup-2026-06-10.json"), JSON.stringify({ hello: "world" }));
     writeFileSync(
-      join(dir, "c-good.json"),
+      join(dir, "standup-2026-06-11.json"),
       JSON.stringify({ date: "2026-06-12", counts: { wip: 0, blocked: 0, done: 1, upNext: 0 } })
     );
+    writeFileSync(join(dir, "unrelated.json"), "{ nope ");
     const warnings: string[] = [];
     const history = readSnapshotHistory(dir, (m) => warnings.push(m));
     assert.equal(history.length, 1);

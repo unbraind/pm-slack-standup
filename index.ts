@@ -1305,7 +1305,7 @@ export function isDirectory(path: string): boolean {
  * List the standup snapshot JSON files inside a history directory, oldest
  * first. Snapshot files are sorted by filename (the exporter writes
  * `standup-YYYY-MM-DD.json`, so lexicographic order IS chronological order);
- * non-JSON entries are ignored. Returns absolute paths.
+ * unrelated JSON entries are ignored. Returns absolute paths.
  */
 export function listSnapshotFiles(dir: string): string[] {
   const root = resolve(dir);
@@ -1316,7 +1316,7 @@ export function listSnapshotFiles(dir: string): string[] {
     return [];
   }
   return entries
-    .filter((name) => name.toLowerCase().endsWith(".json"))
+    .filter((name) => /^standup-\d{4}-\d{2}-\d{2}\.json$/i.test(name))
     .sort((a, b) => a.localeCompare(b))
     .map((name) => join(root, name));
 }
@@ -1688,7 +1688,7 @@ export default defineExtension({
 
       const items = fetchAllItems(ctx.pm_root);
       const data = buildStandupData(items, exportOpts, sinceMs);
-      const snapshotDate = todayISO();
+      const snapshotDate = localDayKeyOf(Date.now());
 
       const buildJsonSnapshot = (): string => {
         const { blocks, fallback } = buildBlockKit(data, opts);
