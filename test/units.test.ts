@@ -36,15 +36,21 @@ import {
   computeDeltas,
   formatDelta,
   renderTrendLine,
+  isDirectory,
+  listSnapshotFiles,
+  readSnapshotHistory,
+  renderHistoryLine,
+  HISTORY_MAX_SNAPSHOTS,
+  type SnapshotEntry,
   type PmItem,
   type StandupOptions,
   type SectionCounts,
   type Poster,
 } from "../dist/index.js";
 
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const baseOpts: StandupOptions = {
   format: "slack",
@@ -815,4 +821,157 @@ test("trend renders as a second context element in Block Kit footer", () => {
   const { blocks: plainBlocks } = buildBlockKit(data, baseOpts);
   const plainFooter = plainBlocks[plainBlocks.length - 1] as any;
   assert.equal(plainFooter.elements.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Multi-snapshot history (--compare <dir> / export --history-dir)
+// ---------------------------------------------------------------------------
+
+test("isDirectory is true for directories, false for files and missing paths", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-hist-"));
+  try {
+    assert.equal(isDirectory(dir), true);
+    const f = join(dir, "a.json");
+    writeFileSync(f, "{}");
+    assert.equal(isDirectory(f), false);
+    assert.equal(isDirectory(join(dir, "missing")), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("listSnapshotFiles returns dated standup JSON sorted lexicographically and ignores unrelated JSON", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-hist-"));
+  try {
+    writeFileSync(join(dir, "standup-2026-06-11.json"), "{}");
+    writeFileSync(join(dir, "standup-2026-06-09.json"), "{}");
+    writeFileSync(join(dir, "standup-2026-06-10.JSON"), "{}");
+    writeFileSync(join(dir, "other-2026-06-08.json"), "{}");
+    writeFileSync(join(dir, "standup-latest.json"), "{}");
+    writeFileSync(join(dir, "notes.md"), "ignore me");
+    mkdirSync(join(dir, "subdir.notjson"));
+    const files = listSnapshotFiles(dir);
+    assert.deepEqual(
+      files.map((f) => basename(f)),
+      ["standup-2026-06-09.json", "standup-2026-06-10.JSON", "standup-2026-06-11.json"]
+    );
+    // missing directory → empty list, no throw
+    assert.deepEqual(listSnapshotFiles(join(dir, "missing")), []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readSnapshotHistory reads snapshots oldest-first, labels by date field with filename fallback", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-hist-"));
+  try {
+    writeFileSync(
+      join(dir, "standup-2026-06-10.json"),
+      JSON.stringify({ date: "2026-06-10", counts: { wip: 1, blocked: 0, done: 2, upNext: 3 } })
+    );
+    // no date field → filename (sans .json) label
+    writeFileSync(
+      join(dir, "standup-2026-06-11.json"),
+      JSON.stringify({ counts: { wip: 2, blocked: 1, done: 2, upNext: 2 } })
+    );
+    const warnings: string[] = [];
+    const history = readSnapshotHistory(dir, (m) => warnings.push(m));
+    assert.equal(history.length, 2);
+    assert.equal(history[0].label, "2026-06-10");
+    assert.deepEqual(history[0].counts, { in_progress: 1, blocked: 0, done: 2, up_next: 3 });
+    assert.equal(history[1].label, "standup-2026-06-11");
+    assert.deepEqual(history[1].counts, { in_progress: 2, blocked: 1, done: 2, up_next: 2 });
+    assert.equal(warnings.length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readSnapshotHistory skips malformed/unrecognizable snapshots with one warning each", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-hist-"));
+  try {
+    writeFileSync(join(dir, "standup-2026-06-09.json"), "{ nope ");
+    writeFileSync(join(dir, "standup-2026-06-10.json"), JSON.stringify({ hello: "world" }));
+    writeFileSync(
+      join(dir, "standup-2026-06-11.json"),
+      JSON.stringify({ date: "2026-06-12", counts: { wip: 0, blocked: 0, done: 1, upNext: 0 } })
+    );
+    writeFileSync(join(dir, "unrelated.json"), "{ nope ");
+    const warnings: string[] = [];
+    const history = readSnapshotHistory(dir, (m) => warnings.push(m));
+    assert.equal(history.length, 1);
+    assert.equal(history[0].label, "2026-06-12");
+    assert.equal(warnings.length, 2);
+    assert.match(warnings[0], /skipping snapshot/i);
+    assert.match(warnings[1], /no recognizable standup counts/i);
+    // empty dir → empty history, no warnings beyond per-file ones
+    const emptyDir = mkdtempSync(join(tmpdir(), "standup-hist-empty-"));
+    try {
+      assert.deepEqual(readSnapshotHistory(emptyDir, () => {}), []);
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readSnapshotHistory keeps only the newest HISTORY_MAX_SNAPSHOTS snapshots", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-hist-"));
+  try {
+    for (let i = 0; i < HISTORY_MAX_SNAPSHOTS + 3; i++) {
+      const day = String(i + 1).padStart(2, "0");
+      writeFileSync(
+        join(dir, `standup-2026-06-${day}.json`),
+        JSON.stringify({ date: `2026-06-${day}`, counts: { wip: i, blocked: 0, done: 0, upNext: 0 } })
+      );
+    }
+    const history = readSnapshotHistory(dir, () => {});
+    assert.equal(history.length, HISTORY_MAX_SNAPSHOTS);
+    // oldest kept snapshot is the (count - max + 1)-th file; newest is last
+    assert.equal(history[0].counts.in_progress, 3);
+    assert.equal(history[history.length - 1].counts.in_progress, HISTORY_MAX_SNAPSHOTS + 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("renderHistoryLine renders per-section count sequences ending at current; empty for <2 snapshots", () => {
+  const history: SnapshotEntry[] = [
+    { label: "2026-06-10", counts: { in_progress: 0, blocked: 1, done: 0, up_next: 3 } },
+    { label: "2026-06-11", counts: { in_progress: 1, blocked: 0, done: 0, up_next: 2 } },
+  ];
+  const current: SectionCounts = { in_progress: 2, blocked: 0, done: 0, up_next: 1 };
+  const line = renderHistoryLine(history, current);
+  assert.match(line, /^History \(2 snapshots → now\): /);
+  assert.match(line, /In Progress 0→1→2/);
+  assert.match(line, /Blocked 1→0→0/);
+  assert.match(line, /Up Next 3→2→1/);
+  assert.equal(renderHistoryLine(history.slice(0, 1), current), "");
+  assert.equal(renderHistoryLine([], current), "");
+});
+
+test("history footer renders in text output below the trend line and in Block Kit context", () => {
+  const data = buildStandupData(
+    [item({ status: "in_progress", title: "A" }), item({ status: "open", title: "B" })],
+    baseOpts
+  );
+  const history: SnapshotEntry[] = [
+    { label: "2026-06-10", counts: { in_progress: 0, blocked: 0, done: 0, up_next: 2 } },
+    { label: "2026-06-11", counts: { in_progress: 1, blocked: 0, done: 0, up_next: 1 } },
+  ];
+  const trend = computeDeltas(history[history.length - 1].counts, currentCounts(data));
+
+  const md = buildTextMessage(data, { ...baseOpts, format: "markdown", trend, history });
+  assert.match(md, /_History \(2 snapshots → now\):.*_/);
+
+  const { blocks } = buildBlockKit(data, { ...baseOpts, trend, history });
+  const footer = blocks[blocks.length - 1] as any;
+  assert.equal(footer.type, "context");
+  assert.equal(footer.elements.length, 3);
+  assert.match(footer.elements[2].text, /History \(2 snapshots → now\)/);
+
+  // single snapshot → no history footer (backward compatible)
+  const single = buildTextMessage(data, { ...baseOpts, trend, history: history.slice(0, 1) });
+  assert.ok(!/History \(/.test(single));
 });
