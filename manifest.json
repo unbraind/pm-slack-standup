@@ -1,15 +1,28 @@
 {
   "name": "pm-slack-standup",
   "version": "2026.6.10-1",
+  "manifest_version": 2,
   "description": "Post pm context as a Slack standup message",
   "author": "@unbraind",
   "entry": "./dist/index.js",
   "priority": 50,
+  "pm_min_version": "2026.6.7",
+  "trusted": true,
+  "sandbox_profile": "restricted",
+  "permissions": {
+    "fs_read": true,
+    "fs_write": true,
+    "network": true,
+    "env_read": true,
+    "env_write": false,
+    "process_spawn": true
+  },
   "capabilities": [
     "commands",
     "schema",
     "importers",
-    "preflight"
+    "preflight",
+    "services"
   ],
   "pm": {
     "compatibility": "v2"

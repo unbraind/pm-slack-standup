@@ -50,6 +50,7 @@ export interface StandupOptions {
     sectionLabels: Partial<Record<SectionKey, SectionLabelOverride>>;
     upNextCount: number;
     trend?: SectionDelta[];
+    history?: SnapshotEntry[];
 }
 /** Default number of items shown in the "Up Next" section. */
 export declare const DEFAULT_UP_NEXT = 3;
@@ -69,6 +70,14 @@ export interface SectionDelta {
 }
 /** Direction → indicator glyph used in trend output. */
 export declare const TREND_GLYPH: Record<SectionDelta["direction"], string>;
+/** One historical standup snapshot: a short label (date) + section counts. */
+export interface SnapshotEntry {
+    /** Human label for the snapshot, e.g. "2026-06-10" (from the export date). */
+    label: string;
+    counts: SectionCounts;
+}
+/** How many snapshots the history footer shows at most (newest last). */
+export declare const HISTORY_MAX_SNAPSHOTS = 8;
 export declare function readBoolOption(options: Record<string, unknown>, key: string): boolean;
 export declare function readStrOption(options: Record<string, unknown>, key: string): string | undefined;
 /**
@@ -321,6 +330,35 @@ export declare function extractPriorCounts(parsed: unknown): SectionCounts | und
  * standup normally WITHOUT deltas (never throws).
  */
 export declare function readPriorCounts(path: string, warn?: (msg: string) => void): SectionCounts | undefined;
+/**
+ * True when `path` exists and is a directory (a snapshot history directory
+ * written by `standup export --history-dir`). Never throws.
+ */
+export declare function isDirectory(path: string): boolean;
+/**
+ * List the standup snapshot JSON files inside a history directory, oldest
+ * first. Snapshot files are sorted by filename (the exporter writes
+ * `standup-YYYY-MM-DD.json`, so lexicographic order IS chronological order);
+ * non-JSON entries are ignored. Returns absolute paths.
+ */
+export declare function listSnapshotFiles(dir: string): string[];
+/**
+ * Read a multi-snapshot history from a `--compare <dir>` directory. Each
+ * `*.json` file is parsed with the same tolerant count extraction as a single
+ * `--compare <file>`; unreadable/unrecognizable snapshots are skipped with one
+ * stderr warning each. At most {@link HISTORY_MAX_SNAPSHOTS} newest snapshots
+ * are kept (oldest first). Labels prefer the snapshot's own `date` field and
+ * fall back to the file name. Returns an empty array when nothing is usable.
+ */
+export declare function readSnapshotHistory(dir: string, warn?: (msg: string) => void): SnapshotEntry[];
+/**
+ * Build the one-line history summary shown below the trend footer when
+ * `--compare` points at a snapshot directory with 2+ snapshots, e.g.
+ * "History (3 snapshots → today): In Progress 2→3→1 · Done 4→6→9".
+ * Sections whose counts never change across the window are still shown so the
+ * line stays positionally stable. Returns "" for fewer than 2 snapshots.
+ */
+export declare function renderHistoryLine(history: SnapshotEntry[], current: SectionCounts): string;
 /**
  * Compute per-section deltas (current − prior) for every standup section.
  * A positive delta is "up", negative "down", zero "flat". The ordering
