@@ -7,13 +7,13 @@
 - Round-trip-safe stdout export, documented export flags, multi-snapshot history \(--history-dir / --compare <dir\>\) ([pm-slack-standup-39h9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-39h9.toon))
 - Configurable Up Next count, milestone grouping, --since warning + friendly export errors ([pm-slack-standup-dc4i](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-dc4i.toon))
 
-## 2026.06.09 - 2026-06-09
+## 2026.6.9 - 2026-06-09
 
 ### Added
 
 - Add --compare standup trend deltas ([pm-slack-standup-o59l](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-o59l.toon))
 
-## 2026.06.07 - 2026-06-07
+## 2026.6.7 - 2026-06-07
 
 ### Added
 
@@ -25,19 +25,19 @@
 - Harden release readiness checks ([pm-slack-standup-9bl1](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-9bl1.toon))
 - Align package dependencies to pm CLI/SDK 2026.6.6 ([pm-slack-standup-iv4f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-iv4f.toon))
 
-## 2026.06.04-1 - 2026-06-04
+## 2026.6.4-1 - 2026-06-04
 
 ### Added
 
 - preflight: fail-fast Slack-credential gate for standup post path ([pm-slack-standup-qnkp](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-qnkp.toon))
 
-## 2026.06.04 - 2026-06-04
+## 2026.6.4 - 2026-06-04
 
 ### Added
 
 - Blocker inference, yesterday/today split, multi-channel, fallback-to-stdout, custom section labels ([pm-slack-standup-8s6b](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-8s6b.toon))
 
-## 2026.06.03 - 2026-06-02
+## 2026.6.3 - 2026-06-02
 
 ### Added
 
@@ -54,19 +54,19 @@
 - Export pure helpers + node:test unit suite \(formatters/grouping/window\) ([pm-slack-standup-uf4j](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-uf4j.toon))
 - Missing-creds real post -\> CommandError \(exit 1\); no network in dry-run ([pm-slack-standup-m9ze](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-m9ze.toon))
 
-## 2026.06.02 - 2026-06-02
+## 2026.6.2 - 2026-06-02
 
 ### Added
 
 - Block Kit standup + standup export exporter + grouping/window/mention flags ([pm-slack-standup-ddta](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-ddta.toon))
 
-## 2026.06.01 - 2026-06-01
+## 2026.6.1 - 2026-06-01
 
 ### Fixed
 
 - standup threw plain Error \(no exitCode\) → runtime double-invocation ([pm-slack-standup-uyr9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-uyr9.toon))
 
-## 2026.05.29 - 2026-05-29
+## 2026.5.29 - 2026-05-29
 
 ### Fixed
 
@@ -76,19 +76,19 @@
 
 - dry-run / include-done flags ignored due to kebab-case option read \(option normalization\) ([pm-slack-standup-ro6d](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-ro6d.toon))
 
-## 2026.05.28 - 2026-05-28
+## 2026.5.28 - 2026-05-28
 
 ### Added
 
 - Add publish retry + provenance fallback to release workflow ([pm-slack-standup-5yh1](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-5yh1.toon))
 
-## 2026.05.27 - 2026-05-27
+## 2026.5.27 - 2026-05-27
 
 ### Added
 
 - Add bun-install verification to release workflow ([pm-slack-standup-rexb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-rexb.toon))
 
-## 2026.05.26 - 2026-05-26
+## 2026.5.26 - 2026-05-26
 
 ### Fixed
 
