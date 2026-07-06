@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
-    "pm-changelog": "^2026.6.13",
+    "pm-changelog": "^2026.6.30",
     "typescript": "^6.0.3"
   },
   "keywords": [
@@ -51,7 +51,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.18.0"
   },
   "author": "@unbraind",
   "pm": {
@@ -89,6 +89,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@unbrained/pm-cli": "^2026.6.12"
+    "@unbrained/pm-cli": "^2026.7.5"
   }
 }
