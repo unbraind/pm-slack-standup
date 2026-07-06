@@ -8,6 +8,7 @@
 
 ### Other
 
+- Align Node engine with pm CLI runtime ([pm-slack-standup-r884](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-r884.toon))
 - Regenerate CHANGELOG after pm close item ([pm-slack-standup-xuty](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-xuty.toon))
 
 ## 2026.6.12 - 2026-06-12
