@@ -1,10 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Fix release CI ordering (publish-before-tag) ([pm-slack-standup-izpr](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-izpr.toon))
+
+### Other
+
+- Regenerate CHANGELOG after pm close item ([pm-slack-standup-xuty](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-xuty.toon))
+
 ## 2026.6.12 - 2026-06-12
 
 ### Added
 
-- Round-trip-safe stdout export, documented export flags, multi-snapshot history \(--history-dir / --compare <dir\>\) ([pm-slack-standup-39h9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-39h9.toon))
+- Round-trip-safe stdout export, documented export flags, multi-snapshot history (--history-dir / --compare <dir\>) ([pm-slack-standup-39h9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-39h9.toon))
 - Configurable Up Next count, milestone grouping, --since warning + friendly export errors ([pm-slack-standup-dc4i](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-dc4i.toon))
 
 ## 2026.6.9 - 2026-06-09
@@ -44,15 +54,15 @@
 - Deep feature expansion: multi-format output, grouping, sections, date windows ([pm-slack-standup-h64p](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-h64p.toon))
 - Add --days relative date window alongside --since ([pm-slack-standup-5sow](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-5sow.toon))
 - Add --sections selection/ordering with dedicated Blocked section ([pm-slack-standup-jimx](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-jimx.toon))
-- Add --group-by sprint and type \(extend assignee/status\) ([pm-slack-standup-f4m6](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-f4m6.toon))
+- Add --group-by sprint and type (extend assignee/status) ([pm-slack-standup-f4m6](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-f4m6.toon))
 - Add --format slack\|blockkit\|markdown\|plain unified output ([pm-slack-standup-dgyy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-dgyy.toon))
 
 ### Other
 
-- Keep slack message text byte-identical; --format governs printed output only \(blockkit JSON no longer always dumped in dry-run\) ([pm-slack-standup-rttw](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/decisions/pm-slack-standup-rttw.toon))
-- Block Kit schema: single header \(150ch\), one mrkdwn section per bucket \(3000ch truncation\), divider + context footer ([pm-slack-standup-rpty](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/decisions/pm-slack-standup-rpty.toon))
-- Export pure helpers + node:test unit suite \(formatters/grouping/window\) ([pm-slack-standup-uf4j](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-uf4j.toon))
-- Missing-creds real post -\> CommandError \(exit 1\); no network in dry-run ([pm-slack-standup-m9ze](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-m9ze.toon))
+- Keep slack message text byte-identical; --format governs printed output only (blockkit JSON no longer always dumped in dry-run) ([pm-slack-standup-rttw](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/decisions/pm-slack-standup-rttw.toon))
+- Block Kit schema: single header (150ch), one mrkdwn section per bucket (3000ch truncation), divider + context footer ([pm-slack-standup-rpty](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/decisions/pm-slack-standup-rpty.toon))
+- Export pure helpers + node:test unit suite (formatters/grouping/window) ([pm-slack-standup-uf4j](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-uf4j.toon))
+- Missing-creds real post -\> CommandError (exit 1); no network in dry-run ([pm-slack-standup-m9ze](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-m9ze.toon))
 
 ## 2026.6.2 - 2026-06-02
 
@@ -64,17 +74,17 @@
 
 ### Fixed
 
-- standup threw plain Error \(no exitCode\) → runtime double-invocation ([pm-slack-standup-uyr9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-uyr9.toon))
+- standup threw plain Error (no exitCode) → runtime double-invocation ([pm-slack-standup-uyr9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-uyr9.toon))
 
 ## 2026.5.29 - 2026-05-29
 
 ### Fixed
 
-- Missing-webhook failure returns error object and exits 0 \(wrong exit code\) ([pm-slack-standup-xk28](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-xk28.toon))
+- Missing-webhook failure returns error object and exits 0 (wrong exit code) ([pm-slack-standup-xk28](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-xk28.toon))
 
 ### Other
 
-- dry-run / include-done flags ignored due to kebab-case option read \(option normalization\) ([pm-slack-standup-ro6d](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-ro6d.toon))
+- dry-run / include-done flags ignored due to kebab-case option read (option normalization) ([pm-slack-standup-ro6d](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-ro6d.toon))
 
 ## 2026.5.28 - 2026-05-28
 
