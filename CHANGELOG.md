@@ -1,15 +1,10 @@
 # Changelog
 
-## 2026.7.6 - 2026-07-06
+## 2026.7.6 - 2026-07-07
 
-### Fixed
+### Added
 
-- Fix release CI ordering (publish-before-tag) ([pm-slack-standup-izpr](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-izpr.toon))
-
-### Other
-
-- Align Node engine with pm CLI runtime ([pm-slack-standup-r884](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-r884.toon))
-- Regenerate CHANGELOG after pm close item ([pm-slack-standup-xuty](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-xuty.toon))
+- Add --format blocks, --schedule, --include-blockers, --team, --compact to pm-slack-standup ([pm-slack-standup-9o06](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-9o06.toon))
 
 ## 2026.6.12 - 2026-06-12
 
