@@ -41,6 +41,10 @@ import {
   readSnapshotHistory,
   renderHistoryLine,
   HISTORY_MAX_SNAPSHOTS,
+  parseTeam,
+  parseSchedule,
+  nextFireTime,
+  type ScheduleSpec,
   type SnapshotEntry,
   type PmItem,
   type StandupOptions,
@@ -974,4 +978,216 @@ test("history footer renders in text output below the trend line and in Block Ki
   // single snapshot → no history footer (backward compatible)
   const single = buildTextMessage(data, { ...baseOpts, trend, history: history.slice(0, 1) });
   assert.ok(!/History \(/.test(single));
+});
+
+// ---------------------------------------------------------------------------
+// --format blocks alias for Block Kit
+// ---------------------------------------------------------------------------
+
+test("parseFormat accepts `blocks` as an alias for blockkit", () => {
+  assert.equal(parseFormat("blocks"), "blockkit");
+  assert.equal(parseFormat("BLOCKS"), "blockkit");
+});
+
+test("renderStandup returns a Block Kit blocks array for --format blocks", () => {
+  const data = buildStandupData([item({ status: "in_progress", title: "X" })], baseOpts);
+  const out = renderStandup(data, { ...baseOpts, format: parseFormat("blocks") });
+  const parsed = JSON.parse(out);
+  assert.ok(Array.isArray(parsed.blocks));
+  assert.equal(parsed.blocks[0].type, "header");
+});
+
+// ---------------------------------------------------------------------------
+// --team: filter by assignee
+// ---------------------------------------------------------------------------
+
+test("parseTeam splits, trims, de-dupes", () => {
+  assert.deepEqual(parseTeam(undefined), []);
+  assert.deepEqual(parseTeam("alice,bob"), ["alice", "bob"]);
+  assert.deepEqual(parseTeam("alice; bob ;alice"), ["alice", "bob"]);
+  assert.deepEqual(parseTeam(""), []);
+});
+
+test("buildStandupData filters to team assignees and hides unassigned items", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "A", assignee: "alice" }),
+    item({ id: "2", status: "in_progress", title: "B", assignee: "bob" }),
+    item({ id: "3", status: "in_progress", title: "C" }), // no assignee
+    item({ id: "4", status: "open", title: "D", assignee: "alice", priority: 1 }),
+  ];
+  const teamOpts: StandupOptions = { ...baseOpts, team: ["alice"] };
+  const data = buildStandupData(items, teamOpts);
+  assert.deepEqual(data.wip.map((i) => i.id), ["1"]);
+  assert.deepEqual(data.upNext.map((i) => i.id), ["4"]);
+  assert.equal(data.total, 2); // only alice's items counted
+  // empty team → no filter (all items)
+  assert.equal(buildStandupData(items, baseOpts).total, 4);
+});
+
+test("--team is reflected in rendered text output", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "A", assignee: "alice" }),
+    item({ id: "2", status: "in_progress", title: "B", assignee: "bob" }),
+  ];
+  const msg = buildTextMessage(buildStandupData(items, { ...baseOpts, team: ["bob"] }), {
+    ...baseOpts,
+    team: ["bob"],
+  });
+  assert.match(msg, /B/);
+  assert.ok(!/A$|A\n|A;| A/.test(msg), "alice's item A should be filtered out");
+  // ensure the title 'A' (alice's item) does not appear as its own row
+  assert.ok(!/^• A$/m.test(msg));
+});
+
+// ---------------------------------------------------------------------------
+// --include-blockers: highlight blocked rows
+// ---------------------------------------------------------------------------
+
+test("--include-blockers prefixes blocked rows with a 🚨 marker in text", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "Plain WIP" }),
+    item({ id: "2", status: "blocked", title: "Hard blocked" }),
+    item({ id: "3", status: "in_progress", title: "WIP w/ dep", blocked_by: "pm-x" }),
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, { ...baseOpts, includeBlockers: true });
+  // both blocked rows carry the marker; the plain WIP row does not
+  assert.match(msg, /🚨.*Hard blocked/);
+  assert.match(msg, /🚨.*WIP w\/ dep/);
+  assert.ok(!/🚨.*Plain WIP/.test(msg), "non-blocked row must not be highlighted");
+});
+
+test("--include-blockers highlights blocked rows in Block Kit sections", () => {
+  const items = [
+    item({ id: "1", status: "blocked", title: "Stuck", blocked_by: "pm-9" }),
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const { blocks } = buildBlockKit(data, { ...baseOpts, includeBlockers: true });
+  const sectionTexts = blocks
+    .filter((b) => b.type === "section")
+    .map((b) => (b as any).text.text as string);
+  assert.ok(
+    sectionTexts.some((t) => /🚨.*Stuck/.test(t)),
+    "a section block should highlight the blocked row"
+  );
+});
+
+test("--include-blockers off by default (backward compatible, no 🚨)", () => {
+  const items = [item({ status: "blocked", title: "Stuck" })];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, baseOpts);
+  assert.ok(!/🚨/.test(msg), "default output should not highlight blockers");
+});
+
+// ---------------------------------------------------------------------------
+// --compact: shorter standups
+// ---------------------------------------------------------------------------
+
+test("--compact renders one line per non-empty section with titles only", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "Alpha", type: "task", priority: 2 }),
+    item({ id: "2", status: "in_progress", title: "Beta", type: "task" }),
+    item({ id: "3", status: "blocked", title: "Gamma" }),
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, { ...baseOpts, compact: true });
+  // single lines, titles joined by semicolons, no [Task] labels or bullets
+  assert.match(msg, /🏃 In Progress \(2\): Alpha; Beta/);
+  assert.match(msg, /🚫 Blocked \(1\): Gamma/);
+  assert.ok(!/• /.test(msg), "compact mode should not emit per-item bullets");
+  assert.ok(!/\[Task\]/.test(msg), "compact mode should drop type labels");
+});
+
+test("--compact omits empty sections entirely", () => {
+  const items = [item({ id: "1", status: "in_progress", title: "Only" })];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, { ...baseOpts, compact: true });
+  assert.match(msg, /In Progress \(1\): Only/);
+  assert.ok(!/Blocked/.test(msg), "empty blocked section should be omitted");
+});
+
+test("--compact collapses Block Kit into a single section block", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "A" }),
+    item({ id: "2", status: "blocked", title: "B" }),
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const { blocks } = buildBlockKit(data, { ...baseOpts, compact: true });
+  const sections = blocks.filter((b) => b.type === "section");
+  assert.equal(sections.length, 1, "compact Block Kit should use one section block");
+  const text = (sections[0] as any).text.text;
+  assert.match(text, /In Progress \(1\): A/);
+  assert.match(text, /Blocked \(1\): B/);
+});
+
+test("--compact still renders the trend footer", () => {
+  const data = buildStandupData([item({ status: "in_progress", title: "A" })], baseOpts);
+  const trend = computeDeltas(
+    { in_progress: 0, blocked: 2, done: 0, up_next: 1 },
+    currentCounts(data)
+  );
+  const msg = buildTextMessage(data, { ...baseOpts, compact: true, trend });
+  assert.match(msg, /Trend vs prior:/);
+});
+
+// ---------------------------------------------------------------------------
+// --schedule: parse + next fire time
+// ---------------------------------------------------------------------------
+
+test("parseSchedule accepts HH:MM daily and 5-field cron", () => {
+  const daily = parseSchedule("09:30")!;
+  assert.equal(daily.kind, "daily");
+  assert.equal(daily.hour, 9);
+  assert.equal(daily.minute, 30);
+
+  const cron = parseSchedule("*/15 * * * *")!;
+  assert.equal(cron.kind, "cron");
+  assert.equal(cron.fields![0].length, 4); // 0,15,30,45
+});
+
+test("parseSchedule rejects garbage with USAGE exit code", () => {
+  assert.equal(parseSchedule(undefined), undefined);
+  assert.equal(parseSchedule(""), undefined);
+  assert.throws(() => parseSchedule("not-a-time"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSchedule("25:00"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSchedule("* * * *"), (e: any) => e.exitCode === 2); // 4 fields
+  assert.throws(() => parseSchedule("99 * * * *"), (e: any) => e.exitCode === 2); // bad minute
+});
+
+test("nextFireTime for daily HH:MM returns the next local occurrence", () => {
+  // 2026-06-10T09:00:00 local → next 09:30 is the same day at 09:30
+  const now = new Date(2026, 5, 10, 9, 0, 0, 0).getTime();
+  const spec: ScheduleSpec = { kind: "daily", hour: 9, minute: 30, raw: "09:30" };
+  const fire = nextFireTime(spec, now);
+  const d = new Date(fire);
+  assert.equal(d.getHours(), 9);
+  assert.equal(d.getMinutes(), 30);
+  assert.ok(fire > now);
+  // already past 09:30 today → rolls to tomorrow
+  const later = new Date(2026, 5, 10, 10, 0, 0, 0).getTime();
+  const fire2 = nextFireTime(spec, later);
+  const d2 = new Date(fire2);
+  assert.equal(d2.getDate(), 11);
+  assert.equal(d2.getHours(), 9);
+  assert.equal(d2.getMinutes(), 30);
+});
+
+test("nextFireTime for cron returns a strictly-future matching minute", () => {
+  const now = new Date(2026, 5, 10, 12, 0, 0, 0).getTime();
+  const spec: ScheduleSpec = parseSchedule("30 9 * * *")!; // daily 09:30
+  const fire = nextFireTime(spec, now);
+  const d = new Date(fire);
+  assert.equal(d.getHours(), 9);
+  assert.equal(d.getMinutes(), 30);
+  assert.equal(d.getDate(), 11); // tomorrow
+  assert.ok(fire > now);
+});
+
+test("nextFireTime for `*/15 * * * *` lands on a 15-minute boundary", () => {
+  const now = new Date(2026, 5, 10, 12, 7, 0, 0).getTime();
+  const spec: ScheduleSpec = parseSchedule("*/15 * * * *")!;
+  const fire = nextFireTime(spec, now);
+  const d = new Date(fire);
+  assert.equal(d.getMinutes(), 15);
+  assert.equal(d.getHours(), 12);
 });

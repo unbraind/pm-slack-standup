@@ -73,7 +73,7 @@ pm slack-standup [flags]   # alias with identical behavior
 | `--webhook <url>` | string | — | Slack incoming webhook URL (overrides `PM_SLACK_WEBHOOK`) |
 | `--channel <name>` | string | — | Channel name shown in the message (e.g. `#team-eng`) |
 | `--dry-run` | boolean | `false` | Build and print the message in the chosen format **without** posting |
-| `--format <fmt>` | string | `slack` | Output format: `slack` (mrkdwn) \| `blockkit` (JSON) \| `markdown` \| `plain` |
+| `--format <fmt>` | string | `slack` | Output format: `slack` (mrkdwn) \| `blockkit`/`blocks` (Block Kit JSON) \| `markdown` \| `plain` |
 | `--include-done` | boolean | `false` | Include recently-closed items in a Done section |
 | `--since <iso>` | string | — | ISO date/time window; scopes the Done section to items updated since then |
 | `--days <n>` | number | — | Relative window: scope Done to items updated in the last N days (combines with `--since`, more restrictive bound wins) |
@@ -87,6 +87,10 @@ pm slack-standup [flags]   # alias with identical behavior
 | `--fallback-to-stdout` | boolean | `false` | If the Slack post fails, print the rendered standup to stdout (exit 0) instead of erroring |
 | `--section-labels <map>` | string | — | Override section titles/emoji, e.g. `in_progress=Rolling,blocked=🔥 On Fire` |
 | `--compare <path>` | string | — | Show trend deltas vs a **prior** standup JSON file (from `standup export --format json`), or vs a snapshot **directory** (from `standup export --history-dir`) for [multi-snapshot history](#multi-snapshot-history); local read, never posts. Missing/malformed → warn + render without deltas |
+| `--schedule <when>` | string | — | Schedule the post instead of sending now: `HH:MM` (daily, local time) or a 5-field cron expression (`min hour dom mon dow`). The process waits until the next fire time, then posts. Combine with `--dry-run` to preview the resolved schedule without waiting |
+| `--include-blockers` | boolean | `false` | Highlight blocked rows with a 🚨 marker in every format so impediments stand out at a glance |
+| `--team <list>` | string | — | Filter the standup to items assigned to the given members (comma list, e.g. `alice,bob`); items with no assignee are hidden |
+| `--compact` | boolean | `false` | Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted) |
 
 > **Note on `text`:** the legacy `--format text` value is still accepted as an alias for `plain`.
 
@@ -174,6 +178,17 @@ pm standup --channels 'https://hooks.slack.com/services/AAA,https://hooks.slack.
 **Never lose the standup if Slack is down:**
 ```bash
 pm standup --fallback-to-stdout   # prints the message to stdout (exit 0) if the post fails
+```
+
+**Filter to your team, compact + highlight blockers:**
+```bash
+pm standup --dry-run --team alice,bob --compact --include-blockers
+```
+
+**Schedule a daily post (waits until the next fire time, then posts):**
+```bash
+pm standup --schedule 09:30 --channel '#team-eng'         # daily at 09:30 local
+pm standup --schedule '*/30 9-17 * * 1-5' --dry-run       # cron: every 30min, 9–17, weekdays (preview)
 ```
 
 **Show momentum vs a prior standup (trend deltas):**

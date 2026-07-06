@@ -51,6 +51,9 @@ export interface StandupOptions {
     upNextCount: number;
     trend?: SectionDelta[];
     history?: SnapshotEntry[];
+    includeBlockers?: boolean;
+    team?: string[];
+    compact?: boolean;
 }
 /** Default number of items shown in the "Up Next" section. */
 export declare const DEFAULT_UP_NEXT = 3;
@@ -88,7 +91,8 @@ export declare function readStrOption(options: Record<string, unknown>, key: str
 export declare function parseMentionMap(spec: string | undefined): Record<string, string>;
 /**
  * Normalize a `--format` value. Accepts the four public formats plus the
- * legacy `text` alias (== `plain`). Unknown values raise a USAGE CommandError.
+ * legacy `text` alias (== `plain`) and `blocks` (== `blockkit`, the Slack Block
+ * Kit `blocks` JSON). Unknown values raise a USAGE CommandError.
  */
 export declare function parseFormat(raw: string | undefined): Format;
 export declare function parseGroupBy(raw: string | undefined): GroupBy;
@@ -117,6 +121,39 @@ export declare function parseSectionLabels(spec: string | undefined): Partial<Re
 export declare function parseChannels(spec: string | undefined): string[];
 /** True when a channel token is a full webhook URL rather than a name. */
 export declare function isWebhookUrl(token: string): boolean;
+/**
+ * Parse a `--team` spec (comma/semicolon list of assignees) into an ordered,
+ * trimmed, de-duped list. Empty spec → [] (no filter). Used by `--team` to
+ * filter the standup to items assigned to one of the named team members.
+ */
+export declare function parseTeam(spec: string | undefined): string[];
+/**
+ * A parsed post schedule. `daily` fires every day at HH:MM (local). `cron` is
+ * a 5-field cron expression (minute hour day-of-month month day-of-week).
+ */
+export interface ScheduleSpec {
+    kind: "daily" | "cron";
+    /** Daily hour (0-23). */
+    hour?: number;
+    /** Daily minute (0-59). */
+    minute?: number;
+    /** Cron: per-field sorted unique lists of valid values, `*` → all. */
+    fields?: number[][];
+    /** Raw user input (for messages / debugging). */
+    raw: string;
+}
+/**
+ * Parse a `--schedule` value. Accepts `HH:MM` (daily, local time) or a 5-field
+ * cron expression (minute hour dom month dow). Raises a USAGE CommandError for
+ * anything unparseable so a typo is loud rather than silently posting now.
+ */
+export declare function parseSchedule(spec: string | undefined): ScheduleSpec | undefined;
+/**
+ * Compute the next epoch-ms fire time at/after `now` (exclusive: the next fire
+ * is always strictly after `now`). For cron, day-of-month vs day-of-week use
+ * standard cron OR semantics when both are restricted. Returns the epoch ms.
+ */
+export declare function nextFireTime(spec: ScheduleSpec, now?: number): number;
 /**
  * Resolve the "recently closed" window start (ms epoch) from `--since` and/or
  * `--days`. `--since` is an explicit ISO date/time; `--days <n>` is N days
