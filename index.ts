@@ -68,6 +68,7 @@ export interface PmItem {
 // The text/preview renderer: `slack` uses Slack mrkdwn (`*bold*`), `plain` is
 // punctuation-free plain text, `markdown` is GitHub/CommonMark (`**bold**`,
 // `#` headings), and `blockkit` emits the Slack Block Kit `blocks` array JSON.
+// `blocks` is accepted as a user-facing alias for `blockkit` (same payload).
 export type Format = "slack" | "blockkit" | "markdown" | "plain";
 export type GroupBy = "status" | "assignee" | "sprint" | "type" | "milestone";
 export type SectionKey = "in_progress" | "blocked" | "done" | "up_next";
@@ -118,6 +119,17 @@ export interface StandupOptions {
   // two or more snapshots, a one-line per-section count sequence is rendered
   // below the trend line. Absent → no history footer.
   history?: SnapshotEntry[];
+  // `--include-blockers`: when true, blocked rows are highlighted with a 🚨
+  // marker in every format so impediments stand out at a glance. Additive;
+  // off by default (blocked rows still render normally in the Blocked section).
+  includeBlockers?: boolean;
+  // `--team`: when set, only items assigned to one of these assignees are
+  // surfaced (items with no assignee are hidden). undefined/empty → no filter.
+  team?: string[];
+  // `--compact`: render a shorter one-line-per-section standup (item titles
+  // only, no per-item bullets / type / priority / grouping sub-headers, empty
+  // sections omitted entirely). Additive; off by default.
+  compact?: boolean;
 }
 
 /** Default number of items shown in the "Up Next" section. */
@@ -225,7 +237,8 @@ export function parseMentionMap(spec: string | undefined): Record<string, string
 
 /**
  * Normalize a `--format` value. Accepts the four public formats plus the
- * legacy `text` alias (== `plain`). Unknown values raise a USAGE CommandError.
+ * legacy `text` alias (== `plain`) and `blocks` (== `blockkit`, the Slack Block
+ * Kit `blocks` JSON). Unknown values raise a USAGE CommandError.
  */
 export function parseFormat(raw: string | undefined): Format {
   if (raw == null) return "slack";
@@ -235,7 +248,7 @@ export function parseFormat(raw: string | undefined): Format {
   if (v === "markdown" || v === "md") return "markdown";
   if (v === "plain" || v === "text" || v === "txt") return "plain";
   throw new CommandError(
-    `Unknown --format '${raw}'. Valid: slack | blockkit | markdown | plain.`,
+    `Unknown --format '${raw}'. Valid: slack | blockkit | blocks | markdown | plain.`,
     EXIT_CODE.USAGE
   );
 }
@@ -360,6 +373,194 @@ export function parseChannels(spec: string | undefined): string[] {
 /** True when a channel token is a full webhook URL rather than a name. */
 export function isWebhookUrl(token: string): boolean {
   return /^https?:\/\//i.test(token.trim());
+}
+
+/**
+ * Parse a `--team` spec (comma/semicolon list of assignees) into an ordered,
+ * trimmed, de-duped list. Empty spec → [] (no filter). Used by `--team` to
+ * filter the standup to items assigned to one of the named team members.
+ */
+export function parseTeam(spec: string | undefined): string[] {
+  if (!spec || !spec.trim()) return [];
+  const out: string[] = [];
+  for (const raw of spec.split(/[,;]/)) {
+    const token = raw.trim();
+    if (token && !out.includes(token)) out.push(token);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Schedule (`--schedule`)
+// ---------------------------------------------------------------------------
+
+/**
+ * A parsed post schedule. `daily` fires every day at HH:MM (local). `cron` is
+ * a 5-field cron expression (minute hour day-of-month month day-of-week).
+ */
+export interface ScheduleSpec {
+  kind: "daily" | "cron";
+  /** Daily hour (0-23). */
+  hour?: number;
+  /** Daily minute (0-59). */
+  minute?: number;
+  /** Cron: per-field sorted unique lists of valid values, `*` → all. */
+  fields?: number[][];
+  /** Raw user input (for messages / debugging). */
+  raw: string;
+}
+
+// Valid value ranges for the five cron fields.
+const CRON_BOUNDS: Array<[number, number]> = [
+  [0, 59], // minute
+  [0, 23], // hour
+  [1, 31], // day-of-month
+  [1, 12], // month
+  [0, 6], // day-of-week (0 = Sunday)
+];
+
+/** Parse one cron field token into a sorted unique list of valid values. */
+function parseCronField(token: string, fieldIndex: number): number[] {
+  const [min, max] = CRON_BOUNDS[fieldIndex];
+  const all = (): number[] => {
+    const out: number[] = [];
+    for (let v = min; v <= max; v++) out.push(v);
+    return out;
+  };
+  const expandRange = (lo: number, hi: number, step: number): number[] => {
+    const out: number[] = [];
+    for (let v = lo; v <= hi; v += step) out.push(v);
+    return out;
+  };
+  const result = new Set<number>();
+  for (const part of token.split(",")) {
+    const p = part.trim();
+    if (p === "") continue;
+    let step = 1;
+    const slashIdx = p.indexOf("/");
+    if (slashIdx >= 0) {
+      const s = Number(p.slice(slashIdx + 1));
+      if (!Number.isInteger(s) || s < 1) {
+        throw new Error(`invalid step '${p.slice(slashIdx + 1)}' in '${p}'`);
+      }
+      step = s;
+    }
+    const rangePart = slashIdx >= 0 ? p.slice(0, slashIdx) : p;
+    if (rangePart === "*") {
+      for (const v of expandRange(min, max, step)) result.add(v);
+    } else {
+      const dashIdx = rangePart.indexOf("-");
+      if (dashIdx >= 0) {
+        const loStr = rangePart.slice(0, dashIdx);
+        const hiStr = rangePart.slice(dashIdx + 1);
+        // Reject empty bounds: Number("") === 0 would accept `-5` (lo=0) or `0-` (hi=0).
+        if (!/^\d+$/.test(loStr) || !/^\d+$/.test(hiStr)) {
+          throw new Error(`invalid range '${rangePart}'`);
+        }
+        const lo = Number(loStr);
+        const hi = Number(hiStr);
+        if (lo < min || hi > max || lo > hi) {
+          throw new Error(`invalid range '${rangePart}'`);
+        }
+        for (const v of expandRange(lo, hi, step)) result.add(v);
+      } else {
+        // Reject an empty base: Number("") === 0 would accept `/5` as `0/5`.
+        if (!/^\d+$/.test(rangePart)) {
+          throw new Error(`invalid value '${rangePart}'`);
+        }
+        const v = Number(rangePart);
+        if (v < min || v > max) {
+          throw new Error(`invalid value '${rangePart}'`);
+        }
+        if (slashIdx >= 0) {
+          // `n/step` means n..max with step
+          for (const x of expandRange(v, max, step)) result.add(x);
+        } else {
+          result.add(v);
+        }
+      }
+    }
+  }
+  if (result.size === 0) throw new Error(`empty field '${token}'`);
+  return [...result].sort((a, b) => a - b);
+}
+
+/**
+ * Parse a `--schedule` value. Accepts `HH:MM` (daily, local time) or a 5-field
+ * cron expression (minute hour dom month dow). Raises a USAGE CommandError for
+ * anything unparseable so a typo is loud rather than silently posting now.
+ */
+export function parseSchedule(spec: string | undefined): ScheduleSpec | undefined {
+  if (!spec || !spec.trim()) return undefined;
+  const s = spec.trim();
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(s);
+  if (m) {
+    return { kind: "daily", hour: Number(m[1]), minute: Number(m[2]), raw: s };
+  }
+  const fields = s.split(/\s+/);
+  if (fields.length === 5) {
+    try {
+      const parsed = fields.map((f, i) => parseCronField(f, i));
+      return { kind: "cron", fields: parsed, raw: s };
+    } catch (err: unknown) {
+      throw new CommandError(
+        `Invalid --schedule cron expression '${s}': ${err instanceof Error ? err.message : String(err)}.`,
+        EXIT_CODE.USAGE
+      );
+    }
+  }
+  throw new CommandError(
+    `Invalid --schedule '${s}'. Use HH:MM (daily, local time) or a 5-field cron expression (min hour dom mon dow).`,
+    EXIT_CODE.USAGE
+  );
+}
+
+/**
+ * Compute the next epoch-ms fire time at/after `now` (exclusive: the next fire
+ * is always strictly after `now`). For cron, day-of-month vs day-of-week use
+ * standard cron OR semantics when both are restricted. Returns the epoch ms.
+ */
+export function nextFireTime(spec: ScheduleSpec, now: number = Date.now()): number {
+  const start = new Date(now + 60_000); // begin one minute after now
+  start.setSeconds(0, 0);
+
+  if (spec.kind === "daily") {
+    const hour = spec.hour!;
+    const minute = spec.minute!;
+    for (let day = 0; day < 366; day++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + day);
+      d.setHours(hour, minute, 0, 0);
+      if (d.getTime() > now) return d.getTime();
+    }
+    // Should not happen within a year; fall back to now + 24h.
+    return now + 86_400_000;
+  }
+
+  // cron: minute-by-minute scan, capped at 366 days.
+  const [minF, hourF, domF, monF, dowF] = spec.fields!;
+  const domAll = domF.length === CRON_BOUNDS[2][1] - CRON_BOUNDS[2][0] + 1;
+  const dowAll = dowF.length === CRON_BOUNDS[4][1] - CRON_BOUNDS[4][0] + 1;
+  const cap = now + 366 * 86_400_000;
+  const t = new Date(start);
+  while (t.getTime() <= cap) {
+    const min = t.getMinutes();
+    const hour = t.getHours();
+    const dom = t.getDate();
+    const mon = t.getMonth() + 1;
+    const dow = t.getDay();
+    if (
+      minF.includes(min) &&
+      hourF.includes(hour) &&
+      monF.includes(mon) &&
+      // standard cron: if both dom and dow are restricted, match EITHER.
+      (domAll || dowAll ? domF.includes(dom) && dowF.includes(dow) : domF.includes(dom) || dowF.includes(dow))
+    ) {
+      return t.getTime();
+    }
+    t.setMinutes(t.getMinutes() + 1);
+  }
+  return now + 86_400_000;
 }
 
 /**
@@ -567,6 +768,13 @@ export function buildStandupData(
   sinceMs: number = NaN,
   now: number = Date.now()
 ): StandupData {
+  // `--team`: filter to items assigned to one of the named members. Items
+  // with no assignee are hidden when a team filter is active. No filter → all.
+  const team = opts.team;
+  const visible =
+    team && team.length > 0
+      ? items.filter((i) => i.assignee != null && team.includes(i.assignee!))
+      : items;
   const isDone = (i: PmItem) => DONE_STATUSES.has(statusOf(i));
   // An item is "blocked" for standup purposes when its status is blocked/
   // on_hold OR it carries a blocked_by dependency — but a done item is never
@@ -574,18 +782,18 @@ export function buildStandupData(
   const isBlocked = (i: PmItem) =>
     !isDone(i) && (BLOCKED_STATUSES.has(statusOf(i)) || hasBlockedByDep(i));
 
-  const wip = items.filter((i) => WIP_STATUSES.has(statusOf(i)) && !isBlocked(i));
-  const blocked = items.filter(isBlocked);
-  const open = items.filter((i) => OPEN_STATUSES.has(statusOf(i)) && !isBlocked(i));
+  const wip = visible.filter((i) => WIP_STATUSES.has(statusOf(i)) && !isBlocked(i));
+  const blocked = visible.filter(isBlocked);
+  const open = visible.filter((i) => OPEN_STATUSES.has(statusOf(i)) && !isBlocked(i));
   const done = opts.includeDone
-    ? items.filter((i) => isDone(i) && withinWindow(i, sinceMs))
+    ? visible.filter((i) => isDone(i) && withinWindow(i, sinceMs))
     : [];
 
   const sortedOpen = [...open].sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
   const upNextCount = opts.upNextCount ?? DEFAULT_UP_NEXT;
   const upNext = upNextCount === Infinity ? sortedOpen : sortedOpen.slice(0, upNextCount);
 
-  const data: StandupData = { wip, blocked, done, upNext, total: items.length };
+  const data: StandupData = { wip, blocked, done, upNext, total: visible.length };
 
   if (opts.splitYesterday && done.length > 0) {
     const todayKey = localDayKeyOf(now);
@@ -720,6 +928,44 @@ export function itemText(item: PmItem, mentionMap: Record<string, string>, withP
   return `${title}${prio}${blockedContext}${mentionFor(item, mentionMap)}`;
 }
 
+/**
+ * True when an item is a blocker for standup purposes: status is blocked/
+ * on_hold OR it carries a `blocked_by` dependency. (A closed item is never a
+ * blocker.) Used by `--include-blockers` highlighting.
+ */
+function isBlockerItem(item: PmItem): boolean {
+  // A closed/done item is never a blocker: a stale `blocked_by` dependency
+  // on a completed item must not resurface it with a 🚨 marker (e.g. when
+  // `--include-done --include-blockers` are combined).
+  return !DONE_STATUSES.has(statusOf(item)) && (BLOCKED_STATUSES.has(statusOf(item)) || hasBlockedByDep(item));
+}
+
+/**
+ * Render one item line, applying `--include-blockers` highlighting (a 🚨
+ * prefix on blocked rows) when enabled. Otherwise identical to `itemText`.
+ */
+function itemLine(item: PmItem, opts: StandupOptions, withPriority: boolean): string {
+  const base = itemText(item, opts.mentionMap, withPriority);
+  if (opts.includeBlockers && isBlockerItem(item)) return `🚨 ${base}`;
+  return base;
+}
+
+/**
+ * Compact one-line summary of a section: `emoji Title (n): t1; t2; t3` using
+ * item titles only (no type/priority/mention/grouping sub-headers). Returns
+ * the empty string for empty sections (so they can be omitted entirely).
+ */
+function compactSectionLine(def: SectionDef, opts: StandupOptions): string {
+  if (def.items.length === 0) return "";
+  // Honor `--include-blockers`: prefix blocked item titles with 🚨 so the
+  // marker is not lost in compact mode (README says blockers are highlighted
+  // in every format). Done items are never blockers (see isBlockerItem).
+  const titles = def.items
+    .map((i) => (opts.includeBlockers && isBlockerItem(i) ? `🚨 ${i.title}` : i.title))
+    .join("; ");
+  return `${def.emoji} ${def.title} (${def.items.length}): ${titles}`;
+}
+
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -794,12 +1040,12 @@ function renderSection(lines: string[], def: SectionDef, opts: StandupOptions): 
       else lines.push(`  ${bold(name, opts.format)}`);
       for (const item of group) {
         const bullet = opts.format === "markdown" ? "  - " : "    • ";
-        lines.push(`${bullet}${itemText(item, opts.mentionMap, def.withPriority)}`);
+        lines.push(`${bullet}${itemLine(item, opts, def.withPriority)}`);
       }
     }
   } else {
     const bullet = opts.format === "markdown" ? "- " : "• ";
-    for (const item of def.items) lines.push(`${bullet}${itemText(item, opts.mentionMap, def.withPriority)}`);
+    for (const item of def.items) lines.push(`${bullet}${itemLine(item, opts, def.withPriority)}`);
   }
 }
 
@@ -820,10 +1066,18 @@ export function buildTextMessage(data: StandupData, opts: StandupOptions): strin
   lines.push("");
 
   const sections = resolveSections(data, opts);
-  sections.forEach((def, idx) => {
-    if (idx > 0) lines.push("");
-    renderSection(lines, def, opts);
-  });
+  if (opts.compact) {
+    // Compact: one line per non-empty section, no per-item bullets / grouping.
+    for (const def of sections) {
+      const line = compactSectionLine(def, opts);
+      if (line) lines.push(line);
+    }
+  } else {
+    sections.forEach((def, idx) => {
+      if (idx > 0) lines.push("");
+      renderSection(lines, def, opts);
+    });
+  }
 
   // Trend footer (from `--compare`): a single directional summary line.
   if (opts.trend && opts.trend.length > 0) {
@@ -863,11 +1117,11 @@ function mrkdwnList(items: PmItem[], opts: StandupOptions, withPriority = false)
     for (const [key, group] of groupItems(items, opts.groupBy)) {
       const name = groupLabel(key, opts.groupBy);
       parts.push(`*${name}*`);
-      for (const item of group) parts.push(`• ${itemText(item, opts.mentionMap, withPriority)}`);
+      for (const item of group) parts.push(`• ${itemLine(item, opts, withPriority)}`);
     }
     return parts.join("\n");
   }
-  return items.map((item) => `• ${itemText(item, opts.mentionMap, withPriority)}`).join("\n");
+  return items.map((item) => `• ${itemLine(item, opts, withPriority)}`).join("\n");
 }
 
 /**
@@ -901,6 +1155,20 @@ export function buildBlockKit(data: StandupData, opts: StandupOptions): { blocks
   }
 
   for (const def of resolveSections(data, opts)) {
+    if (opts.compact) {
+      // Compact: collapse all non-empty sections into a single section block,
+      // one summary line each (titles only), to minimize block count.
+      const lines = resolveSections(data, opts)
+        .map((d) => compactSectionLine(d, opts))
+        .filter(Boolean);
+      if (lines.length > 0) {
+        blocks.push({
+          type: "section",
+          text: { type: "mrkdwn", text: truncate(lines.join("\n"), 3000) },
+        });
+      }
+      break;
+    }
     blocks.push({
       type: "section",
       text: {
@@ -1177,6 +1445,9 @@ export function resolveStandupOptions(
       readStrOption(options, "up-next"),
       readBoolOption(options, "all-open")
     ),
+    team: parseTeam(readStrOption(options, "team")),
+    includeBlockers: readBoolOption(options, "include-blockers"),
+    compact: readBoolOption(options, "compact"),
   };
   // `--days` implies windowing the Done section; surface it even without
   // `--include-done` being set so the footer/window stays accurate.
@@ -1423,7 +1694,7 @@ export default defineExtension({
       { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
       { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
       { long: "--dry-run", description: "Build and print the message in the chosen format WITHOUT posting to Slack" },
-      { long: "--format", value_name: "fmt", description: "Output format: slack (mrkdwn, default) | blockkit (JSON) | markdown | plain" },
+      { long: "--format", value_name: "fmt", description: "Output format: slack (mrkdwn, default) | blockkit | blocks (Block Kit JSON) | markdown | plain" },
       { long: "--include-done", description: "Include recently-closed items in a Done section" },
       { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
       { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
@@ -1437,6 +1708,10 @@ export default defineExtension({
       { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
       { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
       { long: "--compare", value_name: "path", description: "Show trend deltas vs a PRIOR standup JSON file, or vs a snapshot DIRECTORY (from 'standup export --history-dir') for multi-snapshot history; local read, never posts" },
+      { long: "--schedule", value_name: "when", description: "Schedule the post instead of sending now: HH:MM (daily, local) or a 5-field cron expression (min hour dom mon dow); the process waits until the next fire time" },
+      { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
+      { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
+      { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
     ];
 
     const runStandupCommand = async (ctx: any) => {
@@ -1455,6 +1730,43 @@ export default defineExtension({
         parseFormat(readStrOption(ctx.options, "format"))
       );
 
+      // `--schedule`: defer the actual post to the next computed fire time
+      // (HH:MM daily, or a 5-field cron expression). In `--dry-run` we just
+      // report the resolved schedule without waiting. Otherwise the process
+      // waits until the fire time, then posts normally below.
+      //
+      // IMPORTANT: for non-dry-run schedules the wait happens BEFORE the pm
+      // data is fetched/built, so the posted standup reflects state at the
+      // fire time rather than the (potentially stale) snapshot from when the
+      // command was started. A command started at 08:00 for 09:30 thus posts
+      // the 09:30 standup, not the 08:00 one.
+      const scheduleSpec = parseSchedule(readStrOption(ctx.options, "schedule"));
+      let scheduledAt: string | undefined;
+      if (scheduleSpec) {
+        const fireAt = nextFireTime(scheduleSpec, Date.now());
+        scheduledAt = new Date(fireAt).toISOString();
+        if (dryRun) {
+          console.error(`Scheduled: next post at ${scheduledAt} (${scheduleSpec.raw}); --dry-run, not waiting.`);
+        } else {
+          const waitMs = Math.max(0, fireAt - Date.now());
+          console.error(
+            `Scheduled: posting at ${scheduledAt} (${scheduleSpec.raw}); waiting ${Math.round(waitMs / 1000)}s...`
+          );
+          // Node's setTimeout clamps delays larger than 2^31-1 ms (~24.8
+          // days) to 1 ms, which would fire immediately for sparse cron
+          // expressions. Sleep in <= 24-day chunks to stay under the limit.
+          const MAX_CHUNK_MS = 24 * 86_400_000;
+          let remaining = waitMs;
+          while (remaining > 0) {
+            const chunk = Math.min(remaining, MAX_CHUNK_MS);
+            await new Promise<void>((res) => setTimeout(res, chunk));
+            remaining -= chunk;
+          }
+        }
+      }
+
+      // Fetch and bucket the standup AFTER any schedule wait, so a scheduled
+      // (non-dry-run) post reflects the current pm state at fire time.
       const items = fetchAllItems(ctx.pm_root);
       const data = buildStandupData(items, opts, sinceMs);
 
@@ -1496,6 +1808,7 @@ export default defineExtension({
           rendered,
           blocks,
           fallback,
+          scheduledAt,
           wip: data.wip.length,
           blocked: data.blocked.length,
           done: data.done.length,
@@ -1536,6 +1849,7 @@ export default defineExtension({
           posted: results.some((r) => r.ok),
           fallbackToStdout: true,
           results,
+          scheduledAt,
           wip: data.wip.length,
           blocked: data.blocked.length,
           done: data.done.length,
@@ -1555,6 +1869,7 @@ export default defineExtension({
         posted: true,
         channel: opts.channel,
         channels: targets.length > 1 ? targets.map((t) => t.channel) : undefined,
+        scheduledAt,
         wip: data.wip.length,
         blocked: data.blocked.length,
         done: data.done.length,
@@ -1581,6 +1896,9 @@ export default defineExtension({
         "pm standup --section-labels 'in_progress=Rolling,blocked=🔥 On Fire' --dry-run",
         "pm standup --dry-run --compare standup.json",
         "pm standup --dry-run --compare .standup-history",
+        "pm standup --dry-run --team alice,bob --compact",
+        "pm standup --dry-run --include-blockers --format blockkit",
+        "pm standup --schedule 09:30 --channel '#team-eng'",
         "PM_SLACK_WEBHOOK=https://... pm standup --channel '#standups'",
       ],
       flags: standupFlags,
@@ -1671,6 +1989,9 @@ export default defineExtension({
       { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
       { long: "--channel", value_name: "name", description: "Channel name recorded in the exported document" },
       { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
+      { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
+      { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
+      { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
     ];
 
     api.registerExporter(
