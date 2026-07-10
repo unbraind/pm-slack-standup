@@ -301,17 +301,27 @@ function parseCronField(token, fieldIndex) {
         else {
             const dashIdx = rangePart.indexOf("-");
             if (dashIdx >= 0) {
-                const lo = Number(rangePart.slice(0, dashIdx));
-                const hi = Number(rangePart.slice(dashIdx + 1));
-                if (!Number.isInteger(lo) || !Number.isInteger(hi) || lo < min || hi > max || lo > hi) {
+                const loStr = rangePart.slice(0, dashIdx);
+                const hiStr = rangePart.slice(dashIdx + 1);
+                // Reject empty bounds: Number("") === 0 would accept `-5` (lo=0) or `0-` (hi=0).
+                if (!/^\d+$/.test(loStr) || !/^\d+$/.test(hiStr)) {
+                    throw new Error(`invalid range '${rangePart}'`);
+                }
+                const lo = Number(loStr);
+                const hi = Number(hiStr);
+                if (lo < min || hi > max || lo > hi) {
                     throw new Error(`invalid range '${rangePart}'`);
                 }
                 for (const v of expandRange(lo, hi, step))
                     result.add(v);
             }
             else {
+                // Reject an empty base: Number("") === 0 would accept `/5` as `0/5`.
+                if (!/^\d+$/.test(rangePart)) {
+                    throw new Error(`invalid value '${rangePart}'`);
+                }
                 const v = Number(rangePart);
-                if (!Number.isInteger(v) || v < min || v > max) {
+                if (v < min || v > max) {
                     throw new Error(`invalid value '${rangePart}'`);
                 }
                 if (slashIdx >= 0) {
@@ -712,7 +722,10 @@ export function itemText(item, mentionMap, withPriority = false) {
  * blocker.) Used by `--include-blockers` highlighting.
  */
 function isBlockerItem(item) {
-    return BLOCKED_STATUSES.has(statusOf(item)) || hasBlockedByDep(item);
+    // A closed/done item is never a blocker: a stale `blocked_by` dependency
+    // on a completed item must not resurface it with a 🚨 marker (e.g. when
+    // `--include-done --include-blockers` are combined).
+    return !DONE_STATUSES.has(statusOf(item)) && (BLOCKED_STATUSES.has(statusOf(item)) || hasBlockedByDep(item));
 }
 /**
  * Render one item line, applying `--include-blockers` highlighting (a 🚨
@@ -729,10 +742,15 @@ function itemLine(item, opts, withPriority) {
  * item titles only (no type/priority/mention/grouping sub-headers). Returns
  * the empty string for empty sections (so they can be omitted entirely).
  */
-function compactSectionLine(def) {
+function compactSectionLine(def, opts) {
     if (def.items.length === 0)
         return "";
-    const titles = def.items.map((i) => i.title).join("; ");
+    // Honor `--include-blockers`: prefix blocked item titles with 🚨 so the
+    // marker is not lost in compact mode (README says blockers are highlighted
+    // in every format). Done items are never blockers (see isBlockerItem).
+    const titles = def.items
+        .map((i) => (opts.includeBlockers && isBlockerItem(i) ? `🚨 ${i.title}` : i.title))
+        .join("; ");
     return `${def.emoji} ${def.title} (${def.items.length}): ${titles}`;
 }
 function todayISO() {
@@ -849,7 +867,7 @@ export function buildTextMessage(data, opts) {
     if (opts.compact) {
         // Compact: one line per non-empty section, no per-item bullets / grouping.
         for (const def of sections) {
-            const line = compactSectionLine(def);
+            const line = compactSectionLine(def, opts);
             if (line)
                 lines.push(line);
         }
@@ -926,7 +944,7 @@ export function buildBlockKit(data, opts) {
             // Compact: collapse all non-empty sections into a single section block,
             // one summary line each (titles only), to minimize block count.
             const lines = resolveSections(data, opts)
-                .map((d) => compactSectionLine(d))
+                .map((d) => compactSectionLine(d, opts))
                 .filter(Boolean);
             if (lines.length > 0) {
                 blocks.push({
@@ -1419,6 +1437,41 @@ export default defineExtension({
             const webhookUrl = readStrOption(ctx.options, "webhook") ?? process.env["PM_SLACK_WEBHOOK"] ?? "";
             const dryRun = readBoolOption(ctx.options, "dry-run");
             const { opts, sinceMs } = resolveStandupOptions(ctx.options, parseFormat(readStrOption(ctx.options, "format")));
+            // `--schedule`: defer the actual post to the next computed fire time
+            // (HH:MM daily, or a 5-field cron expression). In `--dry-run` we just
+            // report the resolved schedule without waiting. Otherwise the process
+            // waits until the fire time, then posts normally below.
+            //
+            // IMPORTANT: for non-dry-run schedules the wait happens BEFORE the pm
+            // data is fetched/built, so the posted standup reflects state at the
+            // fire time rather than the (potentially stale) snapshot from when the
+            // command was started. A command started at 08:00 for 09:30 thus posts
+            // the 09:30 standup, not the 08:00 one.
+            const scheduleSpec = parseSchedule(readStrOption(ctx.options, "schedule"));
+            let scheduledAt;
+            if (scheduleSpec) {
+                const fireAt = nextFireTime(scheduleSpec, Date.now());
+                scheduledAt = new Date(fireAt).toISOString();
+                if (dryRun) {
+                    console.error(`Scheduled: next post at ${scheduledAt} (${scheduleSpec.raw}); --dry-run, not waiting.`);
+                }
+                else {
+                    const waitMs = Math.max(0, fireAt - Date.now());
+                    console.error(`Scheduled: posting at ${scheduledAt} (${scheduleSpec.raw}); waiting ${Math.round(waitMs / 1000)}s...`);
+                    // Node's setTimeout clamps delays larger than 2^31-1 ms (~24.8
+                    // days) to 1 ms, which would fire immediately for sparse cron
+                    // expressions. Sleep in <= 24-day chunks to stay under the limit.
+                    const MAX_CHUNK_MS = 24 * 86_400_000;
+                    let remaining = waitMs;
+                    while (remaining > 0) {
+                        const chunk = Math.min(remaining, MAX_CHUNK_MS);
+                        await new Promise((res) => setTimeout(res, chunk));
+                        remaining -= chunk;
+                    }
+                }
+            }
+            // Fetch and bucket the standup AFTER any schedule wait, so a scheduled
+            // (non-dry-run) post reflects the current pm state at fire time.
             const items = fetchAllItems(ctx.pm_root);
             const data = buildStandupData(items, opts, sinceMs);
             // `--compare <path>`: read a PRIOR standup JSON and attach per-section
@@ -1445,24 +1498,6 @@ export default defineExtension({
                     const prior = readPriorCounts(comparePath);
                     if (prior)
                         opts.trend = computeDeltas(prior, currentCounts(data));
-                }
-            }
-            // `--schedule`: defer the actual post to the next computed fire time
-            // (HH:MM daily, or a 5-field cron expression). In `--dry-run` we just
-            // report the resolved schedule without waiting. Otherwise the process
-            // waits until the fire time, then posts normally below.
-            const scheduleSpec = parseSchedule(readStrOption(ctx.options, "schedule"));
-            let scheduledAt;
-            if (scheduleSpec) {
-                const fireAt = nextFireTime(scheduleSpec, Date.now());
-                scheduledAt = new Date(fireAt).toISOString();
-                if (dryRun) {
-                    console.error(`Scheduled: next post at ${scheduledAt} (${scheduleSpec.raw}); --dry-run, not waiting.`);
-                }
-                else {
-                    const waitMs = Math.max(0, fireAt - Date.now());
-                    console.error(`Scheduled: posting at ${scheduledAt} (${scheduleSpec.raw}); waiting ${Math.round(waitMs / 1000)}s...`);
-                    await new Promise((res) => setTimeout(res, waitMs));
                 }
             }
             if (dryRun) {

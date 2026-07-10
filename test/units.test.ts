@@ -1191,3 +1191,78 @@ test("nextFireTime for `*/15 * * * *` lands on a 15-minute boundary", () => {
   assert.equal(d.getMinutes(), 15);
   assert.equal(d.getHours(), 12);
 });
+
+// ---------------------------------------------------------------------------
+// Regression tests for review findings (cron empty bounds, done blockers,
+// compact blocker markers)
+// ---------------------------------------------------------------------------
+
+test("parseSchedule rejects cron ranges with empty bounds (-5, 0-)", () => {
+  // Number("") === 0 would previously accept these as 0-5 / 0-0.
+  assert.throws(() => parseSchedule("-5 * * * *"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSchedule("0- * * * *"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSchedule("0-59 0- * * *"), (e: any) => e.exitCode === 2);
+});
+
+test("parseSchedule rejects a cron step with an empty base (/5)", () => {
+  // Number("") === 0 would previously accept `/5` as `0/5`.
+  assert.throws(() => parseSchedule("/5 * * * *"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSchedule("*/ * * * *"), (e: any) => e.exitCode === 2);
+});
+
+test("parseSchedule still accepts valid step/range cron expressions", () => {
+  // sanity: the stricter validation must not reject legitimate syntax.
+  const a = parseSchedule("0-59/15 * * * *")!;
+  assert.equal(a.fields![0].length, 4); // 0,15,30,45
+  const b = parseSchedule("5/10 * * * *")!;
+  assert.ok(b.fields![0].includes(5));
+  const c = parseSchedule("1-5 * * * *")!;
+  assert.deepEqual(c.fields![0], [1, 2, 3, 4, 5]);
+});
+
+test("--include-blockers does not mark done items even with a stale blocked_by", () => {
+  // A closed item that still carries a blocked_by dependency must not be
+  // resurfaced with 🚨 when --include-done --include-blockers are combined.
+  const items = [
+    item({ id: "1", status: "done", title: "Shipped but had dep", blocked_by: "pm-z" }),
+    item({ id: "2", status: "blocked", title: "Still stuck" }),
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, {
+    ...baseOpts,
+    includeDone: true,
+    includeBlockers: true,
+  });
+  assert.match(msg, /🚨.*Still stuck/);
+  assert.ok(!/🚨.*Shipped but had dep/.test(msg), "done item must not be highlighted as a blocker");
+});
+
+test("--compact --include-blockers surfaces the 🚨 marker in text", () => {
+  const items = [
+    item({ id: "1", status: "in_progress", title: "Alpha" }),
+    item({ id: "2", status: "blocked", title: "Stuck" }),
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, { ...baseOpts, compact: true, includeBlockers: true });
+  assert.match(msg, /🚨 Stuck/, "compact text should prefix the blocked title with 🚨");
+  assert.ok(!/🚨.*Alpha/.test(msg), "non-blocked compact row must not be marked");
+});
+
+test("--compact --include-blockers surfaces the 🚨 marker in Block Kit", () => {
+  const items = [
+    item({ id: "1", status: "blocked", title: "Blocked in compact BK" }),
+  ];
+  const data = buildStandupData(items, baseOpts);
+  const { blocks } = buildBlockKit(data, { ...baseOpts, compact: true, includeBlockers: true });
+  const sections = blocks.filter((b) => b.type === "section");
+  assert.equal(sections.length, 1);
+  const text = (sections[0] as any).text.text as string;
+  assert.match(text, /🚨 Blocked in compact BK/);
+});
+
+test("--compact without --include-blockers stays marker-free (backward compatible)", () => {
+  const items = [item({ id: "1", status: "blocked", title: "Stuck" })];
+  const data = buildStandupData(items, baseOpts);
+  const msg = buildTextMessage(data, { ...baseOpts, compact: true });
+  assert.ok(!/🚨/.test(msg), "compact mode without --include-blockers must not add markers");
+});
