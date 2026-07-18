@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Hands-on functional test pass 2026-05-29 (real data) ([pm-slack-standup-s1rp](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-s1rp.toon))
+
+### Other
+
+- Harden release bun-verify so registry-mirror lag cannot block the GitHub release ([pm-slack-standup-do6k](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-do6k.toon))
+
 ## 2026.7.10 - 2026-07-10
 
 ### Added
