@@ -1402,7 +1402,7 @@ export function renderTrendLine(deltas) {
 let exportStdoutViaService = false;
 export default defineExtension({
     name: "pm-slack-standup",
-    version: "2026.7.18",
+    version: "2026.7.19",
     activate(api) {
         const standupFlags = [
             { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
