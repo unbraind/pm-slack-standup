@@ -9,7 +9,7 @@ created_at: "2026-06-07T05:17:37.294Z"
 updated_at: "2026-06-07T05:46:13.750Z"
 author: codex-5-3
 comments[6]{created_at,author,text}:
-  "2026-06-07T05:17:37.781Z",codex-5-3,"Bootstrap complete for pm-slack-standup. Canonical local path: /home/steve/container/pm-slack-standup. Active items: 3. Duplicate active titles: 0. Created_today_item=true."
+  "2026-06-07T05:17:37.781Z",codex-5-3,"Bootstrap complete for pm-slack-standup. Canonical local path: /workspace/pm-slack-standup. Active items: 3. Duplicate active titles: 0. Created_today_item=true."
   "2026-06-07T05:20:39.400Z",codex-5-3,"GitHub triage snapshot: open_prs=0, open_issues=0, dependabot_open=0, code_scanning_open=disabled_or_no_access."
   "2026-06-07T05:21:39.207Z",codex-5-3,"Release/changelog standardization audit: scripts_ok=true, release_workflow=true, daily_schedule=true, pm_changelog=true, npm_publish=true, bun_verify=true."
   "2026-06-07T05:36:33.890Z",codex-5-3,"Validation evidence: local release:check passed (typecheck/build/tests/audit/pack/changelog-check)."
@@ -18,8 +18,8 @@ comments[6]{created_at,author,text}:
 files[2]{path,scope,note}:
   index.ts,project,Add slack-standup command alias wired to standup handler for discoverability
   test/smoke.test.ts,project,Assert both standup and slack-standup commands are registered
-tests[1]{command,path,scope,timeout_seconds,pm_context_mode,env_set,env_clear,shared_host_safe,assert_stdout_contains,assert_stdout_regex,assert_stderr_contains,assert_stderr_regex,assert_stdout_min_lines,assert_json_field_equals,assert_json_field_gte,note}:
-  "npm run release:check",null,project,900,null,null,null,null,null,null,null,null,null,null,null,null
+tests[1]{command,scope,timeout_seconds}:
+  "npm run release:check",project,900
 docs[1]{path,scope,note}:
   README.md,project,Document alias usage path
 close_reason: "Merged PR #8: added package-name alias command, docs, tests, and validated release-check + real-data install smoke."
