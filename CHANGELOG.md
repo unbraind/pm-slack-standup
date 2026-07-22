@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.7.22 - 2026-07-22
+
+### Other
+
+- Adopt pm field-aware merge driver for multi-agent branch-merge safety ([pm-slack-standup-0pxr](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-0pxr.toon))
+
 ## 2026.7.19 - 2026-07-19
 
 ### Added
