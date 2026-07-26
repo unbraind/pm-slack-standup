@@ -413,7 +413,7 @@ export declare function renderTrendLine(deltas: SectionDelta[]): string;
 declare const _default: {
     name: string;
     version: string;
-    activate(api: import("@unbrained/pm-cli/sdk").ExtensionApi): void;
+    activate(api: import("@unbrained/pm-cli/sdk/authoring").ExtensionApi): void;
 };
 export default _default;
 //# sourceMappingURL=index.d.ts.map

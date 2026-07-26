@@ -4,6 +4,12 @@
 
 ### Other
 
+- Adopt the pm-cli 2026.7.26 typed authoring SDK, drop the last any-typed shim, and de-binary the source file ([pm-slack-standup-xms9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-xms9.toon))
+
+## 2026.7.26 - 2026-07-26
+
+### Other
+
 - Enable governance duplicate-detection advisory mode and adopt pm-cli 2026.7.25 ([pm-slack-standup-jl6z](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-jl6z.toon))
 
 ## 2026.7.23 - 2026-07-23
