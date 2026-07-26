@@ -3,9 +3,17 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
 import { basename, resolve, join } from "node:path";
 
-import type { defineExtension as defineExtensionType } from "@unbrained/pm-cli/sdk";
+import type { ExtensionModule } from "@unbrained/pm-cli/sdk/authoring";
 
-const defineExtension: typeof defineExtensionType = ((extension: any) => extension) as any;
+/**
+ * Local stand-in for the SDK's `defineExtension` identity helper.
+ *
+ * Declared here rather than imported so this package keeps a type-only
+ * dependency on `@unbrained/pm-cli` and adds no runtime module edge. The
+ * generic constraint is the SDK's own, so the extension object is contract-
+ * checked against {@link ExtensionModule} exactly as the imported helper would.
+ */
+const defineExtension = <TModule extends ExtensionModule>(module: TModule): TModule => module;
 
 // ---------------------------------------------------------------------------
 // Error contract
@@ -15,9 +23,14 @@ const defineExtension: typeof defineExtensionType = ((extension: any) => extensi
 // handled non-zero exit when the error carries a numeric `exitCode` property
 // (see @unbrained/pm-cli runCommandHandler). A plain `Error` makes the runtime
 // fall through to its "unhandled" path, which RE-INVOKES the command handler a
-// second time and exits with a generic code. We mirror the SDK's EXIT_CODE
-// contract here rather than importing it: standalone-installed extensions load
-// only their own `dist/`, so `@unbrained/pm-cli` is not resolvable at runtime.
+// second time and exits with a generic code.
+//
+// We mirror the SDK's EXIT_CODE contract here rather than importing it, to keep
+// this package's dependency on `@unbrained/pm-cli` type-only and add no runtime
+// module edge. Note the reason is availability, not impossibility: the SDK IS
+// importable at runtime wherever the package's own `node_modules` is populated
+// (upstream pm-cli#717), but a standalone-installed extension is not guaranteed
+// that, so taking a value import here would make activation depend on it.
 const EXIT_CODE = {
   GENERIC_FAILURE: 1,
   USAGE: 2,
@@ -1307,7 +1320,7 @@ export function resolvePostTargets(
     const target: PostTarget = isWebhookUrl(token)
       ? { webhookUrl: token, channel: baseChannel }
       : { webhookUrl: baseWebhook, channel: token };
-    const dedupeKey = `${target.webhookUrl} ${target.channel ?? ""}`;
+    const dedupeKey = `${target.webhookUrl}\u0000${target.channel ?? ""}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
     out.push(target);
