@@ -1440,6 +1440,11 @@ export default defineExtension({
             { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
             { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
         ];
+        // Typed against the SDK's real `CommandHandlerContext` so this closure
+        // is contract-checked against the same shape `registerCommand`'s `run`
+        // field expects (a `CommandHandler`). It is shared by both the `standup`
+        // and `slack-standup` registrations, which are both ordinary command
+        // handlers, so a single context type covers every call site.
         const runStandupCommand = async (ctx) => {
             // Fail-fast credential gate: if a Slack post is actually requested
             // (i.e. NOT --dry-run) but no webhook is configured, abort immediately
