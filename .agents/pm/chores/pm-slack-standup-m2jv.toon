@@ -1,0 +1,21 @@
+id: pm-slack-standup-m2jv
+title: Eliminate the last source any with real SDK handler context types
+description: "Replace the loose ctx: any parameter on runStandupCommand with the SDK's real CommandHandlerContext, imported type-only from @unbrained/pm-cli/sdk/authoring, so the shared command handler is contract-checked against the same shape registerCommand's run field expects. Behaviour must not change."
+type: Chore
+status: closed
+priority: 2
+tags: []
+created_at: "2026-07-27T22:10:47.247Z"
+updated_at: "2026-07-27T22:13:54.337Z"
+closed_at: "2026-07-27T22:13:54.331Z"
+claim_principal: pi-agent
+author: pi-agent
+acceptance_criteria: "Zero any in index.ts; npx tsc --noEmit clean; npm test green (94 pass); npm run build clean; npm run changelog:check prints 'Changelog is up to date'; activation proof under pm-cli 2026.7.27 lists the standup subcommands and leaves host commands intact; output_format decline path returns { handled: false } unchanged."
+resolution: "Imported CommandHandlerContext type-only from @unbrained/pm-cli/sdk/authoring and typed runStandupCommand's ctx parameter with it; no runtime guards needed, no new runtime module edge."
+expected_result: "Zero any in index.ts; tsc --noEmit clean; 94 tests pass; build clean; changelog:check up to date; activation lists standup subcommands."
+actual_result: "Verified: zero any (grep clean); npx tsc --noEmit clean; npm test 94 pass / 0 fail; npm run build clean; changelog:check prints 'Changelog is up to date'; activation proof under pm-cli 2026.7.27 lists slack-standup, standup, standup export with host commands intact."
+notes[2]{created_at,author,text}:
+  "2026-07-27T22:11:34.137Z",pi-agent,"SDK type found in node_modules/@unbrained/pm-cli/dist/core/extensions/extension-types.d.ts: CommandHandlerContext (interface, extends PortableWorkspaceContext). Exported type-only via the package subpath @unbrained/pm-cli/sdk/authoring (re-exported from dist/core/extensions/loader.js). CommandHandler = (context: CommandHandlerContext) => unknown, matching registerCommand's run field. Replaced ctx: any with ctx: CommandHandlerContext. ctx.options is Record<string, unknown> (matches readStrOption/readBoolOption helpers), ctx.pm_root is string (matches fetchAllItems), ctx.global is GlobalOptions. No runtime guards needed to be preserved or added. Import is type-only from the same subpath ExtensionModule already uses, so no new runtime module edge."
+  "2026-07-27T22:11:39.512Z",pi-agent,"Activation proof under pm-cli 2026.7.27 (fresh /tmp/pm-slack-standup-proof workspace): pm install reported verification status ok, registered_commands [slack-standup, standup, standup export], health ok. pm standup --help listed the export subcommand and the full flag set (subcommands really listed, not the upstream pm-cli#772 arity-error masking). pm list --json returned host commands intact ({ items: [], count: 0 }). pm health ran cleanly (embedding_identity_runtime ollama qwen3-embedding:0.6b, items 0)."
+close_reason: "Last source any replaced with the SDK's real CommandHandlerContext, contract-checking the shared standup command handler against registerCommand's run field; behaviour unchanged."
+body: ""

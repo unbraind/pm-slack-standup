@@ -3,7 +3,10 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
 import { basename, resolve, join } from "node:path";
 
-import type { ExtensionModule } from "@unbrained/pm-cli/sdk/authoring";
+import type {
+  CommandHandlerContext,
+  ExtensionModule,
+} from "@unbrained/pm-cli/sdk/authoring";
 
 /**
  * Local stand-in for the SDK's `defineExtension` identity helper.
@@ -1727,7 +1730,12 @@ export default defineExtension({
       { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
     ];
 
-    const runStandupCommand = async (ctx: any) => {
+    // Typed against the SDK's real `CommandHandlerContext` so this closure
+    // is contract-checked against the same shape `registerCommand`'s `run`
+    // field expects (a `CommandHandler`). It is shared by both the `standup`
+    // and `slack-standup` registrations, which are both ordinary command
+    // handlers, so a single context type covers every call site.
+    const runStandupCommand = async (ctx: CommandHandlerContext) => {
       // Fail-fast credential gate: if a Slack post is actually requested
       // (i.e. NOT --dry-run) but no webhook is configured, abort immediately
       // with a clear, actionable, non-zero error — before reading any pm data

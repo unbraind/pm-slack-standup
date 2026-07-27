@@ -6,6 +6,10 @@
 
 - Fix the output_format service override so it declines unclaimed payloads instead of echoing the command context ([pm-slack-standup-v4tf](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-v4tf.toon))
 
+### Other
+
+- Eliminate the last source any with real SDK handler context types ([pm-slack-standup-m2jv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-m2jv.toon))
+
 ## 2026.7.27 - 2026-07-27
 
 ### Other
