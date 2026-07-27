@@ -1963,8 +1963,16 @@ export default defineExtension({
     // round-trip. The sanctioned SDK mechanism is an `output_format` service
     // override: when the active command is `standup export` and the handler
     // result carries our raw-stdout marker, return the export string verbatim
-    // (pm prints exactly that string); for every other command/result return
-    // `context.payload` untouched, which the runtime treats as "not handled".
+    // (pm prints exactly that string); for every other command/result DECLINE
+    // with the `{ handled: false }` decision so the host renders normally.
+    //
+    // Declining must NOT be done by returning `sctx.payload`. As of
+    // @unbrained/pm-cli 2026.7.27 an override's bare return value IS what the
+    // host renders, so echoing the payload made EVERY command in a workspace
+    // with this extension installed print the whole command context (`global`,
+    // `format`, `options`, …) instead of its own result. The SDK's
+    // `declineServiceOverride()` returns exactly this object, but it is a
+    // runtime value this extension deliberately does not depend on.
     // -----------------------------------------------------------------------
     if (typeof api.registerService === "function") {
       api.registerService("output_format", (sctx: { command?: string; payload?: unknown }) => {
@@ -1976,7 +1984,7 @@ export default defineExtension({
             return result["output"];
           }
         }
-        return sctx?.payload;
+        return { handled: false };
       });
       exportStdoutViaService = true;
     }

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Fix the output_format service override so it declines unclaimed payloads instead of echoing the command context ([pm-slack-standup-v4tf](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-v4tf.toon))
+
 ## 2026.7.27 - 2026-07-27
 
 ### Other
