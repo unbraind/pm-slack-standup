@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2026.7.28 - 2026-07-28
 
 ### Fixed
 
@@ -8,6 +8,7 @@
 
 ### Other
 
+- Adopt pm-cli 2026.7.28 ([pm-slack-standup-40od](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-40od.toon))
 - Eliminate the last source any with real SDK handler context types ([pm-slack-standup-m2jv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-m2jv.toon))
 
 ## 2026.7.27 - 2026-07-27
