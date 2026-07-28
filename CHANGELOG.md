@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Adopt --respect-item-release in changelog scripts and bump pm-changelog to 2026.7.24 ([pm-slack-standup-6nwd](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-6nwd.toon))
+- Align pm-slack-standup with pm CLI 2026.6.12 release readiness ([pm-slack-standup-7ikg](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-7ikg.toon))
+- Ecosystem release readiness pass 2026-07-06 ([pm-slack-standup-u81w](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-u81w.toon))
+- Full-cycle hardening wave: pm-slack-standup ([pm-slack-standup-3bae](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-3bae.toon))
+- Production-readiness audit 2026-05-28 ([pm-slack-standup-uqdb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-uqdb.toon))
+
 ## 2026.7.28 - 2026-07-28
 
 ### Fixed
