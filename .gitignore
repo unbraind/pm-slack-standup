@@ -11,3 +11,5 @@ dist-test/
 .env
 .env.*
 !.env.example
+
+coverage/

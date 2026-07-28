@@ -50,7 +50,7 @@ import {
   type StandupOptions,
   type SectionCounts,
   type Poster,
-} from "../dist/index.js";
+} from "../index.ts";
 
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
