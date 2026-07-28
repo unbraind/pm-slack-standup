@@ -23,6 +23,12 @@
 
 - Enable governance duplicate-detection advisory mode and adopt pm-cli 2026.7.25 ([pm-slack-standup-jl6z](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-jl6z.toon))
 
+## 2026.7.25 - 2026-07-25
+
+### Other
+
+- Adopt --respect-item-release in changelog scripts and bump pm-changelog to 2026.7.24 ([pm-slack-standup-6nwd](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-6nwd.toon))
+
 ## 2026.7.23 - 2026-07-23
 
 ### Fixed
@@ -49,6 +55,12 @@
 
 - Add --format blocks, --schedule, --include-blockers, --team, --compact to pm-slack-standup ([pm-slack-standup-9o06](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-9o06.toon))
 
+## 2026.7.7 - 2026-07-07
+
+### Other
+
+- Ecosystem release readiness pass 2026-07-06 ([pm-slack-standup-u81w](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-u81w.toon))
+
 ## 2026.7.6 - 2026-07-06
 
 ### Fixed
@@ -67,11 +79,21 @@
 - Round-trip-safe stdout export, documented export flags, multi-snapshot history (--history-dir / --compare <dir\>) ([pm-slack-standup-39h9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-39h9.toon))
 - Configurable Up Next count, milestone grouping, --since warning + friendly export errors ([pm-slack-standup-dc4i](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-dc4i.toon))
 
+### Other
+
+- Align pm-slack-standup with pm CLI 2026.6.12 release readiness ([pm-slack-standup-7ikg](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-7ikg.toon))
+
 ## 2026.6.9 - 2026-06-09
 
 ### Added
 
 - Add --compare standup trend deltas ([pm-slack-standup-o59l](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-o59l.toon))
+
+## 2026.6.8 - 2026-06-08
+
+### Other
+
+- Full-cycle hardening wave: pm-slack-standup ([pm-slack-standup-3bae](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-3bae.toon))
 
 ## 2026.6.7 - 2026-06-07
 
@@ -125,6 +147,12 @@
 ### Fixed
 
 - standup threw plain Error (no exitCode) → runtime double-invocation ([pm-slack-standup-uyr9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-uyr9.toon))
+
+## 2026.5.30 - 2026-05-30
+
+### Other
+
+- Production-readiness audit 2026-05-28 ([pm-slack-standup-uqdb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-uqdb.toon))
 
 ## 2026.5.29 - 2026-05-29
 
