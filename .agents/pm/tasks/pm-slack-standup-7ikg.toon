@@ -6,10 +6,11 @@ status: closed
 priority: 1
 tags[3]: agent-context,dependency-alignment,release-readiness
 created_at: "2026-06-12T11:53:40.410Z"
-updated_at: "2026-07-28T11:14:18.344Z"
+updated_at: "2026-07-28T11:22:17.923Z"
 closed_at: "2026-07-28T11:14:18.343Z"
 author: codex
 acceptance_criteria: Latest pm CLI/SDK dependency is used; pm-changelog release scripts are present where applicable; package tests and release checks pass or blockers are recorded; no private data is introduced; results are captured in pm history.
+release: 2026.6.12
 notes[1]{created_at,author,text}:
   "2026-06-12T14:01:40.602Z",codex,"Verified release readiness after moving @unbrained/pm-cli to runtime dependencies: npm release:check completed for the fleet on 2026-06-12; npm audit retries for pm-beads and pm-jira returned 0 vulnerabilities after transient advisory endpoint failures."
 close_reason: "Superseded and closed 2026-07-28: this tracked alignment with pm CLI 2026.6.12; the package now ships 2026.7.28 against pm-cli 2026.7.28 with green release checks. Closing the tracker."
