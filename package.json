@@ -95,6 +95,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "@unbrained/pm-cli": "^2026.7.29"
+  },
   "coverageGate": {
     "sources": [
       "."
@@ -108,8 +111,5 @@
       "functions": 87
     },
     "ignore": []
-  },
-  "dependencies": {
-    "@unbrained/pm-cli": ">=2026.7.29"
   }
 }
