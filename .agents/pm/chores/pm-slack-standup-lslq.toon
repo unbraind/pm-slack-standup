@@ -1,0 +1,18 @@
+id: pm-slack-standup-lslq
+title: Adopt pm-cli 2026.7.29
+description: "Bump @unbrained/pm-cli devDependency and dependency to 2026.7.29, set peerDependency to >=2026.7.29, audit for removed --all flag and fixed upstream workarounds (GH-651/672/676/785/792/794), pass all quality gates."
+type: Chore
+status: closed
+priority: 2
+tags: []
+created_at: "2026-07-29T04:31:17.548Z"
+updated_at: "2026-07-29T04:42:39.519Z"
+closed_at: "2026-07-29T04:32:31.602Z"
+completed_at: "2026-07-29T04:32:31.602Z"
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-07-29T04:32:15.108Z",pi-agent,"Bumped @unbrained/pm-cli devDep and dep to 2026.7.29, peerDep to >=2026.7.29. --all audit: no hits. Workaround audit: GH-794 examined — the output_format service override already returns { handled: false } to decline (correct contract), not the old destructive sctx.payload return. No workaround code to remove; the comment at line 1976 documents the historical reason but the code is already correct. GH-651/672/676/785/792: none present."
+notes[1]{created_at,author,text}:
+  "2026-07-29T04:42:39.519Z",claude-orchestrator,"Orchestrator correction during verification: the adoption pass had rewritten the runtime dependencies entry for pm-cli from a caret range to an unbounded '>=2026.7.29' and relocated the block to the end of package.json. An unbounded range is correct for peerDependencies, where host-version flexibility is intentional, but wrong in dependencies: with calendar versioning it would let a future install silently resolve an arbitrarily newer host. Restored to '^2026.7.29' in its original position, so the diff against main is now only the three version strings. Note that this package is the fleet's only outlier in declaring pm-cli in all three of dependencies, devDependencies and peerDependencies; that predates this change and was left as-is rather than folded into a version bump."
+close_reason: "Bumped @unbrained/pm-cli devDep and dep to 2026.7.29, peerDep to >=2026.7.29. --all audit: no hits. GH-794 examined: output_format override already uses correct { handled: false } decline contract, no workaround to remove. GH-651/672/676/785/792: none present. All gates green: 94 tests pass, coverage 83.22% lines / 87.45% branches / 87.96% functions (thresholds met), changelog:check passes, audit:prod 0 vulnerabilities."
+body: ""
