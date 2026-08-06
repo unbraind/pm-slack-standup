@@ -4,7 +4,7 @@
 
 ### Other
 
-- Gate CI on pm health so a silently discarded peer edit cannot merge ([pm-slack-standup-2f0f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-2f0f.toon))
+- Gate CI on strict tracked pm project health ([pm-slack-standup-2f0f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-2f0f.toon))
 
 ## 2026.8.4 - 2026-08-04
 
