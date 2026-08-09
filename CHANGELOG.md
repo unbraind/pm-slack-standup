@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- The mandatory docstring gate could skip its own scan and still exit zero ([pm-slack-standup-cg85](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-cg85.toon))
+
 ### Other
 
 - Adopt the canonical pm-ops docstring gate ([pm-slack-standup-4hk6](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-4hk6.toon))
