@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Adopt the canonical pm-ops docstring gate ([pm-slack-standup-4hk6](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-4hk6.toon))
+
 ## 2026.8.7 - 2026-08-07
 
 ### Other

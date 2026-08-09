@@ -31,7 +31,17 @@ const EXIT_CODE = {
     USAGE: 2,
     NOT_FOUND: 3,
 };
+/**
+ * Error type that carries the numeric exit code pm's command runtime expects.
+ *
+ * pm's extension runtime only treats a thrown error as a cleanly-handled
+ * non-zero exit when the error exposes a numeric `exitCode`; a plain
+ * {@link Error} makes the runtime re-invoke the handler and exit with a generic
+ * code, so every intentional failure path in this package throws a
+ * {@link CommandError} instead.
+ */
 export class CommandError extends Error {
+    /** Numeric exit code pm's runtime reads off the thrown error (see EXIT_CODE). */
     exitCode;
     constructor(message, exitCode = EXIT_CODE.GENERIC_FAILURE) {
         super(message);
@@ -39,6 +49,12 @@ export class CommandError extends Error {
         this.exitCode = exitCode;
     }
 }
+/**
+ * The four standup sections in their canonical render order.
+ *
+ * Used as the default selection and to iterate sections in a stable order
+ * independent of how `--sections` lists them.
+ */
 export const ALL_SECTIONS = [
     "in_progress",
     "blocked",
@@ -66,6 +82,19 @@ export const HISTORY_MAX_SNAPSHOTS = 8;
 function camelCase(key) {
     return key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 }
+/**
+ * Read a boolean option under both the kebab-case and camelCase spellings.
+ *
+ * pm normalizes CLI flags to camelCase at runtime, so reading only one key
+ * silently misses the value; this tries `key` then its {@link camelCase} form
+ * and accepts either a real boolean or a truthy/falsy string (`true`/`1`/`yes`/
+ * `on` vs `false`/`0`/`no`/`off`). A missing or unrecognized option resolves to
+ * `false` so an unset flag never blocks behavior.
+ *
+ * @param options - The raw flag record handed to the command.
+ * @param key - The flag name, in its kebab-case form (e.g. `include-done`).
+ * @returns The resolved boolean, or `false` when the option is unset.
+ */
 export function readBoolOption(options, key) {
     for (const candidate of [key, camelCase(key)]) {
         const value = options[candidate];
@@ -81,6 +110,17 @@ export function readBoolOption(options, key) {
     }
     return false;
 }
+/**
+ * Read a trimmed, non-empty string option under both flag spellings.
+ *
+ * Like {@link readBoolOption}, this tries the kebab-case and camelCase keys so a
+ * value set under either form is found. A blank or whitespace-only value is
+ * treated as absent and skipped, so callers can rely on a non-empty return.
+ *
+ * @param options - The raw flag record handed to the command.
+ * @param key - The flag name, in its kebab-case form.
+ * @returns The trimmed value, or `undefined` when the option is unset or blank.
+ */
 export function readStrOption(options, key) {
     for (const candidate of [key, camelCase(key)]) {
         const value = options[candidate];
@@ -132,6 +172,16 @@ export function parseFormat(raw) {
         return "plain";
     throw new CommandError(`Unknown --format '${raw}'. Valid: slack | blockkit | blocks | markdown | plain.`, EXIT_CODE.USAGE);
 }
+/**
+ * Parse the `--group-by` value into a {@link GroupBy}, defaulting to `status`.
+ *
+ * Accepts the canonical field names (and `owner` as an alias for `assignee`).
+ * A blank or omitted value resolves to `status`; anything else throws a
+ * {@link CommandError} (USAGE) listing the valid choices.
+ *
+ * @param raw - The raw `--group-by` value, possibly undefined.
+ * @returns The resolved grouping field.
+ */
 export function parseGroupBy(raw) {
     if (raw == null)
         return "status";
@@ -469,6 +519,17 @@ export function resolveUpNextCount(upNextRaw, allOpen, fallback = DEFAULT_UP_NEX
     }
     return n;
 }
+/**
+ * Parse the `--days` value into a number of days, or undefined when omitted.
+ *
+ * A blank value resolves to `undefined` (the caller's default applies); a
+ * non-numeric value throws a {@link CommandError} (USAGE). Unlike a coercing
+ * parse, `Number` rejects trailing junk so `5d` fails loudly rather than
+ * silently becoming 5.
+ *
+ * @param raw - The raw `--days` value, possibly undefined.
+ * @returns The parsed day count, or `undefined` when no value was given.
+ */
 export function parseDays(raw) {
     if (raw == null || raw.trim() === "")
         return undefined;
@@ -562,6 +623,18 @@ export function hasBlockedByDep(item) {
     }
     return false;
 }
+/**
+ * Whole days an item has been blocked, for stale-impediment highlighting.
+ *
+ * Only items that are blocked (by status or a `blocked_by` dependency) are
+ * measured; anything else returns `undefined`. The age is measured from the
+ * item's `updated_at` (falling back to `created_at`) to `now`, floored to whole
+ * days and clamped at zero; an unparseable timestamp yields `undefined`.
+ *
+ * @param item - The item to measure.
+ * @param now - Reference epoch-ms instant (defaults to the current time).
+ * @returns The age in whole days, or `undefined` when the item is not blocked or undated.
+ */
 export function blockedAgeDays(item, now = Date.now()) {
     if (!BLOCKED_STATUSES.has(statusOf(item)) && !hasBlockedByDep(item))
         return undefined;
@@ -707,6 +780,20 @@ function mentionFor(item, mentionMap) {
         return ` (${mentionMap[author]})`;
     return "";
 }
+/**
+ * Render a single item as one compact text line for the standup.
+ *
+ * Composes an optional type label, the title, an optional priority suffix, and
+ * — for blocked items — a parenthesized context naming the blocker and flagging
+ * staleness once the block age crosses three days. A mapped assignee mention is
+ * appended when present. This is the per-item unit the text/markdown renderers
+ * concatenate.
+ *
+ * @param item - The item to render.
+ * @param mentionMap - Assignee → Slack mention token map.
+ * @param withPriority - When true, append the numeric priority.
+ * @returns The composed one-line item string.
+ */
 export function itemText(item, mentionMap, withPriority = false) {
     const label = typeLabel(item);
     const title = label ? `${label} ${item.title}` : item.title;
@@ -797,6 +884,18 @@ export function groupItems(items, groupBy) {
     }
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
+/**
+ * Display label for a sub-group key within a section.
+ *
+ * Most keys render verbatim; the `_none` sentinel — used for items missing the
+ * grouped field — is translated into a field-appropriate placeholder
+ * ("Unassigned", "No sprint", "Untyped", "(no milestone)") so the bucket reads
+ * naturally instead of as a bare sentinel.
+ *
+ * @param key - The raw group key (possibly the `_none` sentinel).
+ * @param groupBy - The active grouping field, which picks the placeholder.
+ * @returns The display label for that group.
+ */
 function groupLabel(key, groupBy) {
     if (key !== "_none")
         return key;
@@ -828,6 +927,18 @@ function italic(text, format) {
         return `_${text}_`;
     return text;
 }
+/**
+ * Append one standup section to the rendered line buffer.
+ *
+ * Emits the section header (emoji + title + item count) in the active format
+ * (markdown heading or mrkdwn bold), an empty-state note when the section has no
+ * items, and the items themselves — flat, or nested under sub-group labels when
+ * grouping is on. Pushes onto `lines` in place; returns nothing.
+ *
+ * @param lines - The output line buffer being assembled.
+ * @param def - The section definition (title, emoji, items, empty note).
+ * @param opts - The resolved standup options (format, grouping, labels).
+ */
 function renderSection(lines, def, opts) {
     const count = `(${def.items.length})`;
     if (opts.format === "markdown") {
