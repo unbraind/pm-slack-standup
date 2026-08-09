@@ -40,7 +40,17 @@ const EXIT_CODE = {
   NOT_FOUND: 3,
 } as const;
 
+/**
+ * Error type that carries the numeric exit code pm's command runtime expects.
+ *
+ * pm's extension runtime only treats a thrown error as a cleanly-handled
+ * non-zero exit when the error exposes a numeric `exitCode`; a plain
+ * {@link Error} makes the runtime re-invoke the handler and exit with a generic
+ * code, so every intentional failure path in this package throws a
+ * {@link CommandError} instead.
+ */
 export class CommandError extends Error {
+  /** Numeric exit code pm's runtime reads off the thrown error (see EXIT_CODE). */
   exitCode: number;
   constructor(message: string, exitCode: number = EXIT_CODE.GENERIC_FAILURE) {
     super(message);
@@ -53,6 +63,13 @@ export class CommandError extends Error {
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * One edge in an item's dependency list, as decoded from `pm list-all --json`.
+ *
+ * Carries the target item id and the relationship kind (e.g. `blocked_by`); the
+ * index signature keeps any extra fields the host may add visible without a
+ * parse error.
+ */
 export interface PmDependency {
   id?: string;
   kind?: string;
@@ -86,9 +103,28 @@ export interface PmItem {
 // `#` headings), and `blockkit` emits the Slack Block Kit `blocks` array JSON.
 // `blocks` is accepted as a user-facing alias for `blockkit` (same payload).
 export type Format = "slack" | "blockkit" | "markdown" | "plain";
+/**
+ * Field a standup's items are sub-grouped within each section by.
+ *
+ * `status` (the default) leaves sections flat; the others nest a sub-header per
+ * assignee, sprint, type, or milestone so a reader can scan their own slice.
+ */
 export type GroupBy = "status" | "assignee" | "sprint" | "type" | "milestone";
+/**
+ * Canonical name of one standup section.
+ *
+ * The four fixed buckets the standup renders: work in progress, blocked, done,
+ * and up next. Aliases (e.g. `wip`, `closed`, `next`) normalize to these via
+ * `SECTION_ALIASES`.
+ */
 export type SectionKey = "in_progress" | "blocked" | "done" | "up_next";
 
+/**
+ * The four standup sections in their canonical render order.
+ *
+ * Used as the default selection and to iterate sections in a stable order
+ * independent of how `--sections` lists them.
+ */
 export const ALL_SECTIONS: readonly SectionKey[] = [
   "in_progress",
   "blocked",
@@ -96,6 +132,13 @@ export const ALL_SECTIONS: readonly SectionKey[] = [
   "up_next",
 ] as const;
 
+/**
+ * The bucketed items a standup renders, produced by filtering and grouping pm items.
+ *
+ * Holds the four section populations plus a total; when `--yesterday` is set,
+ * the done bucket is additionally split into items closed yesterday vs. today
+ * (both still subsets of `done`).
+ */
 export interface StandupData {
   wip: PmItem[];
   blocked: PmItem[];
@@ -151,6 +194,13 @@ export interface StandupOptions {
 /** Default number of items shown in the "Up Next" section. */
 export const DEFAULT_UP_NEXT = 3;
 
+/**
+ * Per-section override of the default emoji and/or title.
+ *
+ * Set from `--section-label` so a team can rename, say, the "Up Next" bucket or
+ * swap its emoji without touching code. Either field is optional; an unset
+ * field keeps the built-in default.
+ */
 export interface SectionLabelOverride {
   emoji?: string;
   title?: string;
@@ -202,6 +252,19 @@ function camelCase(key: string): string {
   return key.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }
 
+/**
+ * Read a boolean option under both the kebab-case and camelCase spellings.
+ *
+ * pm normalizes CLI flags to camelCase at runtime, so reading only one key
+ * silently misses the value; this tries `key` then its {@link camelCase} form
+ * and accepts either a real boolean or a truthy/falsy string (`true`/`1`/`yes`/
+ * `on` vs `false`/`0`/`no`/`off`). A missing or unrecognized option resolves to
+ * `false` so an unset flag never blocks behavior.
+ *
+ * @param options - The raw flag record handed to the command.
+ * @param key - The flag name, in its kebab-case form (e.g. `include-done`).
+ * @returns The resolved boolean, or `false` when the option is unset.
+ */
 export function readBoolOption(
   options: Record<string, unknown>,
   key: string
@@ -218,6 +281,17 @@ export function readBoolOption(
   return false;
 }
 
+/**
+ * Read a trimmed, non-empty string option under both flag spellings.
+ *
+ * Like {@link readBoolOption}, this tries the kebab-case and camelCase keys so a
+ * value set under either form is found. A blank or whitespace-only value is
+ * treated as absent and skipped, so callers can rely on a non-empty return.
+ *
+ * @param options - The raw flag record handed to the command.
+ * @param key - The flag name, in its kebab-case form.
+ * @returns The trimmed value, or `undefined` when the option is unset or blank.
+ */
 export function readStrOption(
   options: Record<string, unknown>,
   key: string
@@ -269,6 +343,16 @@ export function parseFormat(raw: string | undefined): Format {
   );
 }
 
+/**
+ * Parse the `--group-by` value into a {@link GroupBy}, defaulting to `status`.
+ *
+ * Accepts the canonical field names (and `owner` as an alias for `assignee`).
+ * A blank or omitted value resolves to `status`; anything else throws a
+ * {@link CommandError} (USAGE) listing the valid choices.
+ *
+ * @param raw - The raw `--group-by` value, possibly undefined.
+ * @returns The resolved grouping field.
+ */
 export function parseGroupBy(raw: string | undefined): GroupBy {
   if (raw == null) return "status";
   const v = raw.trim().toLowerCase();
@@ -640,6 +724,17 @@ export function resolveUpNextCount(
   return n;
 }
 
+/**
+ * Parse the `--days` value into a number of days, or undefined when omitted.
+ *
+ * A blank value resolves to `undefined` (the caller's default applies); a
+ * non-numeric value throws a {@link CommandError} (USAGE). Unlike a coercing
+ * parse, `Number` rejects trailing junk so `5d` fails loudly rather than
+ * silently becoming 5.
+ *
+ * @param raw - The raw `--days` value, possibly undefined.
+ * @returns The parsed day count, or `undefined` when no value was given.
+ */
 export function parseDays(raw: string | undefined): number | undefined {
   if (raw == null || raw.trim() === "") return undefined;
   const n = Number(raw.trim());
@@ -742,6 +837,18 @@ export function hasBlockedByDep(item: PmItem): boolean {
   return false;
 }
 
+/**
+ * Whole days an item has been blocked, for stale-impediment highlighting.
+ *
+ * Only items that are blocked (by status or a `blocked_by` dependency) are
+ * measured; anything else returns `undefined`. The age is measured from the
+ * item's `updated_at` (falling back to `created_at`) to `now`, floored to whole
+ * days and clamped at zero; an unparseable timestamp yields `undefined`.
+ *
+ * @param item - The item to measure.
+ * @param now - Reference epoch-ms instant (defaults to the current time).
+ * @returns The age in whole days, or `undefined` when the item is not blocked or undated.
+ */
 export function blockedAgeDays(item: PmItem, now: number = Date.now()): number | undefined {
   if (!BLOCKED_STATUSES.has(statusOf(item)) && !hasBlockedByDep(item)) return undefined;
   const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
@@ -924,6 +1031,20 @@ function mentionFor(item: PmItem, mentionMap: Record<string, string>): string {
   return "";
 }
 
+/**
+ * Render a single item as one compact text line for the standup.
+ *
+ * Composes an optional type label, the title, an optional priority suffix, and
+ * — for blocked items — a parenthesized context naming the blocker and flagging
+ * staleness once the block age crosses three days. A mapped assignee mention is
+ * appended when present. This is the per-item unit the text/markdown renderers
+ * concatenate.
+ *
+ * @param item - The item to render.
+ * @param mentionMap - Assignee → Slack mention token map.
+ * @param withPriority - When true, append the numeric priority.
+ * @returns The composed one-line item string.
+ */
 export function itemText(item: PmItem, mentionMap: Record<string, string>, withPriority = false): string {
   const label = typeLabel(item);
   const title = label ? `${label} ${item.title}` : item.title;
@@ -1008,6 +1129,18 @@ export function groupItems(items: PmItem[], groupBy: GroupBy): Array<[string, Pm
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
+/**
+ * Display label for a sub-group key within a section.
+ *
+ * Most keys render verbatim; the `_none` sentinel — used for items missing the
+ * grouped field — is translated into a field-appropriate placeholder
+ * ("Unassigned", "No sprint", "Untyped", "(no milestone)") so the bucket reads
+ * naturally instead of as a bare sentinel.
+ *
+ * @param key - The raw group key (possibly the `_none` sentinel).
+ * @param groupBy - The active grouping field, which picks the placeholder.
+ * @returns The display label for that group.
+ */
 function groupLabel(key: string, groupBy: GroupBy): string {
   if (key !== "_none") return key;
   if (groupBy === "assignee") return "Unassigned";
@@ -1035,6 +1168,18 @@ function italic(text: string, format: Format): string {
   return text;
 }
 
+/**
+ * Append one standup section to the rendered line buffer.
+ *
+ * Emits the section header (emoji + title + item count) in the active format
+ * (markdown heading or mrkdwn bold), an empty-state note when the section has no
+ * items, and the items themselves — flat, or nested under sub-group labels when
+ * grouping is on. Pushes onto `lines` in place; returns nothing.
+ *
+ * @param lines - The output line buffer being assembled.
+ * @param def - The section definition (title, emoji, items, empty note).
+ * @param opts - The resolved standup options (format, grouping, labels).
+ */
 function renderSection(lines: string[], def: SectionDef, opts: StandupOptions): void {
   const count = `(${def.items.length})`;
   if (opts.format === "markdown") {
@@ -1121,6 +1266,13 @@ export function buildTextMessage(data: StandupData, opts: StandupOptions): strin
 // Block Kit rendering
 // ---------------------------------------------------------------------------
 
+/**
+ * One entry in a Slack Block Kit `blocks` array.
+ *
+ * Every block carries a `type` and format-specific fields; the index signature
+ * keeps the loose structure the Slack API expects without enumerating every
+ * block shape this package emits (header, section, context, divider, actions).
+ */
 export interface SlackBlock {
   type: string;
   [key: string]: unknown;
