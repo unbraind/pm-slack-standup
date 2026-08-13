@@ -6,10 +6,11 @@ status: closed
 priority: 1
 tags[2]: correctness,packaging
 created_at: "2026-08-13T21:19:05.261Z"
-updated_at: "2026-08-13T21:19:20.202Z"
+updated_at: "2026-08-13T21:57:14.001Z"
 closed_at: "2026-08-13T21:19:20.170Z"
 completed_at: "2026-08-13T21:19:20.170Z"
 author: codex
+resolution: "Removed the CLI from dependencies so the host's peer copy is the only one that loads, and pinned the dev declaration exactly."
 expected_result: Installing this package alongside any CLI version its declared peer range admits yields exactly one resolvable @unbrained/pm-cli.
 actual_result: "Before the change the manifest permitted two independently-resolved copies. After it, the dependency declaration is gone, the peer declaration is what the host satisfies, and the guard in test/packaging.test.ts fails against the previous manifest shape and passes against the corrected one."
 files[3]{path,scope,note}:
