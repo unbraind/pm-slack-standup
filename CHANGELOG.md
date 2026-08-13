@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Declaring the pm CLI as a runtime dependency gives consumers a second nested copy whenever their host pin differs ([pm-slack-standup-v5q6](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-v5q6.toon))
+
 ## 2026.8.10 - 2026-08-10
 
 ### Fixed
