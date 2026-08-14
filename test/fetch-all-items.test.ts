@@ -5,13 +5,14 @@ import {
   fetchAllItems,
   describePmReadFailure,
   pmJsonMaxBuffer,
+  pmReadTimeoutMs,
   resolvePmBin,
   CommandError,
 } from "../index.ts";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 import extension from "../index.ts";
 
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -79,6 +80,10 @@ test("describePmReadFailure handles an error with no errno code", () => {
 test("pmJsonMaxBuffer defaults to 64 MiB and honors a positive PM_JSON_MAX_BUFFER override", () => {
   const saved = process.env["PM_JSON_MAX_BUFFER"];
   try {
+    // Clear it first: the default assertion is only meaningful against an unset
+    // variable, and a developer or CI runner that exports one would otherwise
+    // turn this into a test of their environment.
+    delete process.env["PM_JSON_MAX_BUFFER"];
     assert.equal(pmJsonMaxBuffer(), EXPECTED_DEFAULT_MAX_BUFFER);
     process.env["PM_JSON_MAX_BUFFER"] = "1048576";
     assert.equal(pmJsonMaxBuffer(), 1048576);
@@ -143,12 +148,13 @@ test("fetchAllItems throws a CommandError when the pm subprocess exits non-zero,
   }
 });
 
-test("fetchAllItems throws 'pm list-all failed' when the subprocess exits non-zero with EMPTY stderr", () => {
+test("fetchAllItems names the exit status when the subprocess exits non-zero with EMPTY stderr", () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-nonzero-stderr-"));
   try {
     const bin = join(dir, "empty-stderr-pm");
-    // Exits non-zero without writing anything to stderr — the fallback reason
-    // must surface rather than an empty message.
+    // Exits non-zero without writing anything to stderr. With no stderr text to
+    // quote, the exit status is the only diagnostic the caller can be given, so
+    // it has to be in the message rather than a bare "pm list-all failed".
     writeFileSync(bin, "#!/bin/sh\nexit 9\n", { encoding: "utf-8", mode: 0o755 });
     chmodSync(bin, 0o755);
     assert.throws(
@@ -157,7 +163,7 @@ test("fetchAllItems throws 'pm list-all failed' when the subprocess exits non-ze
         assert.ok(e instanceof CommandError);
         const err = e as CommandError;
         assert.equal(err.exitCode, 1);
-        assert.equal(err.message, "pm list-all failed");
+        assert.equal(err.message, "pm list-all failed (exit 9)");
         return true;
       }
     );
@@ -267,6 +273,85 @@ test("fetchAllItems throws on unparseable JSON stdout from a zero-exit pm subpro
         return true;
       }
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pmReadTimeoutMs defaults to 60s, honors a positive override, and rejects an invalid one", () => {
+  const saved = process.env["PM_READ_TIMEOUT_MS"];
+  try {
+    delete process.env["PM_READ_TIMEOUT_MS"];
+    assert.equal(pmReadTimeoutMs(), 60_000);
+    process.env["PM_READ_TIMEOUT_MS"] = "5000";
+    assert.equal(pmReadTimeoutMs(), 5000);
+    // "5s" would yield 5 under parseInt — a 5 ms ceiling that kills every read
+    // while looking like an honored override. Number() rejects the whole string.
+    process.env["PM_READ_TIMEOUT_MS"] = "5s";
+    assert.equal(pmReadTimeoutMs(), 60_000);
+    process.env["PM_READ_TIMEOUT_MS"] = "0";
+    assert.equal(pmReadTimeoutMs(), 60_000);
+  } finally {
+    if (saved === undefined) delete process.env["PM_READ_TIMEOUT_MS"];
+    else process.env["PM_READ_TIMEOUT_MS"] = saved;
+  }
+});
+
+test("fetchAllItems kills a hung pm read at the timeout rather than waiting forever", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-read-hang-"));
+  const saved = process.env["PM_READ_TIMEOUT_MS"];
+  try {
+    process.env["PM_READ_TIMEOUT_MS"] = "300";
+    const bin = join(dir, "hanging-pm");
+    writeFileSync(bin, "#!/bin/sh\nsleep 30\n", { encoding: "utf-8", mode: 0o755 });
+    chmodSync(bin, 0o755);
+    const started = Date.now();
+    assert.throws(
+      () => fetchAllItems("/anywhere", bin),
+      (e: unknown) => {
+        assert.ok(e instanceof CommandError);
+        return true;
+      }
+    );
+    // The point of the ceiling is that the call returns; asserting it came back
+    // well inside the child's 30s sleep is what proves the kill happened.
+    assert.ok(Date.now() - started < 10_000, "the read must be killed, not awaited");
+  } finally {
+    if (saved === undefined) delete process.env["PM_READ_TIMEOUT_MS"];
+    else process.env["PM_READ_TIMEOUT_MS"] = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("fetchAllItems names the exit status when pm exits non-zero with empty stderr", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-read-status-"));
+  try {
+    const bin = join(dir, "silent-fail-pm");
+    writeFileSync(bin, "#!/bin/sh\nexit 42\n", { encoding: "utf-8", mode: 0o755 });
+    chmodSync(bin, 0o755);
+    assert.throws(
+      () => fetchAllItems("/anywhere", bin),
+      (e: unknown) => {
+        assert.match((e as CommandError).message, /exit 42/);
+        return true;
+      }
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("resolvePmBin prefers the .cmd shim on Windows and the extensionless shim elsewhere", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-shim-"));
+  try {
+    const binDir = join(dir, "node_modules", ".bin");
+    mkdirSync(binDir, { recursive: true });
+    // Both shims present, as npm installs them, so the choice is the assertion.
+    writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
+    writeFileSync(join(binDir, "pm.cmd"), "@echo off\r\n", { encoding: "utf-8", mode: 0o755 });
+    const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
+    const expected = process.platform === "win32" ? join(binDir, "pm.cmd") : join(binDir, "pm");
+    assert.equal(resolvePmBin(moduleUrl), expected);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

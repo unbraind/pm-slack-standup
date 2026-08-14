@@ -6,10 +6,13 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-08-14T05:59:19.742Z"
-updated_at: "2026-08-14T06:02:23.467Z"
+updated_at: "2026-08-14T06:32:32.125Z"
 closed_at: "2026-08-14T05:59:22.595Z"
 completed_at: "2026-08-14T05:59:22.595Z"
 author: claude
+resolution: "fetchAllItems refuses a truncated list-all envelope, naming the returned and total counts and the flag that lifts the cap."
+expected_result: A standup built from an incomplete read refuses instead of under-reporting work as absent.
+actual_result: Refusal implemented and covered by two tests; with the guard removed the refusal test fails while the complete-envelope test still passes.
 comments[1]{created_at,author,text}:
   "2026-08-14T06:02:23.467Z",claude,"Revert experiment: with the truncated guard removed the refusal test fails and the complementary not-truncated test still passes, so the assertion is bound to the behaviour rather than to the call. With the guard restored all 18 tests in the file pass and release:check exits 0. Both linked tests execute green through pm test --run in the sandboxed runner. Reported upstream as unbraind/pm-cli issue 1012."
 files[2]{path,scope}:

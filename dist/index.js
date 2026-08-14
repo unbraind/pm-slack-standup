@@ -613,17 +613,41 @@ export function describePmReadFailure(error, limitBytes) {
  * exercised against synthetic locations without touching the real tree.
  */
 export function resolvePmBin(moduleUrl = import.meta.url) {
+    // npm writes three shims into node_modules/.bin: an extensionless shell
+    // script, a .cmd batch file, and a .ps1 script. `spawnSync` without a shell
+    // executes the file directly, and Windows cannot execute the extensionless
+    // one — it has no recognized extension and CreateProcess rejects it. Picking
+    // the .cmd there is what makes the local install usable at all on Windows;
+    // preferring it only on win32 keeps POSIX on the shebang script it expects.
+    const shims = process.platform === "win32" ? ["pm.cmd", "pm"] : ["pm"];
     let dir = dirname(fileURLToPath(moduleUrl));
     for (let i = 0; i < 4; i += 1) {
-        const bin = join(dir, "node_modules", ".bin", "pm");
-        if (existsSync(bin))
-            return bin;
+        for (const shim of shims) {
+            const bin = join(dir, "node_modules", ".bin", shim);
+            if (existsSync(bin))
+                return bin;
+        }
         const parent = dirname(dir);
         if (parent === dir)
             break;
         dir = parent;
     }
     return "pm";
+}
+/**
+ * Wall-clock ceiling for one `pm` read, in milliseconds. 60s by default;
+ * override with `PM_READ_TIMEOUT_MS`.
+ *
+ * `spawnSync` without a `timeout` waits forever, so a wedged `pm` turns a
+ * scheduled standup into a hung process rather than a failed one — and a hang
+ * is the one failure mode a scheduler cannot report. A kill surfaces as
+ * `result.error` with code `ETIMEDOUT`, which the existing failure path already
+ * classifies. Resolved per call, and invalid or non-positive values fall back to
+ * the default rather than disabling the ceiling.
+ */
+export function pmReadTimeoutMs() {
+    const raw = Number(process.env["PM_READ_TIMEOUT_MS"]);
+    return Number.isSafeInteger(raw) && raw > 0 ? raw : 60_000;
 }
 /**
  * Read every item once via `list-all --json --include-body`, then bucket by
@@ -647,12 +671,16 @@ export function resolvePmBin(moduleUrl = import.meta.url) {
  */
 export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
     const maxBuffer = pmJsonMaxBuffer();
-    const result = spawnSync(pmBin, ["--path", pmRoot, "list-all", "--json", "--include-body"], { encoding: "utf-8", maxBuffer });
+    const result = spawnSync(pmBin, ["--path", pmRoot, "list-all", "--json", "--include-body"], { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs() });
     if (result.error) {
         throw new CommandError(describePmReadFailure(result.error, maxBuffer));
     }
     if (result.status !== 0) {
-        throw new CommandError(result.stderr || "pm list-all failed");
+        // The status has to be in the message: `pm` can exit non-zero with empty
+        // stderr, and "pm list-all failed" with no number tells an operator nothing
+        // about which failure they are looking at.
+        const reason = result.stderr?.trim();
+        throw new CommandError(`pm list-all failed (exit ${result.status})${reason ? `: ${reason}` : ""}`);
     }
     let envelope;
     try {
@@ -1840,14 +1868,16 @@ export default defineExtension({
         // runtime's preflight decision untouched (empty delta) for every other
         // command. The hard abort is enforced in the handler.
         // -----------------------------------------------------------------------
-        api.registerPreflight((pctx) => {
-            if (pctx.command === "standup") {
-                // Mirror the handler's contract without aborting here (the runtime
-                // swallows throws from preflight). Returning an empty delta is an
-                // explicit, scoped pass-through.
-                return {};
-            }
-            return {};
+        // Scoped, not global: `registerPreflight` treats the bare-function form as
+        // applying to every command, so two packages that both use it collide in
+        // `pm health` even though neither guards the other's commands. Declaring the
+        // owned command keeps this override off every other package's path.
+        api.registerPreflight({
+            commands: ["standup"],
+            // Mirror the handler's contract without aborting here (the runtime
+            // swallows throws from preflight). An empty delta is an explicit
+            // pass-through that leaves the runtime's preflight decision untouched.
+            run: () => ({}),
         });
         // -----------------------------------------------------------------------
         // Output-format service override (scoped to `standup export`).

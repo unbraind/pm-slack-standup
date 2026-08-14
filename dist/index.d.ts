@@ -303,6 +303,18 @@ export declare function describePmReadFailure(error: Error, limitBytes: number):
  */
 export declare function resolvePmBin(moduleUrl?: string): string;
 /**
+ * Wall-clock ceiling for one `pm` read, in milliseconds. 60s by default;
+ * override with `PM_READ_TIMEOUT_MS`.
+ *
+ * `spawnSync` without a `timeout` waits forever, so a wedged `pm` turns a
+ * scheduled standup into a hung process rather than a failed one — and a hang
+ * is the one failure mode a scheduler cannot report. A kill surfaces as
+ * `result.error` with code `ETIMEDOUT`, which the existing failure path already
+ * classifies. Resolved per call, and invalid or non-positive values fall back to
+ * the default rather than disabling the ceiling.
+ */
+export declare function pmReadTimeoutMs(): number;
+/**
  * Read every item once via `list-all --json --include-body`, then bucket by
  * status locally. This is a single pm invocation (vs. four list-by-status
  * calls) and gives us bodies + assignee + timestamps for grouping/windowing.
