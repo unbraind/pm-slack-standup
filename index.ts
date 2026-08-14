@@ -134,6 +134,21 @@ export const ALL_SECTIONS: readonly SectionKey[] = [
 ] as const;
 
 /**
+ * The `pm list-all --json` collection envelope, as far as this package reads it.
+ *
+ * Only the completeness fields are modelled: `items` is the payload, and
+ * `truncated`/`total` are how pm-cli reports in-band that it returned fewer rows
+ * than exist. A consumer that reads `items` alone cannot distinguish a complete
+ * small tracker from a truncated large one, because both are exit 0 with valid
+ * JSON — which is why `total` is carried here rather than inferred from `items`.
+ */
+interface PmListAllEnvelope {
+  items?: PmItem[];
+  truncated?: boolean;
+  total?: number;
+}
+
+/**
  * The bucketed items a standup renders, produced by filtering and grouping pm items.
  *
  * Holds the four section populations plus a total; when `--yesterday` is set,
@@ -867,11 +882,30 @@ export function fetchAllItems(pmRoot: string, pmBin: string = resolvePmBin()): P
   if (result.status !== 0) {
     throw new CommandError(result.stderr || "pm list-all failed");
   }
+  let envelope: PmListAllEnvelope;
   try {
-    return (JSON.parse(result.stdout).items ?? []) as PmItem[];
+    envelope = JSON.parse(result.stdout) as PmListAllEnvelope;
   } catch {
     throw new CommandError("Could not parse `pm list-all --json` output.");
   }
+  const items = (envelope.items ?? []) as PmItem[];
+  // `list-all` promises completeness, but pm-cli bounds read output against a
+  // default token budget and reports the shortfall in-band: exit 0, well-formed
+  // JSON, `truncated: true`, and a fraction of the rows. On 2026.8.14 that is 10
+  // of 676 items. A standup built from a truncated read is not a smaller standup,
+  // it is a wrong one that reads as a quiet day — the same failure mode this
+  // function was just fixed for, arriving through a successful call instead of a
+  // failed one. Refuse, and name the flag that lifts the cap: `--output-limit`
+  // and `--no-truncate` are both accepted and both leave the cap in place.
+  if (envelope.truncated === true) {
+    throw new CommandError(
+      `pm list-all returned ${items.length} of ${envelope.total ?? "unknown"} items because the read `
+        + "was truncated. A standup built from a partial read would under-report work as absent. "
+        + "Re-run with `--output-budget unbounded`, or upgrade past the pm-cli release that caps "
+        + "list-all by default."
+    );
+  }
+  return items;
 }
 
 const WIP_STATUSES = new Set(["in_progress", "wip", "doing"]);

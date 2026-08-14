@@ -1,0 +1,26 @@
+id: pm-slack-standup-5q1f
+title: A truncated list-all envelope produces a partial standup that reads as a quiet day
+description: "fetchAllItems parsed the items array from pm list-all and ignored the envelope's truncated flag. pm-cli bounds collection reads against a default output budget and reports the shortfall in band: exit zero, well formed JSON, truncated true, and a fraction of the rows. On pm-cli 2026.8.14 that is ten of six hundred and seventy six items. Nothing about the process outcome distinguishes it from success, so a standup built from a truncated read under-reports work as absent. This is the same failure mode as the empty standup that arrives through a failed read, except it arrives through a successful call. fetchAllItems now refuses a truncated envelope, names the returned and total counts, and names output-budget unbounded, because output-limit and no-truncate are both accepted by pm and both leave the cap in place."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-14T05:59:19.742Z"
+updated_at: "2026-08-14T05:59:46.883Z"
+closed_at: "2026-08-14T05:59:22.595Z"
+completed_at: "2026-08-14T05:59:22.595Z"
+author: claude
+files[2]{path,scope}:
+  index.ts,project
+  test/fetch-all-items.test.ts,project
+tests[2]:
+  - command: "PM_PATH=/tmp/pm-standup-lt PM_GLOBAL_PATH=/tmp/pm-standup-lt-g node --test --test-name-pattern \"envelope reports a truncated read\" test/fetch-all-items.test.ts"
+    scope: project
+    assert_stdout_contains[1]: pass 1
+    note: "Refuses a truncated envelope, naming the returned and total counts and --output-budget unbounded"
+  - command: "PM_PATH=/tmp/pm-standup-lt PM_GLOBAL_PATH=/tmp/pm-standup-lt-g node --test --test-name-pattern \"envelope reports the read was not truncated\" test/fetch-all-items.test.ts"
+    scope: project
+    assert_stdout_contains[1]: pass 1
+    note: "Complementary case: a complete envelope still returns its items, so the refusal is not unconditional"
+close_reason: completed
+body: ""

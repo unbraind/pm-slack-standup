@@ -654,12 +654,29 @@ export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
     if (result.status !== 0) {
         throw new CommandError(result.stderr || "pm list-all failed");
     }
+    let envelope;
     try {
-        return (JSON.parse(result.stdout).items ?? []);
+        envelope = JSON.parse(result.stdout);
     }
     catch {
         throw new CommandError("Could not parse `pm list-all --json` output.");
     }
+    const items = (envelope.items ?? []);
+    // `list-all` promises completeness, but pm-cli bounds read output against a
+    // default token budget and reports the shortfall in-band: exit 0, well-formed
+    // JSON, `truncated: true`, and a fraction of the rows. On 2026.8.14 that is 10
+    // of 676 items. A standup built from a truncated read is not a smaller standup,
+    // it is a wrong one that reads as a quiet day — the same failure mode this
+    // function was just fixed for, arriving through a successful call instead of a
+    // failed one. Refuse, and name the flag that lifts the cap: `--output-limit`
+    // and `--no-truncate` are both accepted and both leave the cap in place.
+    if (envelope.truncated === true) {
+        throw new CommandError(`pm list-all returned ${items.length} of ${envelope.total ?? "unknown"} items because the read `
+            + "was truncated. A standup built from a partial read would under-report work as absent. "
+            + "Re-run with `--output-budget unbounded`, or upgrade past the pm-cli release that caps "
+            + "list-all by default.");
+    }
+    return items;
 }
 const WIP_STATUSES = new Set(["in_progress", "wip", "doing"]);
 const BLOCKED_STATUSES = new Set(["blocked", "on_hold"]);

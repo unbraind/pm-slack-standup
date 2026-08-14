@@ -32,7 +32,7 @@ const EXPECTED_DEFAULT_MAX_BUFFER = 64 * 1024 * 1024;
  * exercises the actual spawn/error/overrun code paths rather than a synthetic
  * stand-in for `spawnSync`.
  */
-function fakePmBin(dir: string, mode: "nonzero" | "overrun" | "good", opts: { stderrText?: string; exitCode?: number; maxBuffer?: number } = {}): string {
+function fakePmBin(dir: string, mode: "nonzero" | "overrun" | "good" | "truncated", opts: { stderrText?: string; exitCode?: number; maxBuffer?: number } = {}): string {
   const bin = join(dir, "fake-pm");
   let script: string;
   if (mode === "nonzero") {
@@ -43,6 +43,11 @@ function fakePmBin(dir: string, mode: "nonzero" | "overrun" | "good", opts: { st
     // Emit more bytes than the maxBuffer the caller will set via PM_JSON_MAX_BUFFER.
     // A 64 KiB run of 'x' overruns any small test cap (e.g. 1024) instantly.
     script = `#!/bin/sh\nhead -c 65536 /dev/zero | tr '\\0' 'x'\n`;
+  } else if (mode === "truncated") {
+    // Exit 0 with well-formed JSON that reports its own incompleteness — the
+    // shape pm-cli emits when a collection read exceeds the default output
+    // budget. Nothing about the process outcome distinguishes it from success.
+    script = `#!/bin/sh\necho '{"items":[{"id":"a","status":"in_progress"}],"total":676,"truncated":true}'\nexit 0\n`;
   } else {
     script = `#!/bin/sh\necho '{"items":[]}'\nexit 0\n`;
   }
@@ -205,6 +210,45 @@ test("fetchAllItems throws on the ENOBUFS shape (status null, empty stderr) with
   } finally {
     if (saved === undefined) delete process.env["PM_JSON_MAX_BUFFER"];
     else process.env["PM_JSON_MAX_BUFFER"] = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("fetchAllItems throws when the envelope reports a truncated read, naming the item counts and the flag that lifts the cap", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-read-truncated-"));
+  try {
+    const bin = fakePmBin(dir, "truncated");
+    assert.throws(
+      () => fetchAllItems("/anywhere", bin),
+      (e: unknown) => {
+        assert.ok(e instanceof CommandError);
+        const msg = (e as CommandError).message;
+        // The counts must be reported, because "1 of 676" is what makes the
+        // shortfall legible; a bare "truncated" reads as a formatting detail.
+        assert.match(msg, /1 of 676 items/);
+        // --output-limit and --no-truncate are both accepted by pm and both
+        // leave the cap in place, so the message has to name the one that works.
+        assert.match(msg, /--output-budget unbounded/);
+        return true;
+      }
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("fetchAllItems returns the items when the envelope reports the read was not truncated", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-read-complete-"));
+  try {
+    const bin = join(dir, "complete-pm");
+    writeFileSync(
+      bin,
+      "#!/bin/sh\necho '{\"items\":[{\"id\":\"a\"},{\"id\":\"b\"}],\"total\":2,\"truncated\":false}'\nexit 0\n",
+      { encoding: "utf-8", mode: 0o755 }
+    );
+    chmodSync(bin, 0o755);
+    assert.deepEqual(fetchAllItems("/anywhere", bin).map((i) => i.id), ["a", "b"]);
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
