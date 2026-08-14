@@ -1,7 +1,8 @@
 import https from "node:https";
 import { spawnSync } from "node:child_process";
-import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
-import { basename, resolve, join } from "node:path";
+import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync, existsSync } from "node:fs";
+import { basename, resolve, join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 /**
  * Local stand-in for the SDK's `defineExtension` identity helper.
  *
@@ -566,23 +567,98 @@ export function writeError(path, err) {
 // ---------------------------------------------------------------------------
 // Data fetch
 // ---------------------------------------------------------------------------
+// Node's spawnSync defaults to a 1 MiB stdout cap, which a mature tracker's JSON
+// dump passes at a few hundred items. Past that the child is killed with ENOBUFS,
+// status null and EMPTY stderr, so the failure surfaces with nothing to diagnose
+// (and at larger sizes stdout is genuinely truncated mid-document).
+// 64 MiB matches the cap the sibling pm packages settled on.
+/** Read-buffer cap for `pm` output, in bytes. 64 MiB by default; override with the
+ * `PM_JSON_MAX_BUFFER` env var. Resolved per call so the override takes effect
+ * without an import-order dependency. Invalid or non-positive values fall back to
+ * the default rather than silently disabling the guard. */
+export function pmJsonMaxBuffer() {
+    // Number(), not parseInt(): parseInt("64MiB") silently yields 64, which would
+    // impose a 64-BYTE cap and break every ordinary read while appearing to honor
+    // the documented invalid-value fallback. Number() rejects the whole string.
+    const raw = Number(process.env["PM_JSON_MAX_BUFFER"]);
+    return Number.isSafeInteger(raw) && raw > 0 ? raw : 64 * 1024 * 1024;
+}
+/** Name the real cause of a failed `pm` read. A stdout overrun kills the child
+ * with `status: null` and EMPTY stderr, so without this the failure surfaces as
+ * an unexplained error (or, worse, as an empty result set). Exposed so the
+ * wording can be regression-tested directly with synthetic errors, mirroring the
+ * `describePmNullStatus` convention the sibling pm-csv package uses. */
+export function describePmReadFailure(error, limitBytes) {
+    const code = error.code;
+    if (code === "ENOBUFS") {
+        return `pm output exceeded the ${limitBytes} byte read buffer. `
+            + "The workspace is larger than this integration's read limit; narrow the "
+            + "operation or raise PM_JSON_MAX_BUFFER.";
+    }
+    return `pm read failed: ${error.message}`;
+}
+/**
+ * Resolve the `pm` executable this package's own `@unbrained/pm-cli` declared,
+ * walking up from `moduleUrl` to the nearest `node_modules/.bin/pm` shim, and
+ * falling back to `pm` on `PATH` only when no local install is found.
+ *
+ * `spawnSync("pm", ...)` runs whichever `pm` comes first on `PATH`, which need
+ * not be the `@unbrained/pm-cli` this package declared — that is what produced
+ * the version skew this fix addresses. Resolving from the package's own
+ * `node_modules` keeps the read against the same CLI the package pins, and the
+ * walk handles both the source layout (`index.ts` at the package root) and the
+ * built layout (`dist/index.js`), as well as a consumer install where the
+ * nearest `.bin/pm` shim is the host CLI that loaded this extension. `moduleUrl`
+ * defaults to this module's URL and is a parameter only so the resolution can be
+ * exercised against synthetic locations without touching the real tree.
+ */
+export function resolvePmBin(moduleUrl = import.meta.url) {
+    let dir = dirname(fileURLToPath(moduleUrl));
+    for (let i = 0; i < 4; i += 1) {
+        const bin = join(dir, "node_modules", ".bin", "pm");
+        if (existsSync(bin))
+            return bin;
+        const parent = dirname(dir);
+        if (parent === dir)
+            break;
+        dir = parent;
+    }
+    return "pm";
+}
 /**
  * Read every item once via `list-all --json --include-body`, then bucket by
  * status locally. This is a single pm invocation (vs. four list-by-status
  * calls) and gives us bodies + assignee + timestamps for grouping/windowing.
+ *
+ * A failed read THROWS a {@link CommandError} rather than degrading to an empty
+ * success. The fleet convention (pm-csv, pm-gantt-chart, pm-jira, pm-linear,
+ * pm-todos, pm-beads) is to refuse on this condition so a scheduled standup
+ * never posts "nothing in progress, nothing blocked" in place of a real read
+ * failure; this package previously returned `[]` and exited 0, which is
+ * indistinguishable from a genuinely quiet day. The thrown message carries the
+ * exit status and stderr, and — when `status` is `null` with empty stderr (a
+ * stdout overrun) — an explicit statement that the output exceeded the
+ * `maxBuffer` ceiling, via {@link describePmReadFailure}.
+ *
+ * `pmBin` defaults to {@link resolvePmBin} so the read runs against the
+ * `@unbrained/pm-cli` this package declared rather than whichever `pm` comes
+ * first on `PATH`; it is a parameter only so a caller (or test) can pin a
+ * specific binary.
  */
-export function fetchAllItems(pmRoot) {
-    const result = spawnSync("pm", ["--path", pmRoot, "list-all", "--json", "--include-body"], { encoding: "utf-8" });
-    if (result.error || result.status !== 0) {
-        console.error(`pm list-all failed: ${result.stderr ?? result.error?.message ?? ""}`);
-        return [];
+export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
+    const maxBuffer = pmJsonMaxBuffer();
+    const result = spawnSync(pmBin, ["--path", pmRoot, "list-all", "--json", "--include-body"], { encoding: "utf-8", maxBuffer });
+    if (result.error) {
+        throw new CommandError(describePmReadFailure(result.error, maxBuffer));
+    }
+    if (result.status !== 0) {
+        throw new CommandError(result.stderr || "pm list-all failed");
     }
     try {
         return (JSON.parse(result.stdout).items ?? []);
     }
-    catch (err) {
-        console.error(`pm list-all returned unparseable JSON: ${err instanceof Error ? err.message : String(err)}`);
-        return [];
+    catch {
+        throw new CommandError("Could not parse `pm list-all --json` output.");
     }
 }
 const WIP_STATUSES = new Set(["in_progress", "wip", "doing"]);

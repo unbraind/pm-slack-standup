@@ -275,12 +275,54 @@ export declare function parseDays(raw: string | undefined): number | undefined;
  * directory, permission, is-a-directory) and falls back to the raw message.
  */
 export declare function writeError(path: string, err: unknown): CommandError;
+/** Read-buffer cap for `pm` output, in bytes. 64 MiB by default; override with the
+ * `PM_JSON_MAX_BUFFER` env var. Resolved per call so the override takes effect
+ * without an import-order dependency. Invalid or non-positive values fall back to
+ * the default rather than silently disabling the guard. */
+export declare function pmJsonMaxBuffer(): number;
+/** Name the real cause of a failed `pm` read. A stdout overrun kills the child
+ * with `status: null` and EMPTY stderr, so without this the failure surfaces as
+ * an unexplained error (or, worse, as an empty result set). Exposed so the
+ * wording can be regression-tested directly with synthetic errors, mirroring the
+ * `describePmNullStatus` convention the sibling pm-csv package uses. */
+export declare function describePmReadFailure(error: Error, limitBytes: number): string;
+/**
+ * Resolve the `pm` executable this package's own `@unbrained/pm-cli` declared,
+ * walking up from `moduleUrl` to the nearest `node_modules/.bin/pm` shim, and
+ * falling back to `pm` on `PATH` only when no local install is found.
+ *
+ * `spawnSync("pm", ...)` runs whichever `pm` comes first on `PATH`, which need
+ * not be the `@unbrained/pm-cli` this package declared — that is what produced
+ * the version skew this fix addresses. Resolving from the package's own
+ * `node_modules` keeps the read against the same CLI the package pins, and the
+ * walk handles both the source layout (`index.ts` at the package root) and the
+ * built layout (`dist/index.js`), as well as a consumer install where the
+ * nearest `.bin/pm` shim is the host CLI that loaded this extension. `moduleUrl`
+ * defaults to this module's URL and is a parameter only so the resolution can be
+ * exercised against synthetic locations without touching the real tree.
+ */
+export declare function resolvePmBin(moduleUrl?: string): string;
 /**
  * Read every item once via `list-all --json --include-body`, then bucket by
  * status locally. This is a single pm invocation (vs. four list-by-status
  * calls) and gives us bodies + assignee + timestamps for grouping/windowing.
+ *
+ * A failed read THROWS a {@link CommandError} rather than degrading to an empty
+ * success. The fleet convention (pm-csv, pm-gantt-chart, pm-jira, pm-linear,
+ * pm-todos, pm-beads) is to refuse on this condition so a scheduled standup
+ * never posts "nothing in progress, nothing blocked" in place of a real read
+ * failure; this package previously returned `[]` and exited 0, which is
+ * indistinguishable from a genuinely quiet day. The thrown message carries the
+ * exit status and stderr, and — when `status` is `null` with empty stderr (a
+ * stdout overrun) — an explicit statement that the output exceeded the
+ * `maxBuffer` ceiling, via {@link describePmReadFailure}.
+ *
+ * `pmBin` defaults to {@link resolvePmBin} so the read runs against the
+ * `@unbrained/pm-cli` this package declared rather than whichever `pm` comes
+ * first on `PATH`; it is a parameter only so a caller (or test) can pin a
+ * specific binary.
  */
-export declare function fetchAllItems(pmRoot: string): PmItem[];
+export declare function fetchAllItems(pmRoot: string, pmBin?: string): PmItem[];
 /**
  * True when an item's last activity falls within the [sinceMs, now] window.
  * NaN sinceMs means "no window" → always true.
