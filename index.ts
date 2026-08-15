@@ -823,15 +823,46 @@ export function describePmReadFailure(error: Error, limitBytes: number): string 
 }
 
 /**
- * How to launch the resolved `pm` binary: the file to pass to `spawnSync` plus
- * the fixed argv that must precede every pm argument on that platform.
+ * Quote one argv element for a Windows command-line tail.
  *
- * This pair — not a bare path — is what a resolution returns, because the path
- * alone is not enough to launch `pm` correctly: on Windows the npm `.cmd` shim
- * can only be executed by a command processor, so "which file" and "how to
- * spawn it" are one decision that must not be split across functions. A caller
- * that ignores {@link prefixArgs} produces an unlaunchable spawn, which is the
- * defect this shape exists to make impossible (see {@link pmLaunchPlan}).
+ * The element is left bare when nothing in it needs quoting, and otherwise
+ * wrapped in double quotes with the documented CommandLineToArgvW escaping:
+ * every `"` in the element becomes `\"`, and a run of backslashes directly
+ * before a quote (including the closing quote this function appends) doubles,
+ * because the parser consuming the line collapses `2n` backslashes before a
+ * quote back to `n`. An empty element becomes `""`, which is the only way an
+ * empty argument survives a command line at all.
+ *
+ * Quoting is triggered by space and tab (which end an unquoted argument), by
+ * `"` (which must be escaped anyway, and only reads as one token once quoted),
+ * and by each of `& | < > ^ ( )`: cmd.exe treats those as operators when they
+ * stand outside quotes and as literals inside them — which is also why quoting
+ * is used instead of `^`-escaping, since a quoted `^` is a literal `^`. One
+ * known limit, shared with Node's own `shell: true` launching: `%` cannot be
+ * neutralized this way, because cmd expands `%VAR%` even inside quotes; no
+ * path this package launches is expected to contain one.
+ *
+ * @param arg - One argv element to render.
+ * @returns The element as it must appear inside a command-line tail.
+ */
+function quoteWindowsArg(arg: string): string {
+  if (arg === "") return '""';
+  if (!/[\t "&|<>()^]/.test(arg)) return arg;
+  return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`;
+}
+
+/**
+ * How to launch the resolved `pm` binary: the file to pass to `spawnSync`, how
+ * to build that spawn's argv for any pm arguments, and the
+ * `windowsVerbatimArguments` value the spawn must pass.
+ *
+ * This triple — not a bare path — is what a resolution returns, because the
+ * path alone is not enough to launch `pm` correctly: on Windows the npm `.cmd`
+ * shim can only be executed by a command processor, so "which file" and "how
+ * to spawn it" are one decision that must not be split across functions. A
+ * caller that goes through {@link args} gets a correct spawn by construction;
+ * a caller that invents its own argv reintroduces one of the two defects this
+ * shape exists to make impossible (see {@link pmLaunchPlan}).
  */
 export interface PmLaunch {
   /**
@@ -841,12 +872,23 @@ export interface PmLaunch {
    */
   readonly command: string;
   /**
-   * argv elements to place before every pm argument: empty on POSIX, and
-   * `["/d", "/s", "/c", bin]` on win32 so the command processor runs the
-   * resolved shim. Every pm argument is appended after these as discrete argv
-   * elements and is never string-joined into a command line.
+   * The complete `spawnSync` argv for one pm invocation carrying these
+   * arguments: the pm arguments themselves on POSIX, and on win32
+   * `["/d", "/s", "/c", tail]` where `tail` is ONE argv element holding the
+   * binary and every pm argument — each quote-escaped per the
+   * CommandLineToArgvW rules — wrapped in the single outer pair of quotes
+   * that cmd's `/s` handling is arranged to strip (see {@link pmLaunchPlan}).
+   * The tail is composed here, not by the caller, so the executable path and
+   * the arguments behind it can never disagree about quoting.
    */
-  readonly prefixArgs: readonly string[];
+  readonly args: (pmArgs: readonly string[]) => string[];
+  /**
+   * The value the spawn must pass as `windowsVerbatimArguments`: `true` on
+   * win32, because the composed tail is already quoted and Node re-quoting it
+   * would destroy the outer pair; `false` on POSIX, Node's per-element
+   * quoting, which the direct spawn has always relied on.
+   */
+  readonly windowsVerbatimArguments: boolean;
 }
 
 /**
@@ -860,36 +902,76 @@ export interface PmLaunch {
  * spawn with EINVAL), CreateProcess rejects the extensionless shim for having
  * no recognized executable extension, and a bare `pm` is not resolved through
  * PATHEXT the way a shell would. So the launch is always the processor with
- * `/d /s /c` and the binary as the first word of the command — the same switch
- * set Node itself uses for `shell: true`, with two deliberate differences:
+ * `/d /s /c` and the binary as the first word of the command.
  *
- * - `shell: true` joins the command and arguments into ONE string and disables
- *   per-argument quoting (`windowsVerbatimArguments`), so any argument
- *   containing cmd metacharacters (`&`, `|`, `"`) is interpreted by the shell —
- *   an injection surface. Here the arguments stay discrete argv elements and
- *   Node quotes each one itself (the spawn passes
- *   `windowsVerbatimArguments: false`), so a metacharacter inside an argument
- *   reaches `pm` as data, never as cmd syntax.
- * - `/d` additionally skips the AutoRun registry hook, so machine-level cmd
- *   configuration cannot alter the launch.
+ * How the command tail after `/c` is built is the subtle part, and it is why
+ * `PmLaunch` composes the whole argv rather than leaving a caller to append
+ * arguments. cmd's documented `/c`/`/k` quote handling ("old behavior", which
+ * `/s` forces unconditionally) is: if the first character after `/c` is a
+ * quote, strip that leading quote and remove the LAST quote character on the
+ * tail, preserving any text after it. Passing the binary and the pm arguments
+ * as discrete argv elements — letting Node quote each one — assembles a tail
+ * like `"C:\spaced path\pm.cmd" --path "C:\tracker root" list-all --json
+ * --include-body`: the tail starts with the binary's opening quote, and when
+ * the FINAL argument needs quoting (any tracker root containing a space), the
+ * last quote on the tail is an inner one. cmd strips the leading quote and
+ * that inner quote, and the executable's path splits at its first space. The
+ * launch then only works when the last argument happens to be unquoted —
+ * which is why the original form passed its tests and still broke on
+ * `C:\Users\Some User\project`.
  *
- * On every other platform the binary is spawned directly with an empty prefix,
- * byte-for-byte the invocation this package has always used: the shebang shim
- * is executable as-is and no processor is involved.
+ * The fix is the mechanism Node itself uses for `shell: true` on win32: the
+ * ENTIRE tail — binary plus every pm argument, each quote-escaped per the
+ * CommandLineToArgvW rules by {@link quoteWindowsArg} — is passed as ONE argv
+ * element wrapped in an outer pair of quotes added here, with
+ * `windowsVerbatimArguments: true` so Node adds nothing of its own. cmd's `/s`
+ * strip removes exactly the outer pair (the first character and the last
+ * quote character are now both ours), and the inner per-element quoting
+ * survives verbatim for the parser on the other side. Unlike `shell: true`,`
+ * no raw string is ever handed to a shell: every element is escaped by this
+ * package before it reaches the command line, so a metacharacter inside an
+ * argument is data to `pm`, never cmd syntax — `shell: true` is what joins
+ * caller strings verbatim and must not be reintroduced.
+ *
+ * `/d` additionally skips the AutoRun registry hook, so machine-level cmd
+ * configuration cannot alter the launch.
+ *
+ * On every other platform the binary is spawned directly with the pm arguments
+ * as discrete argv elements, byte-for-byte the invocation this package has
+ * always used: the shebang shim is executable as-is and no processor is
+ * involved.
  *
  * `platform` defaults to `process.platform` and is a parameter so tests can
  * assert the exact launch shape for win32 without a Windows box.
  *
  * @param bin - Binary path (or PATH fallback name) to launch.
  * @param platform - Platform the launch will run on; defaults to the current one.
- * @returns The `{ command, prefixArgs }` pair to spawn: `command` with
- *          `prefixArgs` followed by the pm arguments.
+ * @returns The launch to hand to `spawnSync`: `command` plus `args(pmArgs)`
+ *          building the full argv, and the `windowsVerbatimArguments` value
+ *          the spawn must pass.
  */
 export function pmLaunchPlan(bin: string, platform: NodeJS.Platform = process.platform): PmLaunch {
   if (platform !== "win32") {
-    return { command: bin, prefixArgs: [] };
+    return {
+      command: bin,
+      args: (pmArgs) => [...pmArgs],
+      windowsVerbatimArguments: false,
+    };
   }
-  return { command: process.env["ComSpec"] || "cmd.exe", prefixArgs: ["/d", "/s", "/c", bin] };
+  return {
+    command: process.env["ComSpec"] || "cmd.exe",
+    // One argv element: outer-quoted by us, inner-quoted per element, so the
+    // /s strip removes exactly the outer pair. See the doc comment above for
+    // why this must not go back to appending the pm arguments as separate
+    // elements after `/c`.
+    args: (pmArgs) => [
+      "/d",
+      "/s",
+      "/c",
+      `"${[bin, ...pmArgs].map(quoteWindowsArg).join(" ")}"`,
+    ],
+    windowsVerbatimArguments: true,
+  };
 }
 
 /**
@@ -984,13 +1066,17 @@ export function fetchAllItems(pmRoot: string, pmBin: string | PmLaunch = resolve
   const maxBuffer = pmJsonMaxBuffer();
   const result = spawnSync(
     launch.command,
-    [...launch.prefixArgs, "--path", pmRoot, "list-all", "--json", "--include-body"],
-    // `windowsVerbatimArguments: false` is Node's default and is stated here
-    // on purpose: it is what makes the win32 launch injection-safe. Node quotes
-    // every argument itself, so the cmd.exe tail is assembled from discrete
-    // quoted elements rather than a raw command string. Nothing here may ever
-    // pass `shell: true`, which would disable exactly that quoting.
-    { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs(), windowsVerbatimArguments: false }
+    launch.args(["--path", pmRoot, "list-all", "--json", "--include-body"]),
+    // `windowsVerbatimArguments` comes from the launch: on win32 the whole
+    // command tail is ONE argv element this package quote-escaped itself (see
+    // pmLaunchPlan), so Node must pass it through untouched — letting Node
+    // re-quote it would bury the outer pair cmd's `/s` strip is meant to
+    // remove. On POSIX the value is false, Node's default per-element quoting,
+    // and the argv is byte-for-byte the discrete-element invocation this
+    // package has always used. Nothing here may ever pass `shell: true`, which
+    // would join a raw command string for a shell to interpret — the injection
+    // surface the composed tail exists to avoid.
+    { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs(), windowsVerbatimArguments: launch.windowsVerbatimArguments }
   );
   if (result.error) {
     throw new CommandError(describePmReadFailure(result.error, maxBuffer));
