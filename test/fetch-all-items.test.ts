@@ -820,3 +820,38 @@ test("pm standup export exits non-zero when the underlying pm read fails (comman
     }
   );
 });
+
+/**
+ * cmd.exe expands `%VAR%` even inside quotes, and there is no escape for it on
+ * a `cmd /c` command tail — so the launch must refuse rather than proceed.
+ *
+ * The consequence of proceeding is the failure mode this whole package guards
+ * against elsewhere: `--pm-path C:\work\%BUILD%\pm` becomes whatever `%BUILD%`
+ * expands to (or nothing), pm reads a DIFFERENT workspace, and the standup is
+ * built from it while reporting success. A refusal naming the argument is
+ * strictly better than a quiet wrong answer.
+ */
+test("the win32 launch refuses an argument cmd.exe would variable-expand", () => {
+  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
+  assert.throws(
+    () => plan.args(["--pm-path", "C:\\work\\%BUILD%\\.agents\\pm", "list-all", "--json"]),
+    (err: unknown) => {
+      assert.ok(err instanceof CommandError, "must refuse, not silently launch an expanded path");
+      assert.match((err as Error).message, /%BUILD%/, "the message must name the offending argument");
+      assert.match((err as Error).message, /different workspace/, "and say what proceeding would cost");
+      return true;
+    },
+  );
+});
+
+/**
+ * Only a `%...%` PAIR can name a variable, so an ordinary literal percent in a
+ * path must still launch — refusing it would break valid workspaces to guard
+ * against a case cmd.exe does not actually expand.
+ */
+test("the win32 launch still accepts a literal percent that names no variable", () => {
+  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
+  const argv = plan.args(["--pm-path", "C:\\reports\\100% done\\.agents\\pm"]);
+  assert.strictEqual(argv[0], "/d");
+  assert.ok(argv[3]?.includes("100% done"), "the literal percent must survive into the tail");
+});

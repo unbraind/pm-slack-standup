@@ -613,9 +613,10 @@ export function describePmReadFailure(error, limitBytes) {
  * and by each of `& | < > ^ ( )`: cmd.exe treats those as operators when they
  * stand outside quotes and as literals inside them — which is also why quoting
  * is used instead of `^`-escaping, since a quoted `^` is a literal `^`. One
- * known limit, shared with Node's own `shell: true` launching: `%` cannot be
- * neutralized this way, because cmd expands `%VAR%` even inside quotes; no
- * path this package launches is expected to contain one.
+ * limit is shared with Node's own `shell: true` launching: `%` cannot be
+ * neutralized this way, because cmd expands `%VAR%` even inside quotes. That
+ * is not left to chance -- see {@link assertNoCmdVariableExpansion}, which
+ * refuses the launch rather than letting pm read a different workspace.
  *
  * @param arg - One argv element to render.
  * @returns The element as it must appear inside a command-line tail.
@@ -626,6 +627,36 @@ function quoteWindowsArg(arg) {
     if (!/[\t "&|<>()^]/.test(arg))
         return arg;
     return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`;
+}
+/**
+ * Refuse a cmd.exe launch whose arguments contain a `%VAR%` cmd would expand.
+ *
+ * `quoteWindowsArg` neutralizes every metacharacter cmd honours inside quotes
+ * except `%`: cmd expands `%NAME%` even within a quoted string, and there is no
+ * escape for it on a `cmd /c` command tail. That limit was documented and
+ * accepted on the assumption that no path this package launches would contain
+ * one — but a Windows workspace path is user-chosen, and `--pm-path` carries it
+ * straight into this tail. A path like `C:\work\%BUILD%\pm` would silently
+ * become whatever `%BUILD%` expands to (or empty), so pm would read a DIFFERENT
+ * workspace and the standup would be built from it while reporting success.
+ *
+ * Since the expansion cannot be prevented, the failure is made loud instead:
+ * a wrong-workspace read that reports success is far worse than a refusal that
+ * names the offending argument. Only a `%...%` pair is refused, so an ordinary
+ * literal percent (`C:\reports\100% done`) still launches.
+ *
+ * @param argv - The binary path followed by every pm argument.
+ * @throws {CommandError} When an argument contains a `%`-delimited name.
+ */
+function assertNoCmdVariableExpansion(argv) {
+    const offending = argv.find((arg) => /%[^%\r\n]*%/.test(arg));
+    if (offending === undefined)
+        return;
+    throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(offending)} contains a `
+        + "%-delimited name, and cmd.exe expands %VAR% even inside quotes with no way to escape it. "
+        + "pm would read a different workspace than the one requested and the standup would be built "
+        + "from it while reporting success. Rename the path so it contains no %NAME% pair, or run "
+        + "from a workspace path without one.");
 }
 /**
  * Decide how `bin` is launched on `platform`: the single place that pairs a
@@ -700,12 +731,15 @@ export function pmLaunchPlan(bin, platform = process.platform) {
         // /s strip removes exactly the outer pair. See the doc comment above for
         // why this must not go back to appending the pm arguments as separate
         // elements after `/c`.
-        args: (pmArgs) => [
-            "/d",
-            "/s",
-            "/c",
-            `"${[bin, ...pmArgs].map(quoteWindowsArg).join(" ")}"`,
-        ],
+        args: (pmArgs) => {
+            assertNoCmdVariableExpansion([bin, ...pmArgs]);
+            return [
+                "/d",
+                "/s",
+                "/c",
+                `"${[bin, ...pmArgs].map(quoteWindowsArg).join(" ")}"`,
+            ];
+        },
         windowsVerbatimArguments: true,
     };
 }
