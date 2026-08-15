@@ -855,3 +855,16 @@ test("the win32 launch still accepts a literal percent that names no variable", 
   assert.strictEqual(argv[0], "/d");
   assert.ok(argv[3]?.includes("100% done"), "the literal percent must survive into the tail");
 });
+
+/**
+ * `%%` is a literal doubled percent, not a variable reference: the doubling rule
+ * is a batch-file convention, and cmd passes `%%` through unchanged on a `/c`
+ * command line. Refusing it would abort a valid workspace path for a case
+ * cmd.exe does not expand, so the guard has to be narrower than "contains two
+ * percent signs".
+ */
+test("the win32 launch accepts a literal doubled percent, which names no variable", () => {
+  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
+  const argv = plan.args(["--pm-path", "C:\\reports\\100%% done\\.agents\\pm"]);
+  assert.ok(argv[3]?.includes("100%% done"), "the doubled percent must survive into the tail");
+});

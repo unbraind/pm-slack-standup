@@ -642,14 +642,20 @@ function quoteWindowsArg(arg) {
  *
  * Since the expansion cannot be prevented, the failure is made loud instead:
  * a wrong-workspace read that reports success is far worse than a refusal that
- * names the offending argument. Only a `%...%` pair is refused, so an ordinary
- * literal percent (`C:\reports\100% done`) still launches.
+ * names the offending argument. Only a `%NAME%` pair with at least one character
+ * between the delimiters is refused, so both an ordinary literal percent
+ * (`C:\reports\100% done`) and a literal doubled pair (`100%% done`) still
+ * launch -- `%%` is a batch-file escape, not a command-line one.
  *
  * @param argv - The binary path followed by every pm argument.
  * @throws {CommandError} When an argument contains a `%`-delimited name.
  */
 function assertNoCmdVariableExpansion(argv) {
-    const offending = argv.find((arg) => /%[^%\r\n]*%/.test(arg));
+    // At least one character between the delimiters: `%%` is a literal doubled
+    // percent, not a variable reference. The doubling rule is a BATCH FILE
+    // convention; on a `cmd /c` command line `%%` is passed through unchanged. A
+    // zero-width match would refuse a valid path such as `C:\reports\100%% done`.
+    const offending = argv.find((arg) => /%[^%\r\n]+%/.test(arg));
     if (offending === undefined)
         return;
     throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(offending)} contains a `
