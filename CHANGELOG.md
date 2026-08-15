@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- The .cmd shim resolvePmBin selects on win32 cannot be launched by its only caller ([pm-slack-standup-20gw](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-20gw.toon))
 - A truncated list-all envelope produces a partial standup that reads as a quiet day ([pm-slack-standup-5q1f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-5q1f.toon))
 - Standup read failure must refuse, not render an empty standup ([pm-slack-standup-011l](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-011l.toon))
 

@@ -287,9 +287,73 @@ export declare function pmJsonMaxBuffer(): number;
  * `describePmNullStatus` convention the sibling pm-csv package uses. */
 export declare function describePmReadFailure(error: Error, limitBytes: number): string;
 /**
+ * How to launch the resolved `pm` binary: the file to pass to `spawnSync` plus
+ * the fixed argv that must precede every pm argument on that platform.
+ *
+ * This pair — not a bare path — is what a resolution returns, because the path
+ * alone is not enough to launch `pm` correctly: on Windows the npm `.cmd` shim
+ * can only be executed by a command processor, so "which file" and "how to
+ * spawn it" are one decision that must not be split across functions. A caller
+ * that ignores {@link prefixArgs} produces an unlaunchable spawn, which is the
+ * defect this shape exists to make impossible (see {@link pmLaunchPlan}).
+ */
+export interface PmLaunch {
+    /**
+     * The file `spawnSync` must execute: the resolved binary on POSIX, or the
+     * Windows command processor when the binary is a batch shim that Windows
+     * cannot execute directly.
+     */
+    readonly command: string;
+    /**
+     * argv elements to place before every pm argument: empty on POSIX, and
+     * `["/d", "/s", "/c", bin]` on win32 so the command processor runs the
+     * resolved shim. Every pm argument is appended after these as discrete argv
+     * elements and is never string-joined into a command line.
+     */
+    readonly prefixArgs: readonly string[];
+}
+/**
+ * Decide how `bin` is launched on `platform`: the single place that pairs a
+ * resolved `pm` binary with the spawn that can actually execute it.
+ *
+ * On win32 every form this package can resolve — the `.cmd` batch shim, the
+ * extensionless POSIX shim, and the bare `pm` PATH fallback — needs the Windows
+ * command processor, for three different reasons: Node 18.20+/20.12+ refuse to
+ * spawn `.cmd`/`.bat` directly at all (the CVE-2024-27980 mitigation fails the
+ * spawn with EINVAL), CreateProcess rejects the extensionless shim for having
+ * no recognized executable extension, and a bare `pm` is not resolved through
+ * PATHEXT the way a shell would. So the launch is always the processor with
+ * `/d /s /c` and the binary as the first word of the command — the same switch
+ * set Node itself uses for `shell: true`, with two deliberate differences:
+ *
+ * - `shell: true` joins the command and arguments into ONE string and disables
+ *   per-argument quoting (`windowsVerbatimArguments`), so any argument
+ *   containing cmd metacharacters (`&`, `|`, `"`) is interpreted by the shell —
+ *   an injection surface. Here the arguments stay discrete argv elements and
+ *   Node quotes each one itself (the spawn passes
+ *   `windowsVerbatimArguments: false`), so a metacharacter inside an argument
+ *   reaches `pm` as data, never as cmd syntax.
+ * - `/d` additionally skips the AutoRun registry hook, so machine-level cmd
+ *   configuration cannot alter the launch.
+ *
+ * On every other platform the binary is spawned directly with an empty prefix,
+ * byte-for-byte the invocation this package has always used: the shebang shim
+ * is executable as-is and no processor is involved.
+ *
+ * `platform` defaults to `process.platform` and is a parameter so tests can
+ * assert the exact launch shape for win32 without a Windows box.
+ *
+ * @param bin - Binary path (or PATH fallback name) to launch.
+ * @param platform - Platform the launch will run on; defaults to the current one.
+ * @returns The `{ command, prefixArgs }` pair to spawn: `command` with
+ *          `prefixArgs` followed by the pm arguments.
+ */
+export declare function pmLaunchPlan(bin: string, platform?: NodeJS.Platform): PmLaunch;
+/**
  * Resolve the `pm` executable this package's own `@unbrained/pm-cli` declared,
  * walking up from `moduleUrl` to the nearest `node_modules/.bin/pm` shim, and
- * falling back to `pm` on `PATH` only when no local install is found.
+ * falling back to `pm` on `PATH` only when no local install is found — then
+ * return it as a {@link PmLaunch} describing the spawn that can execute it.
  *
  * `spawnSync("pm", ...)` runs whichever `pm` comes first on `PATH`, which need
  * not be the `@unbrained/pm-cli` this package declared — that is what produced
@@ -297,11 +361,24 @@ export declare function describePmReadFailure(error: Error, limitBytes: number):
  * `node_modules` keeps the read against the same CLI the package pins, and the
  * walk handles both the source layout (`index.ts` at the package root) and the
  * built layout (`dist/index.js`), as well as a consumer install where the
- * nearest `.bin/pm` shim is the host CLI that loaded this extension. `moduleUrl`
- * defaults to this module's URL and is a parameter only so the resolution can be
- * exercised against synthetic locations without touching the real tree.
+ * nearest `.bin/pm` shim is the host CLI that loaded this extension.
+ *
+ * The result carries the launch decision, not just the path, because the two
+ * cannot be separated on Windows: npm writes three shims into
+ * `node_modules/.bin` (an extensionless shell script, a `.cmd` batch file, and
+ * a `.ps1` script), and on win32 only the `.cmd` is executable at all — but
+ * only through a command processor (see {@link pmLaunchPlan}). Returning the
+ * bare `.cmd` path previously left the caller to invent a launch, and it
+ * spawned the batch file directly, which Node refuses with EINVAL. Routing the
+ * resolved binary through `pmLaunchPlan` here keeps "which file" and "how to
+ * spawn it" in one place, so no caller can pair them wrongly.
+ *
+ * `moduleUrl` defaults to this module's URL and is a parameter only so the
+ * resolution can be exercised against synthetic locations without touching the
+ * real tree; `platform` likewise defaults to `process.platform` so the win32
+ * launch shape can be asserted without a Windows box.
  */
-export declare function resolvePmBin(moduleUrl?: string): string;
+export declare function resolvePmBin(moduleUrl?: string, platform?: NodeJS.Platform): PmLaunch;
 /**
  * Wall-clock ceiling for one `pm` read, in milliseconds. 60s by default;
  * override with `PM_READ_TIMEOUT_MS`.
@@ -331,10 +408,11 @@ export declare function pmReadTimeoutMs(): number;
  *
  * `pmBin` defaults to {@link resolvePmBin} so the read runs against the
  * `@unbrained/pm-cli` this package declared rather than whichever `pm` comes
- * first on `PATH`; it is a parameter only so a caller (or test) can pin a
- * specific binary.
+ * first on `PATH`. It accepts that returned {@link PmLaunch} or a plain binary
+ * path — a string is normalized through {@link pmLaunchPlan}, so an explicitly
+ * pinned binary gets the same platform-correct launch instead of bypassing it.
  */
-export declare function fetchAllItems(pmRoot: string, pmBin?: string): PmItem[];
+export declare function fetchAllItems(pmRoot: string, pmBin?: string | PmLaunch): PmItem[];
 /**
  * True when an item's last activity falls within the [sinceMs, now] window.
  * NaN sinceMs means "no window" → always true.

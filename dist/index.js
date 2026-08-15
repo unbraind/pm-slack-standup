@@ -598,9 +598,52 @@ export function describePmReadFailure(error, limitBytes) {
     return `pm read failed: ${error.message}`;
 }
 /**
+ * Decide how `bin` is launched on `platform`: the single place that pairs a
+ * resolved `pm` binary with the spawn that can actually execute it.
+ *
+ * On win32 every form this package can resolve — the `.cmd` batch shim, the
+ * extensionless POSIX shim, and the bare `pm` PATH fallback — needs the Windows
+ * command processor, for three different reasons: Node 18.20+/20.12+ refuse to
+ * spawn `.cmd`/`.bat` directly at all (the CVE-2024-27980 mitigation fails the
+ * spawn with EINVAL), CreateProcess rejects the extensionless shim for having
+ * no recognized executable extension, and a bare `pm` is not resolved through
+ * PATHEXT the way a shell would. So the launch is always the processor with
+ * `/d /s /c` and the binary as the first word of the command — the same switch
+ * set Node itself uses for `shell: true`, with two deliberate differences:
+ *
+ * - `shell: true` joins the command and arguments into ONE string and disables
+ *   per-argument quoting (`windowsVerbatimArguments`), so any argument
+ *   containing cmd metacharacters (`&`, `|`, `"`) is interpreted by the shell —
+ *   an injection surface. Here the arguments stay discrete argv elements and
+ *   Node quotes each one itself (the spawn passes
+ *   `windowsVerbatimArguments: false`), so a metacharacter inside an argument
+ *   reaches `pm` as data, never as cmd syntax.
+ * - `/d` additionally skips the AutoRun registry hook, so machine-level cmd
+ *   configuration cannot alter the launch.
+ *
+ * On every other platform the binary is spawned directly with an empty prefix,
+ * byte-for-byte the invocation this package has always used: the shebang shim
+ * is executable as-is and no processor is involved.
+ *
+ * `platform` defaults to `process.platform` and is a parameter so tests can
+ * assert the exact launch shape for win32 without a Windows box.
+ *
+ * @param bin - Binary path (or PATH fallback name) to launch.
+ * @param platform - Platform the launch will run on; defaults to the current one.
+ * @returns The `{ command, prefixArgs }` pair to spawn: `command` with
+ *          `prefixArgs` followed by the pm arguments.
+ */
+export function pmLaunchPlan(bin, platform = process.platform) {
+    if (platform !== "win32") {
+        return { command: bin, prefixArgs: [] };
+    }
+    return { command: process.env["ComSpec"] || "cmd.exe", prefixArgs: ["/d", "/s", "/c", bin] };
+}
+/**
  * Resolve the `pm` executable this package's own `@unbrained/pm-cli` declared,
  * walking up from `moduleUrl` to the nearest `node_modules/.bin/pm` shim, and
- * falling back to `pm` on `PATH` only when no local install is found.
+ * falling back to `pm` on `PATH` only when no local install is found — then
+ * return it as a {@link PmLaunch} describing the spawn that can execute it.
  *
  * `spawnSync("pm", ...)` runs whichever `pm` comes first on `PATH`, which need
  * not be the `@unbrained/pm-cli` this package declared — that is what produced
@@ -608,31 +651,41 @@ export function describePmReadFailure(error, limitBytes) {
  * `node_modules` keeps the read against the same CLI the package pins, and the
  * walk handles both the source layout (`index.ts` at the package root) and the
  * built layout (`dist/index.js`), as well as a consumer install where the
- * nearest `.bin/pm` shim is the host CLI that loaded this extension. `moduleUrl`
- * defaults to this module's URL and is a parameter only so the resolution can be
- * exercised against synthetic locations without touching the real tree.
+ * nearest `.bin/pm` shim is the host CLI that loaded this extension.
+ *
+ * The result carries the launch decision, not just the path, because the two
+ * cannot be separated on Windows: npm writes three shims into
+ * `node_modules/.bin` (an extensionless shell script, a `.cmd` batch file, and
+ * a `.ps1` script), and on win32 only the `.cmd` is executable at all — but
+ * only through a command processor (see {@link pmLaunchPlan}). Returning the
+ * bare `.cmd` path previously left the caller to invent a launch, and it
+ * spawned the batch file directly, which Node refuses with EINVAL. Routing the
+ * resolved binary through `pmLaunchPlan` here keeps "which file" and "how to
+ * spawn it" in one place, so no caller can pair them wrongly.
+ *
+ * `moduleUrl` defaults to this module's URL and is a parameter only so the
+ * resolution can be exercised against synthetic locations without touching the
+ * real tree; `platform` likewise defaults to `process.platform` so the win32
+ * launch shape can be asserted without a Windows box.
  */
-export function resolvePmBin(moduleUrl = import.meta.url) {
-    // npm writes three shims into node_modules/.bin: an extensionless shell
-    // script, a .cmd batch file, and a .ps1 script. `spawnSync` without a shell
-    // executes the file directly, and Windows cannot execute the extensionless
-    // one — it has no recognized extension and CreateProcess rejects it. Picking
-    // the .cmd there is what makes the local install usable at all on Windows;
-    // preferring it only on win32 keeps POSIX on the shebang script it expects.
-    const shims = process.platform === "win32" ? ["pm.cmd", "pm"] : ["pm"];
+export function resolvePmBin(moduleUrl = import.meta.url, platform = process.platform) {
+    // Prefer the .cmd shim on win32 (Windows cannot execute the extensionless
+    // one) and the shebang script everywhere else; pmLaunchPlan then decides how
+    // the chosen file is spawned on that platform.
+    const shims = platform === "win32" ? ["pm.cmd", "pm"] : ["pm"];
     let dir = dirname(fileURLToPath(moduleUrl));
     for (let i = 0; i < 4; i += 1) {
         for (const shim of shims) {
             const bin = join(dir, "node_modules", ".bin", shim);
             if (existsSync(bin))
-                return bin;
+                return pmLaunchPlan(bin, platform);
         }
         const parent = dirname(dir);
         if (parent === dir)
             break;
         dir = parent;
     }
-    return "pm";
+    return pmLaunchPlan("pm", platform);
 }
 /**
  * Wall-clock ceiling for one `pm` read, in milliseconds. 60s by default;
@@ -666,12 +719,20 @@ export function pmReadTimeoutMs() {
  *
  * `pmBin` defaults to {@link resolvePmBin} so the read runs against the
  * `@unbrained/pm-cli` this package declared rather than whichever `pm` comes
- * first on `PATH`; it is a parameter only so a caller (or test) can pin a
- * specific binary.
+ * first on `PATH`. It accepts that returned {@link PmLaunch} or a plain binary
+ * path — a string is normalized through {@link pmLaunchPlan}, so an explicitly
+ * pinned binary gets the same platform-correct launch instead of bypassing it.
  */
 export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
+    const launch = typeof pmBin === "string" ? pmLaunchPlan(pmBin) : pmBin;
     const maxBuffer = pmJsonMaxBuffer();
-    const result = spawnSync(pmBin, ["--path", pmRoot, "list-all", "--json", "--include-body"], { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs() });
+    const result = spawnSync(launch.command, [...launch.prefixArgs, "--path", pmRoot, "list-all", "--json", "--include-body"], 
+    // `windowsVerbatimArguments: false` is Node's default and is stated here
+    // on purpose: it is what makes the win32 launch injection-safe. Node quotes
+    // every argument itself, so the cmd.exe tail is assembled from discrete
+    // quoted elements rather than a raw command string. Nothing here may ever
+    // pass `shell: true`, which would disable exactly that quoting.
+    { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs(), windowsVerbatimArguments: false });
     if (result.error) {
         throw new CommandError(describePmReadFailure(result.error, maxBuffer));
     }

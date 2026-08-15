@@ -5,6 +5,7 @@ import {
   fetchAllItems,
   describePmReadFailure,
   pmJsonMaxBuffer,
+  pmLaunchPlan,
   pmReadTimeoutMs,
   resolvePmBin,
   CommandError,
@@ -107,13 +108,25 @@ test("pmJsonMaxBuffer falls back to the default for invalid or non-positive valu
 });
 
 // --- resolvePmBin: project-local pm vs PATH fallback -------------------------
+// The command the resolver hands back depends on ComSpec only on win32, and the
+// assertion has to hold on any machine running the suite, so the expected
+// processor is computed the same way the implementation computes it.
+function expectedComSpec(): string {
+  return process.env["ComSpec"] || "cmd.exe";
+}
+
 test("resolvePmBin resolves the project-local node_modules/.bin/pm shim from this module", () => {
-  const bin = resolvePmBin(import.meta.url);
+  const launch = resolvePmBin(import.meta.url, "linux");
   // Walking up from this test file reaches the package root, whose
   // node_modules/.bin/pm shim exists (this package dev-depends on @unbrained/pm-cli).
-  assert.ok(bin.endsWith(join("node_modules", ".bin", "pm")), `expected a node_modules/.bin/pm path, got ${bin}`);
-  // It must NOT be the bare PATH fallback.
-  assert.notEqual(bin, "pm");
+  assert.ok(
+    launch.command.endsWith(join("node_modules", ".bin", "pm")),
+    `expected a node_modules/.bin/pm path, got ${launch.command}`
+  );
+  // It must NOT be the bare PATH fallback, and on POSIX the shim is launched
+  // directly — no command processor, no prefix argv.
+  assert.notEqual(launch.command, "pm");
+  assert.deepEqual(launch.prefixArgs, []);
 });
 
 test("resolvePmBin falls back to 'pm' on PATH when no local node_modules/.bin/pm exists", () => {
@@ -121,7 +134,7 @@ test("resolvePmBin falls back to 'pm' on PATH when no local node_modules/.bin/pm
   try {
     // A module URL inside a temp tree with no node_modules must fall back.
     const fakeModuleUrl = pathToFileURL(join(dir, "index.js")).href;
-    assert.equal(resolvePmBin(fakeModuleUrl), "pm");
+    assert.deepEqual(resolvePmBin(fakeModuleUrl, "linux"), { command: "pm", prefixArgs: [] });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -341,17 +354,142 @@ test("fetchAllItems names the exit status when pm exits non-zero with empty stde
   }
 });
 
-test("resolvePmBin prefers the .cmd shim on Windows and the extensionless shim elsewhere", () => {
-  const dir = mkdtempSync(join(tmpdir(), "standup-shim-"));
+// --- resolvePmBin / pmLaunchPlan: the exact launch shape per platform ----------
+//
+// These are the regression tests for the unlaunchable-.cmd defect: the resolver
+// used to hand back the bare `pm.cmd` path, and the caller spawned it directly,
+// which Node (18.20+/20.12+, the CVE-2024-27980 mitigation) refuses with EINVAL.
+// Now the resolver returns the launch — command processor plus the `/d /s /c`
+// prefix on win32, the bare shim with no prefix on POSIX — and these assertions
+// pin the exact argv for each platform without needing a Windows box. Revert the
+// launch wrapping and the win32 assertions fail: the expected `cmd.exe /d /s /c`
+// shape collapses back to the bare (unlaunchable) shim path.
+
+test("resolvePmBin produces the cmd.exe launch for the .cmd shim on win32 (npm's both-shims layout)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-shim-cmd-"));
   try {
     const binDir = join(dir, "node_modules", ".bin");
     mkdirSync(binDir, { recursive: true });
-    // Both shims present, as npm installs them, so the choice is the assertion.
+    // Both shims present, as npm installs them, so the .cmd choice is the assertion.
     writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
     writeFileSync(join(binDir, "pm.cmd"), "@echo off\r\n", { encoding: "utf-8", mode: 0o755 });
     const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
-    const expected = process.platform === "win32" ? join(binDir, "pm.cmd") : join(binDir, "pm");
-    assert.equal(resolvePmBin(moduleUrl), expected);
+    const launch = resolvePmBin(moduleUrl, "win32");
+    // The exact spawn for a read: cmd.exe is the executable, and the /d /s /c
+    // prefix carries the batch shim as the command. `/d` skips AutoRun, `/s`
+    // gives stable quote handling, `/c` runs and exits — the same switches
+    // Node's own `shell: true` uses, minus the string-joined command line.
+    assert.deepEqual(
+      [launch.command, ...launch.prefixArgs, "--path", "/tracker", "list-all", "--json", "--include-body"],
+      [expectedComSpec(), "/d", "/s", "/c", join(binDir, "pm.cmd"), "--path", "/tracker", "list-all", "--json", "--include-body"]
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("resolvePmBin wraps the extensionless shim in cmd.exe on win32 when only it exists", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-shim-ext-"));
+  try {
+    const binDir = join(dir, "node_modules", ".bin");
+    mkdirSync(binDir, { recursive: true });
+    // POSIX-style layout with no .cmd: resolution falls to the extensionless
+    // shim, and on win32 even that needs the command processor (CreateProcess
+    // rejects an extensionless file), so the launch is the wrapped form, not a
+    // direct spawn that would fail.
+    writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
+    const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
+    const launch = resolvePmBin(moduleUrl, "win32");
+    assert.deepEqual(
+      [launch.command, ...launch.prefixArgs, "--path", "/tracker", "list-all", "--json", "--include-body"],
+      [expectedComSpec(), "/d", "/s", "/c", join(binDir, "pm"), "--path", "/tracker", "list-all", "--json", "--include-body"]
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("resolvePmBin keeps the direct shebang-shim launch on POSIX with an empty prefix", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-shim-posix-"));
+  try {
+    const binDir = join(dir, "node_modules", ".bin");
+    mkdirSync(binDir, { recursive: true });
+    // Both shims present; on POSIX the extensionless one is chosen AND launched
+    // directly — byte-for-byte the invocation this package has always used.
+    writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
+    writeFileSync(join(binDir, "pm.cmd"), "@echo off\r\n", { encoding: "utf-8", mode: 0o755 });
+    const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
+    const launch = resolvePmBin(moduleUrl, "linux");
+    assert.deepEqual(
+      [launch.command, ...launch.prefixArgs, "--path", "/tracker", "list-all", "--json", "--include-body"],
+      [join(binDir, "pm"), "--path", "/tracker", "list-all", "--json", "--include-body"]
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the win32 launch resolves the command processor through ComSpec and falls back to cmd.exe", () => {
+  const saved = process.env["ComSpec"];
+  try {
+    // ComSpec honored when set: the launch must use the machine's configured
+    // processor rather than assuming cmd.exe lives at a bare name.
+    process.env["ComSpec"] = "C:\\Windows\\system32\\cmd.exe";
+    assert.deepEqual(pmLaunchPlan(join("x", "pm.cmd"), "win32"), {
+      command: "C:\\Windows\\system32\\cmd.exe",
+      prefixArgs: ["/d", "/s", "/c", join("x", "pm.cmd")],
+    });
+    // Fallback when unset: the documented default.
+    delete process.env["ComSpec"];
+    assert.deepEqual(pmLaunchPlan(join("x", "pm.cmd"), "win32"), {
+      command: "cmd.exe",
+      prefixArgs: ["/d", "/s", "/c", join("x", "pm.cmd")],
+    });
+  } finally {
+    if (saved === undefined) delete process.env["ComSpec"];
+    else process.env["ComSpec"] = saved;
+  }
+});
+
+test("pmLaunchPlan wraps even the bare PATH fallback 'pm' on win32 so PATHEXT resolution happens", () => {
+  // On win32 a bare 'pm' cannot be spawned directly either: Node does not do
+  // PATHEXT lookup, so the direct spawn would ENOENT. The command processor
+  // does that lookup, so the fallback goes through it like every other form.
+  assert.deepEqual(pmLaunchPlan("pm", "win32"), {
+    command: expectedComSpec(),
+    prefixArgs: ["/d", "/s", "/c", "pm"],
+  });
+});
+
+test("pmLaunchPlan returns a direct launch with no prefix on POSIX", () => {
+  assert.deepEqual(pmLaunchPlan(join("x", "pm"), "linux"), { command: join("x", "pm"), prefixArgs: [] });
+});
+
+test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-metachar-"));
+  try {
+    // A fake pm that echoes every argv element it received back as item ids.
+    // Whatever reaches this child arrives via a real spawnSync launch, so the
+    // round trip proves the metacharacter root survived as ONE argv element:
+    // any shell concatenation would split or interpret it (`&`, `|`, `"`).
+    const bin = join(dir, "argv-echo-pm");
+    writeFileSync(
+      bin,
+      "#!/bin/sh\nexec node -e 'process.stdout.write(JSON.stringify({items:process.argv.slice(1).map(id=>({id}))}))' -- \"$@\"\n",
+      { encoding: "utf-8", mode: 0o755 }
+    );
+    chmodSync(bin, 0o755);
+    const evil = 'root with space & "quote" | pipe';
+    // Passed as a PmLaunch (the shape resolvePmBin returns), exercising the
+    // non-string arm of fetchAllItems' parameter on the same path.
+    const items = fetchAllItems(evil, { command: bin, prefixArgs: [] });
+    assert.deepEqual(items.map((i) => i.id), [
+      "--path",
+      evil,
+      "list-all",
+      "--json",
+      "--include-body",
+    ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
