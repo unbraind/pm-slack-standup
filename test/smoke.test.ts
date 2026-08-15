@@ -103,3 +103,35 @@ test("output_format override declines a standup export that is not raw stdout", 
   assert.equal(outcome.handled, false, "without the raw-stdout marker the payload must be declined");
   assert.deepEqual(outcome.result, payload, "a declined payload must reach the host untouched");
 });
+
+/**
+ * The preflight scope must name every command path this package registers.
+ *
+ * `slack-standup` is registered as a full command sharing `runStandupCommand`,
+ * not as a Commander alias, so the runtime matches it by its own exact
+ * normalized name. A scope naming only `standup` therefore leaves the alias
+ * outside the override entirely. The registration is a pass-through today, so
+ * nothing misbehaves at runtime — but the declared scope is what `pm health`
+ * reads as this package's ownership claim, and if the override ever becomes
+ * authoritative the alias would silently escape its gate.
+ *
+ * Derived from the real activation rather than a hand-maintained list, so a
+ * newly registered command path fails here instead of quietly falling outside
+ * the scope. Driven through the SDK harness, because the api double above
+ * registers the override and then never inspects what was registered.
+ */
+test("the preflight scope covers every registered command path", async () => {
+  const harness = await activateForServiceTest();
+  const override = harness.assertPreflightOverride();
+  const registered = harness.activation.commands.handlers.map((handler) => handler.command).sort();
+  assert.deepEqual(
+    [...(override.commands ?? [])].sort(),
+    registered,
+    "every command this extension registers must appear in the preflight scope",
+  );
+  assert.deepEqual(
+    registered,
+    ["slack-standup", "standup", "standup export"],
+    "the registered command paths this scope is derived from",
+  );
+});
