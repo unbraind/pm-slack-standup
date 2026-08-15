@@ -1096,6 +1096,15 @@ export function fetchAllItems(pmRoot: string, pmBin: string | PmLaunch = resolve
   } catch {
     throw new CommandError("Could not parse `pm list-all --json` output.");
   }
+  // Every other malformed shape above is refused with a CommandError; a non-array
+  // `items` must be too. `{"items":{}}` would otherwise pass straight through and
+  // fail inside buildStandupData with a TypeError far from the read that caused
+  // it, naming neither the command nor the payload.
+  if (envelope.items !== undefined && !Array.isArray(envelope.items)) {
+    throw new CommandError(
+      "`pm list-all --json` returned a non-array `items` field, so the workspace could not be read."
+    );
+  }
   const items = (envelope.items ?? []) as PmItem[];
   // `list-all` promises completeness, but pm-cli bounds read output against a
   // default token budget and reports the shortfall in-band: exit 0, well-formed
@@ -2427,7 +2436,18 @@ export default defineExtension({
     // `pm health` even though neither guards the other's commands. Declaring the
     // owned command keeps this override off every other package's path.
     api.registerPreflight({
-      commands: ["standup"],
+      // EVERY registered command path, not just `standup`. `slack-standup` is
+      // registered as a full command sharing `runStandupCommand`, not as a
+      // Commander alias, and `standup export` is its own path — the runtime
+      // matches each by its exact normalized name, so a scope naming only
+      // `standup` left the other two outside this override entirely. The
+      // registration is a pass-through today, so nothing misbehaves at runtime,
+      // but the declared scope is this package's ownership claim as `pm health`
+      // reads it, and if the override ever becomes authoritative the omitted
+      // paths would silently escape its gate. The smoke test derives the
+      // expected list from the real activation, so a newly registered command
+      // path cannot be added without appearing here.
+      commands: ["standup", "slack-standup", "standup export"],
       // Mirror the handler's contract without aborting here (the runtime
       // swallows throws from preflight). An empty delta is an explicit
       // pass-through that leaves the runtime's preflight decision untouched.

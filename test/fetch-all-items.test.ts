@@ -34,6 +34,20 @@ const EXPECTED_DEFAULT_MAX_BUFFER = 64 * 1024 * 1024;
  * exercises the actual spawn/error/overrun code paths rather than a synthetic
  * stand-in for `spawnSync`.
  */
+/**
+ * Skip options for the tests that launch a fake `pm` binary.
+ *
+ * Every fake here is a `#!/bin/sh` script (one uses `sleep 30`), so on win32 the
+ * spawn fails for reasons that have nothing to do with the behaviour under test
+ * and the failure names the wrong cause. This repository runs a
+ * `windows-acceptance-launcher` job, so those runs must report a skip. The
+ * win32 launch path itself is not left uncovered: the `resolvePmBin` cmd.exe
+ * tests below exercise it directly and run on every platform.
+ */
+const posixOnly = {
+  skip: process.platform === "win32" ? "fake pm binaries are POSIX shell scripts" : false,
+} as const;
+
 function fakePmBin(dir: string, mode: "nonzero" | "overrun" | "good" | "truncated", opts: { stderrText?: string; exitCode?: number; maxBuffer?: number } = {}): string {
   const bin = join(dir, "fake-pm");
   let script: string;
@@ -146,7 +160,7 @@ test("resolvePmBin falls back to 'pm' on PATH when no local node_modules/.bin/pm
 
 // --- fetchAllItems: throws on each failure shape (real subprocesses) ---------
 
-test("fetchAllItems throws a CommandError when the pm subprocess exits non-zero, with the stderr text in the message", () => {
+test("fetchAllItems throws a CommandError when the pm subprocess exits non-zero, with the stderr text in the message", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-nonzero-"));
   try {
     const bin = fakePmBin(dir, "nonzero", { stderrText: "tracker_not_initialized boom", exitCode: 7 });
@@ -165,7 +179,7 @@ test("fetchAllItems throws a CommandError when the pm subprocess exits non-zero,
   }
 });
 
-test("fetchAllItems names the exit status when the subprocess exits non-zero with EMPTY stderr", () => {
+test("fetchAllItems names the exit status when the subprocess exits non-zero with EMPTY stderr", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-nonzero-stderr-"));
   try {
     const bin = join(dir, "empty-stderr-pm");
@@ -189,7 +203,7 @@ test("fetchAllItems names the exit status when the subprocess exits non-zero wit
   }
 });
 
-test("fetchAllItems throws a CommandError when the pm binary cannot be spawned (result.error set)", () => {
+test("fetchAllItems throws a CommandError when the pm binary cannot be spawned (result.error set)", posixOnly, () => {
   // A non-existent binary path makes spawnSync set result.error (ENOENT).
   const dir = mkdtempSync(join(tmpdir(), "standup-read-error-"));
   try {
@@ -211,7 +225,7 @@ test("fetchAllItems throws a CommandError when the pm binary cannot be spawned (
   }
 });
 
-test("fetchAllItems throws on the ENOBUFS shape (status null, empty stderr) with a message naming the buffer ceiling", () => {
+test("fetchAllItems throws on the ENOBUFS shape (status null, empty stderr) with a message naming the buffer ceiling", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-enobufs-"));
   const saved = process.env["PM_JSON_MAX_BUFFER"];
   try {
@@ -237,7 +251,7 @@ test("fetchAllItems throws on the ENOBUFS shape (status null, empty stderr) with
   }
 });
 
-test("fetchAllItems throws when the envelope reports a truncated read, naming the item counts and the flag that lifts the cap", () => {
+test("fetchAllItems throws when the envelope reports a truncated read, naming the item counts and the flag that lifts the cap", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-truncated-"));
   try {
     const bin = fakePmBin(dir, "truncated");
@@ -260,7 +274,7 @@ test("fetchAllItems throws when the envelope reports a truncated read, naming th
   }
 });
 
-test("fetchAllItems returns the items when the envelope reports the read was not truncated", () => {
+test("fetchAllItems returns the items when the envelope reports the read was not truncated", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-complete-"));
   try {
     const bin = join(dir, "complete-pm");
@@ -276,7 +290,34 @@ test("fetchAllItems returns the items when the envelope reports the read was not
   }
 });
 
-test("fetchAllItems throws on unparseable JSON stdout from a zero-exit pm subprocess", () => {
+/**
+ * `{"items":{}}` is a zero-exit, well-formed-JSON envelope, so nothing about the
+ * process outcome distinguishes it from success. Without an explicit shape check
+ * it flowed straight through as `PmItem[]` and failed inside `buildStandupData`
+ * with a TypeError naming neither the command that produced it nor the payload.
+ * Every other malformed shape is refused with a CommandError at the read; this
+ * one has to be too.
+ */
+test("fetchAllItems refuses a non-array items field instead of passing it on as rows", posixOnly, () => {
+  const dir = mkdtempSync(join(tmpdir(), "standup-read-nonarray-"));
+  try {
+    const bin = join(dir, "nonarray-pm");
+    writeFileSync(bin, `#!/bin/sh\necho '{"items":{},"total":0}'\nexit 0\n`, { encoding: "utf-8", mode: 0o755 });
+    chmodSync(bin, 0o755);
+    assert.throws(
+      () => fetchAllItems(dir, bin),
+      (err: unknown) => {
+        assert.ok(err instanceof CommandError, "must refuse with a CommandError, not a TypeError");
+        assert.match(err.message, /non-array `items`/, "the message must name the offending field");
+        return true;
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("fetchAllItems throws on unparseable JSON stdout from a zero-exit pm subprocess", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-badjson-"));
   try {
     const bin = join(dir, "bad-json-pm");
@@ -314,7 +355,7 @@ test("pmReadTimeoutMs defaults to 60s, honors a positive override, and rejects a
   }
 });
 
-test("fetchAllItems kills a hung pm read at the timeout rather than waiting forever", () => {
+test("fetchAllItems kills a hung pm read at the timeout rather than waiting forever", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-hang-"));
   const saved = process.env["PM_READ_TIMEOUT_MS"];
   try {
@@ -340,7 +381,7 @@ test("fetchAllItems kills a hung pm read at the timeout rather than waiting fore
   }
 });
 
-test("fetchAllItems names the exit status when pm exits non-zero with empty stderr", () => {
+test("fetchAllItems names the exit status when pm exits non-zero with empty stderr", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-status-"));
   try {
     const bin = join(dir, "silent-fail-pm");
