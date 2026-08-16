@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- The pm CLI compatibility floor is declared where npm enforces it and absent from the field the CLI actually reads ([pm-slack-standup-glnl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-glnl.toon))
+- The pm CLI compatibility floor was declared only where npm enforces it, and absent from the field the CLI actually reads ([pm-slack-standup-glnl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-glnl.toon))
 - A quoted final argument makes cmd /s strip the quotes that protect the executable path in the win32 pm launch ([pm-slack-standup-ogys](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ogys.toon))
 - The .cmd shim resolvePmBin selects on win32 cannot be launched by its only caller ([pm-slack-standup-20gw](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-20gw.toon))
 - A truncated list-all envelope produces a partial standup that reads as a quiet day ([pm-slack-standup-5q1f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-5q1f.toon))
