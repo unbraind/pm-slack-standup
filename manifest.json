@@ -1,6 +1,6 @@
 {
   "name": "pm-slack-standup",
-  "version": "2026.8.16",
+  "version": "2026.8.17",
   "manifest_version": 2,
   "description": "Post pm context as a Slack standup message",
   "author": "@unbraind",
