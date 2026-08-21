@@ -1,7 +1,7 @@
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { COMPLETE_LIST_COMMAND_ARGUMENTS } from "../index.ts";
 
@@ -42,6 +42,13 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
 const bunCommand = process.platform === "win32" ? "bun.exe" : "bun";
 const bunxCommand = process.platform === "win32" ? "bunx.exe" : "bunx";
+const npmCli = process.env.npm_execpath?.endsWith(".js") ? process.env.npm_execpath : undefined;
+const npmLauncher = npmCli === undefined
+  ? { command: npmCommand, prefix: [] as string[] }
+  : { command: process.execPath, prefix: [npmCli] };
+const npxLauncher = npmCli === undefined
+  ? { command: npxCommand, prefix: [] as string[] }
+  : { command: process.execPath, prefix: [resolve(dirname(npmCli), "npx-cli.js")] };
 const cleanEnvironment: NodeJS.ProcessEnv = {
   ...process.env,
   npm_config_userconfig: devNull,
@@ -75,7 +82,7 @@ function run(command: string, args: string[], cwd: string, env: NodeJS.ProcessEn
 /** Invoke the scenario-local pm host through its user-facing launcher. */
 function runPm(scenario: AcceptanceScenario, cwd: string, env: NodeJS.ProcessEnv, args: string[]): SpawnSyncReturns<string> {
   return scenario.manager === "npm"
-    ? run(npxCommand, ["--no-install", "pm", ...args], cwd, env)
+    ? run(npxLauncher.command, [...npxLauncher.prefix, "--no-install", "pm", ...args], cwd, env)
     : run(bunxCommand, ["--no-install", "pm", ...args], cwd, env);
 }
 
@@ -84,8 +91,8 @@ try {
   const packRoot = join(temporaryRoot, "pack");
   mkdirSync(packRoot);
   run(
-    npmCommand,
-    ["pack", "--ignore-scripts", "--pack-destination", packRoot],
+    npmLauncher.command,
+    [...npmLauncher.prefix, "pack", "--ignore-scripts", "--pack-destination", packRoot],
     repoRoot,
     { ...cleanEnvironment, npm_config_ignore_scripts: "true", NPM_CONFIG_IGNORE_SCRIPTS: "true" },
   );
@@ -118,8 +125,8 @@ try {
     mkdirSync(isolatedConfig);
     mkdirSync(isolatedData);
     if (scenario.manager === "npm") {
-      run(npmCommand, ["init", "-y"], scenarioRoot, scenarioEnvironment);
-      run(npmCommand, ["install", "--ignore-scripts", `${cliPackage}@${scenario.hostVersion}`, tarball], scenarioRoot, scenarioEnvironment);
+      run(npmLauncher.command, [...npmLauncher.prefix, "init", "-y"], scenarioRoot, scenarioEnvironment);
+      run(npmLauncher.command, [...npmLauncher.prefix, "install", "--ignore-scripts", `${cliPackage}@${scenario.hostVersion}`, tarball], scenarioRoot, scenarioEnvironment);
     } else {
       run(bunCommand, ["init", "-y"], scenarioRoot, scenarioEnvironment);
       run(bunCommand, ["add", "--ignore-scripts", `${cliPackage}@${scenario.hostVersion}`, tarball], scenarioRoot, scenarioEnvironment);
