@@ -353,7 +353,7 @@ npm run dev   # watch mode
 
 ## How It Works
 
-1. Reads every item once via `pm --path <root> list-all --json --include-body` and buckets them locally into In Progress, Blocked, open (Up Next) and optionally Done. Any open/in-progress item with a `blocked_by` dependency (top-level or in `dependencies[]`) is re-bucketed into Blocked; closed items are never re-surfaced as blocked.
+1. Reads every item once via canonical `pm --path <root> list --all --json --include-body --strict-read --no-truncate --output-budget unbounded --output-limit unbounded --output-include full`, certifies the complete corpus with the public pm SDK, and buckets it locally into In Progress, Blocked, open (Up Next) and optionally Done. Any open/in-progress item with a `blocked_by` dependency (top-level or in `dependencies[]`) is re-bucketed into Blocked; closed items are never re-surfaced as blocked.
 2. Sorts open items by priority (ascending) and takes the top N as "Up Next" (default 3; set with `--up-next <n>`, or `--all-open` to show the entire open backlog).
 3. Builds a Slack Block Kit `blocks` array (header + a section per bucket + context footer) plus a plain-text `fallback`, optionally grouped by assignee and annotated with Slack mentions. Section titles/emoji can be overridden with `--section-labels`, and `--yesterday` expands Done into Done Yesterday / Done Today.
 4. In `--dry-run`, prints the message in the chosen `--format` and exits without any network call. Otherwise posts `{ text, blocks }` to each target (the base webhook plus any `--channels`) using Node.js native `https`. A missing webhook (on a real post) raises a structured `CommandError`; a failed post does too **unless** `--fallback-to-stdout` is set, in which case the rendered standup is printed to stdout and the command exits 0.
@@ -364,7 +364,7 @@ MIT
 
 ## Release Automation
 
-This package is release-ready for GitHub, npm, and Bun-compatible installs. CI runs type checking, build, production dependency audit, package packing, Bun install verification, and pm-changelog validation. The daily release workflow publishes only when commits exist after the latest release tag and uses pm-changelog to generate CHANGELOG.md and GitHub release notes.
+The package and daily release workflow support npm and Bun-compatible installs. CI runs type checking, build, docstring and configured coverage gates, production dependency audit, package packing, four real packed-host scenarios (npm and Bun against the current and declared-minimum pm CLI), canonical-reader acceptance, and pm-changelog validation. The daily release workflow publishes only when commits exist after the latest release tag and uses pm-changelog to generate CHANGELOG.md and GitHub release notes. Release and publication remain blocked until the repository's open exact all-source coverage and reachable-history privacy items are resolved.
 
 ## Multi-agent merge safety
 

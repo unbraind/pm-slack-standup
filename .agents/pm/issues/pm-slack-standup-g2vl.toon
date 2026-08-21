@@ -1,0 +1,31 @@
+id: pm-slack-standup-g2vl
+title: Authorize and execute reachable-history privacy remediation
+description: "Current tracked files contain no detected home paths, private IPs, private keys, or common personal mailbox addresses, but reachable history contains four patch lines carrying an old absolute home path and 109 commits use personal author identity values. Public history must not be rewritten without an explicit coordinated authorization and downstream impact plan."
+type: Issue
+status: open
+priority: 1
+tags[4]: history,privacy,release-blocker,supply-chain
+created_at: "2026-08-21T10:11:53.599Z"
+updated_at: "2026-08-21T10:35:14.741Z"
+author: codex
+estimated_minutes: 360
+acceptance_criteria: "Inventory every reachable ref and tag; classify absolute paths, identities, secrets, hosted data and personal domains; obtain explicit maintainer authorization before any rewrite; preserve an offline recovery bundle; rewrite atomically across every affected ref when authorized; publish coordinated clone invalidation guidance; rescan current files, pack contents and full reachable history to zero approved-scope findings before merge or publication"
+definition_of_ready: Current tracked and reachable-history scans plus author inventory are recorded.
+reviewer: maintainer
+risk: critical
+confidence: high
+sprint: 2026-08-privacy
+release: future
+reporter: codex
+severity: critical
+environment: 213 reachable commits on main and remote refs
+repro_steps: Scan git log --all -p for absolute home paths and git log --all --format for personal author identities.
+expected_result: The public repository and every published artifact have an explicitly approved privacy boundary with no unreviewed personal or hosted-service data in reachable history.
+actual_result: Current tracked scan is clean; reachable history has four absolute-home-path patch lines and 109 personal-identity author commits. No rewrite authorization exists.
+affected_version: entire reachable history
+component: git history and publication privacy
+customer_impact: Merging or publishing without an approved history boundary can permanently disclose personal host or identity metadata.
+docs[2]{path,scope,note}:
+  "https://github.com/unbraind/pm-slack-standup",global,Public repository whose reachable refs require coordinated remediation
+  "https://github.com/unbraind/pm-slack-standup/issues/45",global,Public authorization and remediation gate
+body: ""
