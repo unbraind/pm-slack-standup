@@ -86,6 +86,11 @@ function runPm(scenario: AcceptanceScenario, cwd: string, env: NodeJS.ProcessEnv
     : run(bunxCommand, ["--no-install", "pm", ...args], cwd, env);
 }
 
+/** Invoke a host whose CLI is installed outside the tracker under test. */
+function runNodePm(hostCli: string, cwd: string, env: NodeJS.ProcessEnv, args: string[]): SpawnSyncReturns<string> {
+  return run(process.execPath, [hostCli, ...args], cwd, env);
+}
+
 const temporaryRoot = mkdtempSync(join(tmpdir(), "pm-slack-standup-packed-acceptance-"));
 try {
   const packRoot = join(temporaryRoot, "pack");
@@ -175,6 +180,54 @@ try {
       fixtures_present: true,
     });
   }
+
+  const globalScenarioRoot = join(temporaryRoot, "npm-global-current");
+  const globalHostRoot = join(globalScenarioRoot, "host");
+  const globalProjectRoot = join(globalScenarioRoot, "project");
+  const globalConfigRoot = join(globalScenarioRoot, "xdg-config");
+  const globalDataRoot = join(globalScenarioRoot, "xdg-data");
+  mkdirSync(globalHostRoot, { recursive: true });
+  mkdirSync(globalProjectRoot);
+  mkdirSync(globalConfigRoot);
+  mkdirSync(globalDataRoot);
+  const globalEnvironment: NodeJS.ProcessEnv = {
+    ...cleanEnvironment,
+    PM_GLOBAL_PATH: join(globalScenarioRoot, "global-pm"),
+    XDG_CONFIG_HOME: globalConfigRoot,
+    XDG_DATA_HOME: globalDataRoot,
+    npm_config_cache: join(globalScenarioRoot, "npm-cache"),
+  };
+  run(npmLauncher.command, [...npmLauncher.prefix, "install", "--prefix", globalHostRoot, "--ignore-scripts", `${cliPackage}@${developmentVersion}`], globalScenarioRoot, globalEnvironment);
+  const globalHostCli = join(globalHostRoot, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+  const globalVersion = runNodePm(globalHostCli, globalProjectRoot, globalEnvironment, ["--version"]).stdout.trim();
+  if (globalVersion !== developmentVersion) {
+    throw new Error(`npm-global-current resolved pm ${globalVersion}, expected ${developmentVersion}`);
+  }
+  runNodePm(globalHostCli, globalProjectRoot, globalEnvironment, ["init", "--defaults", "--agent-guidance", "skip", "--prefix", "accept"]);
+  const globalTitle = "Packed global-host fixture";
+  runNodePm(globalHostCli, globalProjectRoot, globalEnvironment, ["create", "task", globalTitle, "--status", "open", "--create-mode", "progressive"]);
+  runNodePm(globalHostCli, globalProjectRoot, globalEnvironment, ["install", tarball, "--project"]);
+  const globalExport = runNodePm(globalHostCli, globalProjectRoot, globalEnvironment, ["standup", "export", "--format", "json"]);
+  const globalDocument = JSON.parse(globalExport.stdout) as Record<string, unknown>;
+  const globalSections = globalDocument.sections_data;
+  const globalRendered = globalSections !== null && typeof globalSections === "object" && !Array.isArray(globalSections)
+    ? Object.values(globalSections).flatMap((value) => Array.isArray(value) ? value : [])
+    : [];
+  if (globalRendered.length !== 1 || !globalRendered.some((value) => value !== null && typeof value === "object"
+    && (value as Record<string, unknown>).title === globalTitle)) {
+    throw new Error("npm-global-current could not load the SDK-backed extension from a global host without project node_modules");
+  }
+  if (/deprecated|list-all/iu.test(globalExport.stderr)) {
+    throw new Error(`npm-global-current emitted a deprecated-command diagnostic: ${globalExport.stderr.trim()}`);
+  }
+  receipts.push({
+    scenario: "npm-global-current",
+    host_version: globalVersion,
+    tracker_items: 1,
+    rendered_items: globalRendered.length,
+    stderr_bytes: Buffer.byteLength(globalExport.stderr),
+    fixtures_present: true,
+  });
 
   process.stdout.write(`${JSON.stringify({ ok: true, receipts })}\n`);
 } finally {

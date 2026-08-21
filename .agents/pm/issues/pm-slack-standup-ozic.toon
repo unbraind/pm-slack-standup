@@ -6,7 +6,7 @@ status: in_progress
 priority: 1
 tags[5]: agents,cli-ux,complete-corpus,latest-cli,multi-agent
 created_at: "2026-08-21T10:11:27.117Z"
-updated_at: "2026-08-21T10:41:13.088Z"
+updated_at: "2026-08-21T10:44:47.718Z"
 assignee: codex
 author: codex
 estimated_minutes: 420
@@ -22,16 +22,17 @@ severity: high
 environment: "pm-slack-standup 2026.8.17, pm CLI 2026.8.21, Node 22.19.0"
 repro_steps: "Run the current standup reader and inspect its argv: it invokes list-all without strict-read, full projection, or either unbounded output control."
 expected_result: "A standup is rendered only from a structurally valid, SDK-certified, complete tracker corpus using canonical CLI syntax."
-actual_result: "One shared reader now issues the exact canonical strict/full/doubly-unbounded list --all request, delegates common completeness policy to the public SDK, rejects every verified pm-cli 2026.8.21 receipt gap, and validates all renderer fields. The release gate passes 150 tests, 73 documented declarations across five source files, zero production vulnerabilities, a nine-file pack, canonical-launch acceptance, and four fresh packed npm/Bun scenarios at current 2026.8.21 and minimum 2026.8.20 hosts. Configured coverage remains below the all-source mandate and reachable-history privacy remains unresolved, so this item stays in progress and the branch must not merge or publish."
+actual_result: "One shared reader now issues the exact canonical strict/full/doubly-unbounded list --all request, delegates common completeness policy to the public SDK, rejects every verified pm-cli 2026.8.21 receipt gap, and validates all renderer fields. The release gate passes 150 tests, 73 documented declarations across five source files, zero production vulnerabilities, a nine-file pack, canonical-launch acceptance, four fresh local-host npm/Bun scenarios at current 2026.8.21 and minimum 2026.8.20, plus a separate global-current host with no tracker-local node_modules. Configured coverage remains below the all-source mandate and reachable-history privacy remains unresolved, so this item stays in progress and the branch must not merge or publish."
 affected_version: pm-slack-standup 2026.8.17
 component: fetchAllItems complete-corpus reader
 customer_impact: "A partial or unverifiable tracker read can under-report active work in an automated standup, while alias warnings pollute agent stderr."
-notes[5]{created_at,author,text}:
+notes[6]{created_at,author,text}:
   "2026-08-21T10:13:33.108Z",codex,"Red-first evidence: new complete-list contract tests require one exact canonical argv, public SDK rejection for malformed/filter/paging/projection/count/identity evidence, narrow pm-cli 2026.8.21 supplemental receipt checks, and renderer-field validation. npm run build:test fails because COMPLETE_LIST_COMMAND_ARGUMENTS and readCompleteStandupItems do not yet exist; implementation has not been added."
   "2026-08-21T10:31:29.856Z",codex,"Green implementation evidence: npm run release:check passes. Configured index.ts coverage is 89.97 percent lines, 88.32 percent branches, and 91.27 percent functions; this is explicitly not exact all-source 100/100/100/100. The packed matrix initialized fresh trackers through npm and Bun on pm CLI 2026.8.21 and 2026.8.20, created one in-progress and one open item, installed the packed extension, exported one standup, reconciled two rendered items to the two tracker items, and found no deprecated list-all diagnostic. CI and release changelog reads now pass both unbounded controls; PR CI runs both installed acceptance gates."
   "2026-08-21T10:35:15.193Z",codex,"A dedicated Windows PR job now type-checks, compiles the test graph, runs the launcher contract suite, and executes the same packed npm/Bun current/minimum matrix through real Windows launchers. This is pending GitHub exact-head execution and is not yet counted as green evidence."
   "2026-08-21T10:37:55.511Z",codex,"First exact-head Windows execution exposed three additional POSIX-shell fixture tests that lacked the established posixOnly declaration. Their failures were ENOENT/cmd launch artifacts rather than product behavior; the real project-local pm integration passed on Windows. The three tests now declare the same explicit Windows skip as every other #!/bin/sh fixture, while the Windows job continues to the real packed npm/Bun launcher matrix."
   "2026-08-21T10:41:13.088Z",codex,"Second Windows run reached the packed gate and reproduced Node spawnSync EINVAL when launching npm.cmd directly. The acceptance runner now executes npm-cli.js and npx-cli.js through process.execPath, preserving discrete argv and avoiding shell:true while exercising the same user-facing npm/npx code. Bun remains a direct executable launch. Local typecheck and all four packed scenarios pass after the change."
+  "2026-08-21T10:44:47.718Z",codex,"Greptile P1 claimed a peer-only top-level SDK import would break GitHub or copied installs. Exact reproduction disproved the runtime claim: pm install materializes the extension with a symlink from its node_modules/@unbrained/pm-cli to the active external host, and standup export rendered real data with no tracker-local node_modules. The review still exposed an acceptance visibility gap, so a fifth mandatory npm-global-current scenario now proves this layout. The finding was down-voted and answered inline with the evidence; no duplicate runtime CLI dependency was introduced."
 files[10]{path,scope,note}:
   .github/workflows/ci.yml,project,Exact Node floor and installed acceptance gates
   .github/workflows/release.yml,project,Exact Node floor and unbounded changelog reads

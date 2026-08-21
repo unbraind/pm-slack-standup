@@ -364,7 +364,7 @@ MIT
 
 ## Release Automation
 
-The package and daily release workflow support npm and Bun-compatible installs. CI runs type checking, build, docstring and configured coverage gates, production dependency audit, package packing, four real packed-host scenarios (npm and Bun against the current and declared-minimum pm CLI), canonical-reader acceptance, and pm-changelog validation. The daily release workflow publishes only when commits exist after the latest release tag and uses pm-changelog to generate CHANGELOG.md and GitHub release notes. Release and publication remain blocked until the repository's open exact all-source coverage and reachable-history privacy items are resolved.
+The package and daily release workflow support npm and Bun-compatible installs. CI runs type checking, build, docstring and configured coverage gates, production dependency audit, package packing, five real packed-host scenarios (npm and Bun against the current and declared-minimum pm CLI, plus a global npm host with no project `node_modules`), canonical-reader acceptance, and pm-changelog validation. The daily release workflow publishes only when commits exist after the latest release tag and uses pm-changelog to generate CHANGELOG.md and GitHub release notes. Release and publication remain blocked until the repository's open exact all-source coverage and reachable-history privacy items are resolved.
 
 ## Multi-agent merge safety
 
