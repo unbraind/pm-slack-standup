@@ -6,7 +6,7 @@ status: closed
 priority: 1
 tags[5]: agents,cli-ux,complete-corpus,latest-cli,multi-agent
 created_at: "2026-08-21T10:11:27.117Z"
-updated_at: "2026-08-21T11:26:52.909Z"
+updated_at: "2026-08-21T11:48:17.176Z"
 closed_at: "2026-08-21T11:26:52.891Z"
 completed_at: "2026-08-21T11:26:52.891Z"
 author: codex
@@ -28,7 +28,7 @@ actual_result: "The final implementation head 19d4640 passed 152 tests, 73 docum
 affected_version: pm-slack-standup 2026.8.17
 component: fetchAllItems complete-corpus reader
 customer_impact: "A partial or unverifiable tracker read can under-report active work in an automated standup, while alias warnings pollute agent stderr."
-notes[9]{created_at,author,text}:
+notes[10]{created_at,author,text}:
   "2026-08-21T10:13:33.108Z",codex,"Red-first evidence: new complete-list contract tests require one exact canonical argv, public SDK rejection for malformed/filter/paging/projection/count/identity evidence, narrow pm-cli 2026.8.21 supplemental receipt checks, and renderer-field validation. npm run build:test fails because COMPLETE_LIST_COMMAND_ARGUMENTS and readCompleteStandupItems do not yet exist; implementation has not been added."
   "2026-08-21T10:31:29.856Z",codex,"Green implementation evidence: npm run release:check passes. Configured index.ts coverage is 89.97 percent lines, 88.32 percent branches, and 91.27 percent functions; this is explicitly not exact all-source 100/100/100/100. The packed matrix initialized fresh trackers through npm and Bun on pm CLI 2026.8.21 and 2026.8.20, created one in-progress and one open item, installed the packed extension, exported one standup, reconciled two rendered items to the two tracker items, and found no deprecated list-all diagnostic. CI and release changelog reads now pass both unbounded controls; PR CI runs both installed acceptance gates."
   "2026-08-21T10:35:15.193Z",codex,"A dedicated Windows PR job now type-checks, compiles the test graph, runs the launcher contract suite, and executes the same packed npm/Bun current/minimum matrix through real Windows launchers. This is pending GitHub exact-head execution and is not yet counted as green evidence."
@@ -38,6 +38,7 @@ notes[9]{created_at,author,text}:
   "2026-08-21T10:54:23.493Z",codex,"Exact head 337bacf GitHub CI completed green: Node 22.18.0 and Node 26 each ran the mandatory release surfaces; windows-acceptance-launcher passed its native launcher suite and all five packed scenarios in 9m02s. The earlier pending-Windows note is superseded by this evidence."
   "2026-08-21T11:03:00.324Z",codex,"author=codex,text=Late CodeRabbit exact-head review found tag-pinned actions and persisted checkout credentials in the new Windows job. Applied the finding across both CI jobs and immutable-pin consistency across release workflow, added executable workflow security regression tests, and reran release:check green with 152 tests and all five packed acceptance scenarios."
   "2026-08-21T11:26:52.214Z",codex,"Final review audit at implementation head 19d4640 found one valid CodeRabbit workflow-hardening issue. Exact action SHA pins,persist-credentials false on both CI checkouts,and mandatory regression tests fixed it. Node 22.18.0,Node 26,and Windows acceptance passed; the CodeRabbit thread is resolved. Exact-head CodeRabbit was rate-limited,Sourcery and Cubic quota-limited,and Greptile and Gemini supplied no substantive exact-head response,so these are limitations rather than approvals."
+  "2026-08-21T11:48:17.151Z",codex,"Clarification after exact-head review: 19d4640 is deliberately named as the final code-bearing implementation head. Commit 010935e only appended the scoped closure evidence and changelog. A commit cannot persist its own eventual SHA; PR 46 is the authoritative exact-head pointer for the later review-fix commit. The coverage baseline remains 89.97/88.32/91.27 and the independent blockers remain open."
 files[11]{path,scope,note}:
   .github/workflows/ci.yml,project,Exact Node floor and installed acceptance gates
   .github/workflows/release.yml,project,Exact Node floor and unbounded changelog reads

@@ -41,8 +41,8 @@ test("canonical reader acceptance issues exactly one complete-list read", () => 
   const argsFile = join(root, "args.json");
   const previousResponse = process.env.PM_STANDUP_FAKE_RESPONSE;
   const previousArgsFile = process.env.PM_STANDUP_ARGS_FILE;
-  writeFileSync(fakePm, `import { writeFileSync } from "node:fs";
-writeFileSync(process.env.PM_STANDUP_ARGS_FILE, JSON.stringify(process.argv.slice(2)));
+  writeFileSync(fakePm, `import { appendFileSync } from "node:fs";
+appendFileSync(process.env.PM_STANDUP_ARGS_FILE, JSON.stringify(process.argv.slice(2)) + "\\n");
 process.stdout.write(process.env.PM_STANDUP_FAKE_RESPONSE);
 `, "utf8");
   process.env.PM_STANDUP_FAKE_RESPONSE = JSON.stringify(completeEnvelope());
@@ -56,9 +56,13 @@ process.stdout.write(process.env.PM_STANDUP_FAKE_RESPONSE);
     assert.deepEqual(fetchAllItems("/tracker", launch), [
       { id: "fixture-1", title: "Tracked standup work", status: "in_progress" },
     ]);
-    assert.deepEqual(JSON.parse(readFileSync(argsFile, "utf8")) as string[], [
+    const invocations = readFileSync(argsFile, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as string[]);
+    assert.deepEqual(invocations, [[
       "--path", "/tracker", ...COMPLETE_LIST_COMMAND_ARGUMENTS,
-    ]);
+    ]], "the acceptance must observe exactly one canonical host invocation");
   } finally {
     if (previousResponse === undefined) delete process.env.PM_STANDUP_FAKE_RESPONSE;
     else process.env.PM_STANDUP_FAKE_RESPONSE = previousResponse;
