@@ -711,7 +711,7 @@ test("backslash and quote interactions in the win32 tail follow the documented d
   }
 });
 
-test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", () => {
+test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-metachar-"));
   try {
     // A fake pm that echoes every argv element it received back as item titles.
@@ -741,7 +741,7 @@ test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv ele
   }
 });
 
-test("fetchAllItems returns items from a valid canonical list --all document", () => {
+test("fetchAllItems returns items from a valid canonical list --all document", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-ok-"));
   try {
     const bin = join(dir, "good-pm");
@@ -756,7 +756,7 @@ test("fetchAllItems returns items from a valid canonical list --all document", (
   }
 });
 
-test("fetchAllItems refuses a canonical envelope that omits its items field", () => {
+test("fetchAllItems refuses a canonical envelope that omits its items field", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-no-items-"));
   try {
     const bin = join(dir, "no-items-pm");
