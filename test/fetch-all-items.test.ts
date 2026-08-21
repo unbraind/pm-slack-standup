@@ -9,9 +9,11 @@ import {
   pmReadTimeoutMs,
   resolvePmBin,
   CommandError,
+  COMPLETE_LIST_COMMAND_ARGUMENTS,
 } from "../index.ts";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 import extension from "../index.ts";
+import { completeListEnvelope } from "./complete-list-fixture.ts";
 
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,7 +31,7 @@ const EXPECTED_DEFAULT_MAX_BUFFER = 64 * 1024 * 1024;
  * one of the failure shapes under test, and return its path. `mode` selects the
  * shape: `"nonzero"` prints `stderrText` to stderr and exits `exitCode`;
  * `"overrun"` prints more than `maxBuffer` bytes to stdout (to trigger ENOBUFS);
- * `"good"` prints a valid `list-all --json` document. Every shape is a real
+ * `"good"` prints a valid canonical complete-list document. Every shape is a real
  * subprocess launched by {@link fetchAllItems}'s `spawnSync`, so the test
  * exercises the actual spawn/error/overrun code paths rather than a synthetic
  * stand-in for `spawnSync`.
@@ -53,7 +55,7 @@ function fakePmBin(dir: string, mode: "nonzero" | "overrun" | "good" | "truncate
   let script: string;
   if (mode === "nonzero") {
     const code = opts.exitCode ?? 7;
-    const stderrText = (opts.stderrText ?? "pm list-all failed").replace(/'/g, "'\\''");
+    const stderrText = (opts.stderrText ?? "pm list --all failed").replace(/'/g, "'\\''");
     script = `#!/bin/sh\necho '${stderrText}' >&2\nexit ${code}\n`;
   } else if (mode === "overrun") {
     // Emit more bytes than the maxBuffer the caller will set via PM_JSON_MAX_BUFFER.
@@ -63,9 +65,9 @@ function fakePmBin(dir: string, mode: "nonzero" | "overrun" | "good" | "truncate
     // Exit 0 with well-formed JSON that reports its own incompleteness — the
     // shape pm-cli emits when a collection read exceeds the default output
     // budget. Nothing about the process outcome distinguishes it from success.
-    script = `#!/bin/sh\necho '{"items":[{"id":"a","status":"in_progress"}],"total":676,"truncated":true}'\nexit 0\n`;
+    script = `#!/bin/sh\necho '${JSON.stringify(completeListEnvelope({ items: [{ id: "a", title: "A", status: "in_progress" }], count: 1, total: 676, truncated: true }))}'\nexit 0\n`;
   } else {
-    script = `#!/bin/sh\necho '{"items":[]}'\nexit 0\n`;
+    script = `#!/bin/sh\necho '${JSON.stringify(completeListEnvelope({ items: [], count: 0, total: 0 }))}'\nexit 0\n`;
   }
   writeFileSync(bin, script, { encoding: "utf-8", mode: 0o755 });
   chmodSync(bin, 0o755);
@@ -185,7 +187,7 @@ test("fetchAllItems names the exit status when the subprocess exits non-zero wit
     const bin = join(dir, "empty-stderr-pm");
     // Exits non-zero without writing anything to stderr. With no stderr text to
     // quote, the exit status is the only diagnostic the caller can be given, so
-    // it has to be in the message rather than a bare "pm list-all failed".
+    // it has to be in the message rather than a bare "pm list --all failed".
     writeFileSync(bin, "#!/bin/sh\nexit 9\n", { encoding: "utf-8", mode: 0o755 });
     chmodSync(bin, 0o755);
     assert.throws(
@@ -194,7 +196,7 @@ test("fetchAllItems names the exit status when the subprocess exits non-zero wit
         assert.ok(e instanceof CommandError);
         const err = e as CommandError;
         assert.equal(err.exitCode, 1);
-        assert.equal(err.message, "pm list-all failed (exit 9)");
+        assert.equal(err.message, "pm list --all failed (exit 9)");
         return true;
       }
     );
@@ -262,10 +264,10 @@ test("fetchAllItems throws when the envelope reports a truncated read, naming th
         const msg = (e as CommandError).message;
         // The counts must be reported, because "1 of 676" is what makes the
         // shortfall legible; a bare "truncated" reads as a formatting detail.
-        assert.match(msg, /1 of 676 items/);
+        assert.match(msg, /count=1 of total=676/);
         // --output-limit and --no-truncate are both accepted by pm and both
         // leave the cap in place, so the message has to name the one that works.
-        assert.match(msg, /--output-budget unbounded/);
+        assert.match(msg, /partial tracker read/);
         return true;
       }
     );
@@ -280,7 +282,7 @@ test("fetchAllItems returns the items when the envelope reports the read was not
     const bin = join(dir, "complete-pm");
     writeFileSync(
       bin,
-      "#!/bin/sh\necho '{\"items\":[{\"id\":\"a\"},{\"id\":\"b\"}],\"total\":2,\"truncated\":false}'\nexit 0\n",
+      `#!/bin/sh\necho '${JSON.stringify(completeListEnvelope({ items: [{ id: "a", title: "A", status: "open" }, { id: "b", title: "B", status: "open" }], count: 2, total: 2 }))}'\nexit 0\n`,
       { encoding: "utf-8", mode: 0o755 }
     );
     chmodSync(bin, 0o755);
@@ -308,7 +310,7 @@ test("fetchAllItems refuses a non-array items field instead of passing it on as 
       () => fetchAllItems(dir, bin),
       (err: unknown) => {
         assert.ok(err instanceof CommandError, "must refuse with a CommandError, not a TypeError");
-        assert.match(err.message, /non-array `items`/, "the message must name the offending field");
+        assert.match(err.message, /invalid_envelope/, "the SDK finding must name the invalid envelope");
         return true;
       },
     );
@@ -426,8 +428,8 @@ test("resolvePmBin produces the cmd.exe launch for the .cmd shim on win32 (npm's
     // runs and exits — the same switch set Node's own `shell: true` uses,
     // with per-element quoting done here instead of a raw string join.
     assert.deepEqual(
-      [launch.command, ...launch.args(["--path", "/tracker", "list-all", "--json", "--include-body"])],
-      [expectedComSpec(), "/d", "/s", "/c", `"${join(binDir, "pm.cmd")} --path /tracker list-all --json --include-body"`]
+      [launch.command, ...launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"])],
+      [expectedComSpec(), "/d", "/s", "/c", `"${join(binDir, "pm.cmd")} --path /tracker list --all --json --include-body"`]
     );
     assert.equal(launch.windowsVerbatimArguments, true);
   } finally {
@@ -448,10 +450,10 @@ test("resolvePmBin wraps the extensionless shim in cmd.exe on win32 when only it
     writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
     const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
     const launch = resolvePmBin(moduleUrl, "win32");
-    const argv = launch.args(["--path", "/tracker", "list-all", "--json", "--include-body"]);
+    const argv = launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"]);
     assert.deepEqual(
       [launch.command, ...argv],
-      [expectedComSpec(), "/d", "/s", "/c", `"${join(binDir, "pm")} --path /tracker list-all --json --include-body"`]
+      [expectedComSpec(), "/d", "/s", "/c", `"${join(binDir, "pm")} --path /tracker list --all --json --include-body"`]
     );
     // Extensionless shim: still wrapped, so /s still strips exactly one pair.
     assert.equal(launch.windowsVerbatimArguments, true);
@@ -476,8 +478,8 @@ test("resolvePmBin keeps the direct shebang-shim launch on POSIX with the argv v
     const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
     const launch = resolvePmBin(moduleUrl, "linux");
     assert.deepEqual(
-      [launch.command, ...launch.args(["--path", "/tracker", "list-all", "--json", "--include-body"])],
-      [join(binDir, "pm"), "--path", "/tracker", "list-all", "--json", "--include-body"]
+      [launch.command, ...launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"])],
+      [join(binDir, "pm"), "--path", "/tracker", "list", "--all", "--json", "--include-body"]
     );
     assert.equal(launch.windowsVerbatimArguments, false);
   } finally {
@@ -487,7 +489,7 @@ test("resolvePmBin keeps the direct shebang-shim launch on POSIX with the argv v
 
 test("the win32 launch resolves the command processor through ComSpec and falls back to cmd.exe", () => {
   const saved = process.env["ComSpec"];
-  const pmArgs = ["--path", "/tracker", "list-all", "--json", "--include-body"];
+  const pmArgs = ["--path", "/tracker", "list", "--all", "--json", "--include-body"];
   try {
     // ComSpec honored when set: the launch must use the machine's configured
     // processor rather than assuming cmd.exe lives at a bare name.
@@ -496,7 +498,7 @@ test("the win32 launch resolves the command processor through ComSpec and falls 
     assert.equal(viaComSpec.command, "C:\\Windows\\system32\\cmd.exe");
     assert.deepEqual(
       viaComSpec.args(pmArgs),
-      ["/d", "/s", "/c", `"${join("x", "pm.cmd")} --path /tracker list-all --json --include-body"`]
+      ["/d", "/s", "/c", `"${join("x", "pm.cmd")} --path /tracker list --all --json --include-body"`]
     );
     // Fallback when unset: the documented default.
     delete process.env["ComSpec"];
@@ -504,7 +506,7 @@ test("the win32 launch resolves the command processor through ComSpec and falls 
     assert.equal(viaDefault.command, "cmd.exe");
     assert.deepEqual(
       viaDefault.args(pmArgs),
-      ["/d", "/s", "/c", `"${join("x", "pm.cmd")} --path /tracker list-all --json --include-body"`]
+      ["/d", "/s", "/c", `"${join("x", "pm.cmd")} --path /tracker list --all --json --include-body"`]
     );
   } finally {
     if (saved === undefined) delete process.env["ComSpec"];
@@ -520,8 +522,8 @@ test("pmLaunchPlan wraps even the bare PATH fallback 'pm' on win32 so PATHEXT re
   const launch = pmLaunchPlan("pm", "win32");
   assert.equal(launch.command, expectedComSpec());
   assert.deepEqual(
-    launch.args(["--path", "/tracker", "list-all", "--json", "--include-body"]),
-    ["/d", "/s", "/c", '"pm --path /tracker list-all --json --include-body"']
+    launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"]),
+    ["/d", "/s", "/c", '"pm --path /tracker list --all --json --include-body"']
   );
 });
 
@@ -617,14 +619,14 @@ test("win32 outer-wraps the tail so /s cannot strip the quotes protecting a spac
   const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd";
   const root = "C:\\Users\\Some User\\tracker";
   const launch = pmLaunchPlan(bin, "win32");
-  const argv = launch.args(["--path", root, "list-all", "--json", "--include-body"]);
+  const argv = launch.args(["--path", root, "list", "--all", "--json", "--include-body"]);
   assert.equal(launch.windowsVerbatimArguments, true, "the tail is pre-quoted; Node must not re-quote it");
   // The exact spawn argv: the entire command tail is ONE element. Note the
   // doubled opening quote: the outer pair we add, then the bin's own quotes —
   // /s strips exactly the outer pair and leaves the inner one intact.
   assert.deepEqual(argv, [
     "/d", "/s", "/c",
-    '""C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd" --path "C:\\Users\\Some User\\tracker" list-all --json --include-body"',
+    '""C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd" --path "C:\\Users\\Some User\\tracker" list --all --json --include-body"',
   ]);
   const tail = argv[3];
   // The outer pair exists: the FIRST character after /c and the LAST quote on
@@ -644,7 +646,7 @@ test("win32 outer-wraps the tail so /s cannot strip the quotes protecting a spac
   // And cmd hands the child exactly the command line we intended: strip the
   // outer pair the way /s does, parse per CommandLineToArgvW, compare.
   assert.deepEqual(parseWindowsCommandLine(tail.slice(1, -1)), [
-    bin, "--path", root, "list-all", "--json", "--include-body",
+    bin, "--path", root, "list", "--all", "--json", "--include-body",
   ]);
 });
 
@@ -654,12 +656,12 @@ test("win32 wraps the spaced extensionless shim in the same outer-quoted tail", 
   const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm";
   const root = "C:\\Users\\Some User\\tracker";
   const launch = pmLaunchPlan(bin, "win32");
-  const argv = launch.args(["--path", root, "list-all", "--json", "--include-body"]);
+  const argv = launch.args(["--path", root, "list", "--all", "--json", "--include-body"]);
   assert.equal(launch.windowsVerbatimArguments, true);
   assert.equal(argv.length, 4, "the whole tail must be one argv element after /d /s /c");
   assert.ok(argv[3].startsWith('"') && argv[3].endsWith('"'), "outer pair present");
   assert.deepEqual(parseWindowsCommandLine(argv[3].slice(1, -1)), [
-    bin, "--path", root, "list-all", "--json", "--include-body",
+    bin, "--path", root, "list", "--all", "--json", "--include-body",
   ]);
 });
 
@@ -670,7 +672,7 @@ test("every cmd metacharacter round-trips through the win32 tail per the Command
   // every one of these, and the re-parse must recover the original argv.
   for (const ch of [" ", "\t", "&", "|", "<", ">", "^", "(", ")", '"']) {
     const root = `C:\\Users\\Some User ${ch} part\\tracker`;
-    const pmArgs = ["--path", root, "list-all", "--json", "--include-body"];
+    const pmArgs = ["--path", root, "list", "--all", "--json", "--include-body"];
     const argv = pmLaunchPlan(bin, "win32").args(pmArgs);
     assert.equal(argv.length, 4, `one tail element for '${ch}'`);
     const tail = argv[3];
@@ -697,7 +699,7 @@ test("backslash and quote interactions in the win32 tail follow the documented d
     "plain",                                   // no quoting needed at all
   ];
   for (const root of cases) {
-    const pmArgs = ["--path", root, "list-all", "--json", "--include-body"];
+    const pmArgs = ["--path", root, "list", "--all", "--json", "--include-body"];
     const { args } = pmLaunchPlan(bin, "win32");
     const tail = args(pmArgs)[3];
     assert.ok(tail.startsWith('"') && tail.endsWith('"'), `outer pair for ${JSON.stringify(root)}`);
@@ -709,17 +711,17 @@ test("backslash and quote interactions in the win32 tail follow the documented d
   }
 });
 
-test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", () => {
+test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-metachar-"));
   try {
-    // A fake pm that echoes every argv element it received back as item ids.
+    // A fake pm that echoes every argv element it received back as item titles.
     // Whatever reaches this child arrives via a real spawnSync launch, so the
     // round trip proves the metacharacter root survived as ONE argv element:
     // any shell concatenation would split or interpret it (`&`, `|`, `"`).
     const bin = join(dir, "argv-echo-pm");
     writeFileSync(
       bin,
-      "#!/bin/sh\nexec node -e 'process.stdout.write(JSON.stringify({items:process.argv.slice(1).map(id=>({id}))}))' -- \"$@\"\n",
+      "#!/bin/sh\nexec node -e 'const a=process.argv.slice(1);process.stdout.write(JSON.stringify({items:a.map((title,index)=>({id:`arg-${index}`,title,status:`open`})),count:a.length,total:a.length,has_more:false,truncated:false,next_cursor:null,filters:{status:`all`,include_body:true,no_truncate:true,strict_read:true,runtime_filters:{}},limit:null,requested_limit:null,effective_limit:null,source:null,completeness:{status:`complete`,unreadable_item_count:0,unreadable_directory_count:0},projection:{mode:`full`,fields:null},omission_receipt:{has_omissions:false,omitted_field_group_count:0,omitted_field_groups:[]},read_output:{contract_version:1,command:`list`,requested_dimensions:[`include`,`amount`,`cost`],within_budget:true,strings_compacted:false,rows_compacted:false,result_omitted:false}}))' -- \"$@\"\n",
       { encoding: "utf-8", mode: 0o755 }
     );
     chmodSync(bin, 0o755);
@@ -729,23 +731,21 @@ test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv ele
     // the launch is the direct spawn, so this is the same metacharacter
     // round trip the real read performs.
     const items = fetchAllItems(evil, pmLaunchPlan(bin, "linux"));
-    assert.deepEqual(items.map((i) => i.id), [
+    assert.deepEqual(items.map((i) => i.title), [
       "--path",
       evil,
-      "list-all",
-      "--json",
-      "--include-body",
+      ...COMPLETE_LIST_COMMAND_ARGUMENTS,
     ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("fetchAllItems returns items from a valid list-all --json document", () => {
+test("fetchAllItems returns items from a valid canonical list --all document", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-ok-"));
   try {
     const bin = join(dir, "good-pm");
-    const doc = JSON.stringify({ items: [{ id: "pm-1", title: "T", status: "open" }, { id: "pm-2", title: "U", status: "in_progress" }] });
+    const doc = JSON.stringify(completeListEnvelope({ items: [{ id: "pm-1", title: "T", status: "open" }, { id: "pm-2", title: "U", status: "in_progress" }], count: 2, total: 2 }));
     writeFileSync(bin, `#!/bin/sh\necho '${doc}'\nexit 0\n`, { encoding: "utf-8", mode: 0o755 });
     chmodSync(bin, 0o755);
     const items = fetchAllItems("/anywhere", bin);
@@ -756,16 +756,14 @@ test("fetchAllItems returns items from a valid list-all --json document", () => 
   }
 });
 
-test("fetchAllItems returns an empty array when list-all --json omits the items field", () => {
+test("fetchAllItems refuses a canonical envelope that omits its items field", posixOnly, () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-read-no-items-"));
   try {
     const bin = join(dir, "no-items-pm");
-    // A valid JSON document with no `items` key must fall back to [] rather than
-    // throw or return undefined.
+    // A zero-exit JSON object without rows is not a verifiable complete corpus.
     writeFileSync(bin, "#!/bin/sh\necho '{}'\nexit 0\n", { encoding: "utf-8", mode: 0o755 });
     chmodSync(bin, 0o755);
-    const items = fetchAllItems("/anywhere", bin);
-    assert.deepEqual(items, []);
+    assert.throws(() => fetchAllItems("/anywhere", bin), /invalid_envelope/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -807,7 +805,7 @@ test("pm standup export exits non-zero when the underlying pm read fails (comman
   });
   assert.deepEqual(harness.activation.failed, [], "activation must not fail");
 
-  // A non-existent tracker root makes the real pm list-all read exit non-zero,
+  // A non-existent tracker root makes the real pm list --all read exit non-zero,
   // so fetchAllItems throws a CommandError, which the runtime propagates.
   await assert.rejects(
     harness.runExporter({ exporter: "standup", pmRoot: "/tmp/standup-regression-no-such-tracker", options: { format: "md" } }),
@@ -815,7 +813,7 @@ test("pm standup export exits non-zero when the underlying pm read fails (comman
       assert.ok(e instanceof CommandError, "the handler must propagate a CommandError, not return an empty export");
       const err = e as CommandError;
       assert.notEqual(err.exitCode, 0, "the propagated exit code must be non-zero");
-      assert.match(err.message, /tracker_not_initialized|Tracker is not initialized|pm list-all failed/);
+      assert.match(err.message, /tracker_not_initialized|Tracker is not initialized|pm list --all failed/);
       return true;
     }
   );
@@ -834,7 +832,7 @@ test("pm standup export exits non-zero when the underlying pm read fails (comman
 test("the win32 launch refuses an argument cmd.exe would variable-expand", () => {
   const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
   assert.throws(
-    () => plan.args(["--pm-path", "C:\\work\\%BUILD%\\.agents\\pm", "list-all", "--json"]),
+    () => plan.args(["--pm-path", "C:\\work\\%BUILD%\\.agents\\pm", "list", "--all", "--json"]),
     (err: unknown) => {
       assert.ok(err instanceof CommandError, "must refuse, not silently launch an expanded path");
       assert.match((err as Error).message, /%BUILD%/, "the message must name the offending argument");

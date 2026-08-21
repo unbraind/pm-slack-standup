@@ -13,7 +13,7 @@ export declare class CommandError extends Error {
     constructor(message: string, exitCode?: number);
 }
 /**
- * One edge in an item's dependency list, as decoded from `pm list-all --json`.
+ * One edge in an item's dependency list, as decoded from canonical `pm list --all` output.
  *
  * Carries the target item id and the relationship kind (e.g. `blocked_by`); the
  * index signature keeps any extra fields the host may add visible without a
@@ -65,6 +65,19 @@ export type SectionKey = "in_progress" | "blocked" | "done" | "up_next";
  * independent of how `--sections` lists them.
  */
 export declare const ALL_SECTIONS: readonly SectionKey[];
+/**
+ * The canonical complete-list collection contract this package requires.
+ *
+ * Only the completeness fields are modelled: `items` is the payload, and
+ * `truncated`/`total` are how pm-cli reports in-band that it returned fewer rows
+ * than exist. A consumer that reads `items` alone cannot distinguish a complete
+ * small tracker from a truncated large one, because both are exit 0 with valid
+ * JSON — which is why `total` is carried here rather than inferred from `items`.
+ */
+/** Canonical whole-corpus arguments used by every standup read. */
+export declare const COMPLETE_LIST_COMMAND_ARGUMENTS: readonly ["list", "--all", "--json", "--include-body", "--strict-read", "--no-truncate", "--output-budget", "unbounded", "--output-limit", "unbounded", "--output-include", "full"];
+/** Decode only a complete, unbounded canonical standup item envelope. */
+export declare function readCompleteStandupItems(parsed: unknown): PmItem[];
 /**
  * The bucketed items a standup renders, produced by filtering and grouping pm items.
  *
@@ -345,8 +358,8 @@ export interface PmLaunch {
  * quote, strip that leading quote and remove the LAST quote character on the
  * tail, preserving any text after it. Passing the binary and the pm arguments
  * as discrete argv elements — letting Node quote each one — assembles a tail
- * like `"C:\spaced path\pm.cmd" --path "C:\tracker root" list-all --json
- * --include-body`: the tail starts with the binary's opening quote, and when
+ * like `"C:\spaced path\pm.cmd" --path "C:\tracker root" list --all --json`:
+ * the tail starts with the binary's opening quote, and when
  * the FINAL argument needs quoting (any tracker root containing a space), the
  * last quote on the tail is an inner one. cmd strips the leading quote and
  * that inner quote, and the executable's path splits at its first space. The
@@ -428,9 +441,10 @@ export declare function resolvePmBin(moduleUrl?: string, platform?: NodeJS.Platf
  */
 export declare function pmReadTimeoutMs(): number;
 /**
- * Read every item once via `list-all --json --include-body`, then bucket by
- * status locally. This is a single pm invocation (vs. four list-by-status
- * calls) and gives us bodies + assignee + timestamps for grouping/windowing.
+ * Read every item once through the canonical strict, full, doubly-unbounded
+ * `list --all` contract, then bucket by status locally. This is a single pm
+ * invocation (vs. four list-by-status calls) and gives us bodies, assignees,
+ * dependency edges, and timestamps for grouping/windowing.
  *
  * A failed read THROWS a {@link CommandError} rather than degrading to an empty
  * success. The fleet convention (pm-csv, pm-gantt-chart, pm-jira, pm-linear,
@@ -709,7 +723,7 @@ export declare function renderTrendLine(deltas: SectionDelta[]): string;
 declare const _default: {
     name: string;
     version: string;
-    activate(api: import("@unbrained/pm-cli/sdk/authoring").ExtensionApi): void;
+    activate(api: import("@unbrained/pm-cli/sdk").ExtensionApi): void;
 };
 export default _default;
 //# sourceMappingURL=index.d.ts.map

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Canonicalize complete standup reads on pm CLI 2026.8.21 ([pm-slack-standup-ozic](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ozic.toon))
+
 ## 2026.8.16 - 2026-08-16
 
 ### Fixed

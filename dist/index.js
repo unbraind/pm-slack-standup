@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync, existsSync } from "node:fs";
 import { basename, resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { certifyCompleteListResult, inspectCompleteListResult } from "@unbrained/pm-cli/sdk";
 /**
  * Local stand-in for the SDK's `defineExtension` identity helper.
  *
@@ -62,6 +63,134 @@ export const ALL_SECTIONS = [
     "done",
     "up_next",
 ];
+/**
+ * The canonical complete-list collection contract this package requires.
+ *
+ * Only the completeness fields are modelled: `items` is the payload, and
+ * `truncated`/`total` are how pm-cli reports in-band that it returned fewer rows
+ * than exist. A consumer that reads `items` alone cannot distinguish a complete
+ * small tracker from a truncated large one, because both are exit 0 with valid
+ * JSON — which is why `total` is carried here rather than inferred from `items`.
+ */
+/** Canonical whole-corpus arguments used by every standup read. */
+export const COMPLETE_LIST_COMMAND_ARGUMENTS = [
+    "list", "--all", "--json", "--include-body", "--strict-read", "--no-truncate",
+    "--output-budget", "unbounded", "--output-limit", "unbounded", "--output-include", "full",
+];
+/** Complete-list read-output receipt versions whose fields this package knows. */
+const SUPPORTED_READ_OUTPUT_CONTRACT_VERSIONS = new Set([1]);
+/** Whether an unknown JSON value is a non-array object. */
+function isRecord(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+/** Stable diagnostic rendering that distinguishes a missing receipt field. */
+function describeReceiptValue(value) {
+    if (value === undefined)
+        return "<missing>";
+    return JSON.stringify(value) ?? String(value);
+}
+/** Collect the pm 2026.8.21 receipt gaps not yet rejected by the public SDK. */
+function supplementalCompleteListFindings(record) {
+    const findings = [];
+    const completeness = isRecord(record.completeness) ? record.completeness : undefined;
+    for (const field of ["unreadable_item_count", "unreadable_directory_count"]) {
+        if (completeness?.[field] !== 0)
+            findings.push(`completeness.${field}=${describeReceiptValue(completeness?.[field])}`);
+    }
+    const omission = isRecord(record.omission_receipt) ? record.omission_receipt : undefined;
+    if (omission === undefined) {
+        findings.push("omission_receipt=<missing>");
+    }
+    else {
+        if (omission.has_omissions !== false)
+            findings.push(`omission_receipt.has_omissions=${describeReceiptValue(omission.has_omissions)}`);
+        if (!Number.isSafeInteger(omission.omitted_field_group_count) || omission.omitted_field_group_count !== 0) {
+            findings.push(`omission_receipt.omitted_field_group_count=${describeReceiptValue(omission.omitted_field_group_count)}`);
+        }
+        if (!Array.isArray(omission.omitted_field_groups) || omission.omitted_field_groups.length !== 0) {
+            findings.push(`omission_receipt.omitted_field_groups=${describeReceiptValue(omission.omitted_field_groups)}`);
+        }
+    }
+    const rawReadOutput = record.read_output;
+    const readOutput = isRecord(rawReadOutput) ? rawReadOutput : undefined;
+    if (readOutput === undefined) {
+        findings.push(`read_output=${describeReceiptValue(rawReadOutput)}`);
+    }
+    else {
+        for (const [field, expected] of [
+            ["command", "list"], ["within_budget", true], ["strings_compacted", false],
+            ["rows_compacted", false], ["result_omitted", false],
+        ]) {
+            if (readOutput[field] !== expected)
+                findings.push(`read_output.${field}=${describeReceiptValue(readOutput[field])}`);
+        }
+        const contractVersion = readOutput.contract_version;
+        if (typeof contractVersion !== "number" || !SUPPORTED_READ_OUTPUT_CONTRACT_VERSIONS.has(contractVersion)) {
+            findings.push(`read_output.contract_version=${describeReceiptValue(contractVersion)}`);
+        }
+        const dimensions = readOutput.requested_dimensions;
+        if (!Array.isArray(dimensions)) {
+            findings.push(`read_output.requested_dimensions=${describeReceiptValue(dimensions)}`);
+        }
+        else {
+            for (const dimension of ["include", "amount", "cost"]) {
+                if (!dimensions.includes(dimension))
+                    findings.push(`read_output.requested_dimensions missing ${dimension}`);
+            }
+        }
+    }
+    if (record.output_budget_truncation !== undefined)
+        findings.push("output_budget_truncation=<present>");
+    if (record.output_budget_exceeded !== undefined)
+        findings.push("output_budget_exceeded=<present>");
+    return findings;
+}
+/** Decode only a complete, unbounded canonical standup item envelope. */
+export function readCompleteStandupItems(parsed) {
+    const record = isRecord(parsed) ? parsed : undefined;
+    const sdkFindings = inspectCompleteListResult(parsed).findings.map((finding) => `${finding.code}: ${finding.message}`);
+    const findings = record === undefined ? sdkFindings : [...sdkFindings, ...supplementalCompleteListFindings(record)];
+    if (record === undefined || findings.length > 0) {
+        const count = record && typeof record.count === "number" ? record.count : "unknown";
+        const total = record && typeof record.total === "number" ? record.total : "unknown";
+        throw new CommandError(`pm list --all complete-corpus answer was refused for the standup: ${findings.join("; ")}; `
+            + `count=${count} of total=${total}. A partial tracker read would under-report active work.`);
+    }
+    const rows = [];
+    for (const certifiedItem of certifyCompleteListResult(record).items) {
+        const item = certifiedItem;
+        if (typeof item.title !== "string" || typeof item.status !== "string") {
+            throw new CommandError(`Refusing unverifiable pm list --all output: item ${certifiedItem.id} needs string title and status.`);
+        }
+        const row = { id: certifiedItem.id, title: item.title, status: item.status };
+        for (const field of ["type", "milestone", "release", "sprint", "assignee", "author", "body", "created_at", "updated_at", "blocked_by"]) {
+            if (item[field] !== undefined && typeof item[field] !== "string") {
+                throw new CommandError(`Refusing unverifiable pm list --all output: item ${certifiedItem.id} field ${field} must be a string when present.`);
+            }
+            if (typeof item[field] === "string")
+                row[field] = item[field];
+        }
+        if (item.priority !== undefined && typeof item.priority !== "number") {
+            throw new CommandError(`Refusing unverifiable pm list --all output: item ${certifiedItem.id} priority must be a number when present.`);
+        }
+        if (typeof item.priority === "number")
+            row.priority = item.priority;
+        if (item.tags !== undefined && (!Array.isArray(item.tags) || item.tags.some((tag) => typeof tag !== "string"))) {
+            throw new CommandError(`Refusing unverifiable pm list --all output: item ${certifiedItem.id} tags must be strings when present.`);
+        }
+        if (Array.isArray(item.tags))
+            row.tags = item.tags;
+        if (item.dependencies !== undefined && (!Array.isArray(item.dependencies) || item.dependencies.some((dependency) => !isRecord(dependency)
+            || (dependency.id !== undefined && typeof dependency.id !== "string")
+            || (dependency.kind !== undefined && typeof dependency.kind !== "string")))) {
+            throw new CommandError(`Refusing unverifiable pm list --all output: item ${certifiedItem.id} dependency id and kind must be strings when present.`);
+        }
+        if (Array.isArray(item.dependencies))
+            row.dependencies = item.dependencies;
+        rows.push(row);
+    }
+    return rows;
+}
 /** Default number of items shown in the "Up Next" section. */
 export const DEFAULT_UP_NEXT = 3;
 /** Direction → indicator glyph used in trend output. */
@@ -684,8 +813,8 @@ function assertNoCmdVariableExpansion(argv) {
  * quote, strip that leading quote and remove the LAST quote character on the
  * tail, preserving any text after it. Passing the binary and the pm arguments
  * as discrete argv elements — letting Node quote each one — assembles a tail
- * like `"C:\spaced path\pm.cmd" --path "C:\tracker root" list-all --json
- * --include-body`: the tail starts with the binary's opening quote, and when
+ * like `"C:\spaced path\pm.cmd" --path "C:\tracker root" list --all --json`:
+ * the tail starts with the binary's opening quote, and when
  * the FINAL argument needs quoting (any tracker root containing a space), the
  * last quote on the tail is an inner one. cmd strips the leading quote and
  * that inner quote, and the executable's path splits at its first space. The
@@ -813,9 +942,10 @@ export function pmReadTimeoutMs() {
     return Number.isSafeInteger(raw) && raw > 0 ? raw : 60_000;
 }
 /**
- * Read every item once via `list-all --json --include-body`, then bucket by
- * status locally. This is a single pm invocation (vs. four list-by-status
- * calls) and gives us bodies + assignee + timestamps for grouping/windowing.
+ * Read every item once through the canonical strict, full, doubly-unbounded
+ * `list --all` contract, then bucket by status locally. This is a single pm
+ * invocation (vs. four list-by-status calls) and gives us bodies, assignees,
+ * dependency edges, and timestamps for grouping/windowing.
  *
  * A failed read THROWS a {@link CommandError} rather than degrading to an empty
  * success. The fleet convention (pm-csv, pm-gantt-chart, pm-jira, pm-linear,
@@ -836,7 +966,6 @@ export function pmReadTimeoutMs() {
 export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
     const launch = typeof pmBin === "string" ? pmLaunchPlan(pmBin) : pmBin;
     const maxBuffer = pmJsonMaxBuffer();
-    const result = spawnSync(launch.command, launch.args(["--path", pmRoot, "list-all", "--json", "--include-body"]), 
     // `windowsVerbatimArguments` comes from the launch: on win32 the whole
     // command tail is ONE argv element this package quote-escaped itself (see
     // pmLaunchPlan), so Node must pass it through untouched — letting Node
@@ -846,47 +975,25 @@ export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
     // package has always used. Nothing here may ever pass `shell: true`, which
     // would join a raw command string for a shell to interpret — the injection
     // surface the composed tail exists to avoid.
-    { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs(), windowsVerbatimArguments: launch.windowsVerbatimArguments });
+    const result = spawnSync(launch.command, launch.args(["--path", pmRoot, ...COMPLETE_LIST_COMMAND_ARGUMENTS]), { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs(), windowsVerbatimArguments: launch.windowsVerbatimArguments });
     if (result.error) {
         throw new CommandError(describePmReadFailure(result.error, maxBuffer));
     }
     if (result.status !== 0) {
         // The status has to be in the message: `pm` can exit non-zero with empty
-        // stderr, and "pm list-all failed" with no number tells an operator nothing
+        // stderr, and "pm list --all failed" with no number tells an operator nothing
         // about which failure they are looking at.
         const reason = result.stderr?.trim();
-        throw new CommandError(`pm list-all failed (exit ${result.status})${reason ? `: ${reason}` : ""}`);
+        throw new CommandError(`pm list --all failed (exit ${result.status})${reason ? `: ${reason}` : ""}`);
     }
     let envelope;
     try {
         envelope = JSON.parse(result.stdout);
     }
     catch {
-        throw new CommandError("Could not parse `pm list-all --json` output.");
+        throw new CommandError("Could not parse `pm list --all --json` output.");
     }
-    // Every other malformed shape above is refused with a CommandError; a non-array
-    // `items` must be too. `{"items":{}}` would otherwise pass straight through and
-    // fail inside buildStandupData with a TypeError far from the read that caused
-    // it, naming neither the command nor the payload.
-    if (envelope.items !== undefined && !Array.isArray(envelope.items)) {
-        throw new CommandError("`pm list-all --json` returned a non-array `items` field, so the workspace could not be read.");
-    }
-    const items = (envelope.items ?? []);
-    // `list-all` promises completeness, but pm-cli bounds read output against a
-    // default token budget and reports the shortfall in-band: exit 0, well-formed
-    // JSON, `truncated: true`, and a fraction of the rows. On 2026.8.14 that is 10
-    // of 676 items. A standup built from a truncated read is not a smaller standup,
-    // it is a wrong one that reads as a quiet day — the same failure mode this
-    // function was just fixed for, arriving through a successful call instead of a
-    // failed one. Refuse, and name the flag that lifts the cap: `--output-limit`
-    // and `--no-truncate` are both accepted and both leave the cap in place.
-    if (envelope.truncated === true) {
-        throw new CommandError(`pm list-all returned ${items.length} of ${envelope.total ?? "unknown"} items because the read `
-            + "was truncated. A standup built from a partial read would under-report work as absent. "
-            + "Re-run with `--output-budget unbounded`, or upgrade past the pm-cli release that caps "
-            + "list-all by default.");
-    }
-    return items;
+    return readCompleteStandupItems(envelope);
 }
 const WIP_STATUSES = new Set(["in_progress", "wip", "doing"]);
 const BLOCKED_STATUSES = new Set(["blocked", "on_hold"]);
