@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-slack-standup-eeo9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-eeo9.toon))
+
 ## 2026.8.24 - 2026-08-24
 
 ### Fixed
