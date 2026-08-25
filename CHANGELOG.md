@@ -1,15 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2026.8.25 - 2026-08-25
 
 ### Fixed
 
 - The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-slack-standup-eeo9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-eeo9.toon))
-
-## 2026.8.24 - 2026-08-24
-
-### Fixed
-
 - Canonicalize complete standup reads on pm CLI 2026.8.21 ([pm-slack-standup-ozic](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ozic.toon))
 
 ## 2026.8.16 - 2026-08-16
