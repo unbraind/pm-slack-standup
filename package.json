@@ -33,14 +33,15 @@
     "changelog": "pm-changelog --pm-root .agents/pm --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded --mode prepend --output CHANGELOG.md --release-version-from-package --date-from-version --since-previous-tag --until-release-tag --item-url-base https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm --respect-item-release --pm-bin ./node_modules/.bin/pm",
     "changelog:full": "pm-changelog --pm-root .agents/pm --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded --mode replace --output CHANGELOG.md --all-release-tags --release-version-from-package --date-from-version --item-url-base https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm --respect-item-release --pm-bin ./node_modules/.bin/pm",
     "changelog:check": "pm-changelog --pm-root .agents/pm --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded --mode replace --output CHANGELOG.md --all-release-tags --release-version-from-package --date-from-version --item-url-base https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm --respect-item-release --pm-bin ./node_modules/.bin/pm --check",
-    "release:check": "npm run typecheck && npm run build && npm run docstring && npm run coverage && npm run accept:canonical-reader && npm run audit:prod && npm run pack:dry-run && npm run accept:packed && npm run changelog:check",
+    "release:check": "npm run typecheck && npm run build && npm run docstring && npm run coverage && npm run accept:canonical-reader && npm run audit:prod && npm run pack:dry-run && npm run accept:packed && npm run changelog:check && npm run verify:release-changelog-date",
     "prepublishOnly": "npm run release:check",
     "release:notes": "pm-changelog --pm-root .agents/pm --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded --stdout --since-previous-tag --until-release-tag --release-version-from-package --date-from-version --item-url-base https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm --respect-item-release --pm-bin ./node_modules/.bin/pm --github-step-summary",
     "prepare": "node scripts/prepare-merge-driver.mjs",
     "merge:install": "pm merge install",
     "coverage": "npm run build && npm run build:test && node scripts/coverage-gate.ts",
     "accept:canonical-reader": "node scripts/accept-canonical-reader.ts",
-    "accept:packed": "node scripts/accept-packed.ts"
+    "accept:packed": "node scripts/accept-packed.ts",
+    "verify:release-changelog-date": "bash scripts/verify-release-changelog-date.sh"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
