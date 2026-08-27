@@ -1,12 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Security
-
-- The identity gate deadlocks the one remediation its own failure message prescribes ([pm-slack-standup-yzns](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-yzns.toon))
-
-## 2026.8.26 - 2026-08-26
+## 2026.8.27 - 2026-08-27
 
 ### Fixed
 
