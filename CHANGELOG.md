@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-k05n](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-k05n.toon))
+- A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-m48a](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-m48a.toon))
+- A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-ofro](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ofro.toon))
 - The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-slack-standup-eeo9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-eeo9.toon))
 - Canonicalize complete standup reads on pm CLI 2026.8.21 ([pm-slack-standup-ozic](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ozic.toon))
 
