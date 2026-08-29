@@ -795,6 +795,14 @@ test("a publish routed through an unquoted scalar is audited, not hidden by an a
   assert.match(result.failures[0]!, /does not enable --provenance/);
 });
 
+test("scalar expansion follows execution order", () => {
+  const result = auditPublishAttestation([{ file: "release.yml", text: [
+    `npm publish --provenance`,
+    `FLAG=--no-provenance; npm publish $FLAG; FLAG=--provenance`,
+  ].join("\n") }]);
+  assert.equal(result.failures.length, 1);
+});
+
 test("an assignment the shell never makes is not indexed", () => {
   // Scalars used to be read straight out of the raw text, which indexed three
   // things the shell does not assign. The middle one is a gate bypass: a name
@@ -865,6 +873,49 @@ test("a scalar is taken only from a line that is exactly one literal assignment"
     assert.match(result.failures[0]!, /does not enable --provenance/);
   }
 });
+test("unbalanced prose quotes cannot hide later publishes", () => {
+  for (const prose of ["name: Don't skip", 'name: "unterminated']) {
+    const result = auditPublishAttestation([{ file: "release.yml", text: `${prose}\nnpm publish --provenance\nnpm publish` }]);
+    assert.equal(result.failures.length, 1);
+  }
+});
+
+test("local composite actions and Dockerfile RUN commands are audited", () => {
+  assert.equal(isExecutableSource(".github/actions/release/action.yml", ""), true);
+  assert.equal(auditPublishAttestation([{ file: "Dockerfile", text: "RUN npm publish" }]).failures.length, 1);
+});
+
+test("conditional and background assignments do not leak", () => {
+  for (const text of [
+    "npm publish --provenance\nFLAG=--provenance & npm publish $FLAG",
+    "npm publish --provenance\nfalse && FLAG=--provenance; npm publish $FLAG",
+  ]) assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
+});
+
+test("assignments in skipped multiline control blocks do not leak", () => {
+  const result = auditPublishAttestation([{ file: "release.yml", text: [
+    `npm publish --provenance`,
+    `if false; then`,
+    `FLAG=--provenance`,
+    `fi`,
+    `npm publish $FLAG`,
+  ].join("\n") }]);
+  assert.equal(result.failures.length, 1);
+});
+
+test("a quoted greater-than before a pipe cannot hide a publish", () => {
+  const result = auditPublishAttestation([{ file: "release.yml", text: `npm publish --provenance\necho ">"|npm publish` }]);
+  assert.equal(result.failures.length, 1);
+});
+
+test("a clobber redirection cannot hide a publish", () => {
+  const result = auditPublishAttestation([{ file: "release.yml", text: [
+    `npm publish --provenance`,
+    `>| publish.log npm publish --access public`,
+  ].join("\n") }]);
+  assert.equal(result.failures.length, 1);
+});
+
 test("a read-write redirection does not turn its target into the command", () => {
   // `<>` is one operator, not `<` followed by `>`. Unnamed, it was read as a
   // joined redirection that consumes no target, so `/dev/null` became the

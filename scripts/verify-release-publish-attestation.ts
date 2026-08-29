@@ -59,6 +59,7 @@ const GENERATED_PREFIXES = ["dist/", "coverage/", "node_modules/", ".agents/pm/r
 /** Tracked paths that can execute a command, matched against the repository-relative path. */
 const EXECUTABLE_PATHS = [
   /^\.github\/workflows\/[^/]+\.ya?ml$/,
+  /^\.github\/actions\/.+\/action\.ya?ml$/,
   /(^|\/)package\.json$/,
   /\.(sh|bash|zsh|ksh)$/,
   /(^|\/)(Makefile|makefile|GNUmakefile)$/,
@@ -193,6 +194,42 @@ export function attestationEnabled(command: ShellCommand): boolean {
 }
 
 /**
+ * Split shell text on unquoted separators while preserving quote state.
+ *
+ * @param text - Joined shell text.
+ * @returns Alternating command segments and separators.
+ */
+function shellSegments(text: string): string[] {
+  const parts: string[] = [];
+  let value = "";
+  let quote: "'" | '"' | undefined;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]!;
+    if (character === "\\" && quote !== "'") {
+      value += character + (text[index + 1] ?? "");
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = quote === undefined ? character : quote === character ? undefined : quote;
+      value += character;
+      continue;
+    }
+    if (quote === undefined && (character === ";" || character === "&" || character === "|" || character === "\n")) {
+      if (value !== "") parts.push(value);
+      const doubled = text[index + 1] === character && (character === "&" || character === "|");
+      parts.push(doubled ? character + character : character);
+      if (doubled) index += 1;
+      value = "";
+      continue;
+    }
+    value += character;
+  }
+  if (value !== "") parts.push(value);
+  return parts;
+}
+
+/**
  * Find every publish invocation in one file's contents.
  *
  * Continuations are joined and shared arrays expanded before tokenising, for
@@ -204,13 +241,39 @@ export function attestationEnabled(command: ShellCommand): boolean {
  */
 export function publishInvocationsIn(source: SourceFile): PublishInvocation[] {
   const raw = source.file.endsWith("package.json") ? manifestCommandLines(source.text) : source.text;
-  const text = joinContinuations(raw);
-  const arrays = bashArrays(text);
-  const scalars = shellScalars(text);
-  const expanded = text
-    .split("\n")
-    .map((line) => expandScalars(expandArrays(line, arrays), scalars))
-    .join("\n");
+  const joined = joinContinuations(raw);
+  const text = /(^|\/)Dockerfile(?:[.-][^/]*)?$/.test(source.file)
+    ? joined.split("\n").map((line) => /^\s*RUN\s+/i.test(line) ? line.replace(/^\s*RUN\s+/i, "") : "").join("\n")
+    : joined;
+  let prior = "";
+  const scalars = new Map<string, string>();
+  let pendingAssignments = new Map<string, string>();
+  let assignmentEligible = true;
+  let controlDepth = 0;
+  const expanded = shellSegments(text).map((segment) => {
+    if (/^(?:\n|;|&&?|\|\|?)$/.test(segment)) {
+      if (segment === ";" || segment === "\n") {
+        for (const [name, value] of pendingAssignments) scalars.set(name, value);
+      }
+      pendingAssignments = new Map();
+      assignmentEligible = segment === ";" || segment === "\n";
+      prior += segment;
+      return segment;
+    }
+    const resolved = expandScalars(expandArrays(segment, bashArrays(prior)), scalars);
+    const trimmed = segment.trim();
+    if (/^(?:fi|done|esac)\b/.test(trimmed)) controlDepth = Math.max(0, controlDepth - 1);
+    const insideControl = controlDepth > 0;
+    if (/^(?:if|while|until|for|case)\b/.test(trimmed)) controlDepth += 1;
+    // Defer persistence until the following separator is known: assignments
+    // in conditional/loop blocks or before `&`, `&&`, `||`, or a pipe may not
+    // affect the later command at all, so they cannot supply audit evidence.
+    pendingAssignments = assignmentEligible && !insideControl && controlDepth === 0
+      ? shellScalars(`${segment};`)
+      : new Map();
+    prior += segment;
+    return resolved;
+  }).join("");
   const found: PublishInvocation[] = [];
   for (const command of tokenizeCommands(expanded)) {
     // Every reading, not just the command's own: a wrapper option that takes a

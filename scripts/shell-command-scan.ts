@@ -253,7 +253,10 @@ export function tokenizeCommands(text: string, depth = 0): ShellCommand[] {
     }
     if (character === "'") {
       const close = text.indexOf("'", index + 1);
-      const end = close === -1 ? text.length : close;
+      const newline = text.indexOf("\n", index + 1);
+      const end = close !== -1 && (newline === -1 || close < newline)
+        ? close
+        : (newline === -1 ? text.length : newline);
       value += text.slice(index + 1, end);
       quoted = true;
       if (!started) startsQuoted = true;
@@ -263,7 +266,7 @@ export function tokenizeCommands(text: string, depth = 0): ShellCommand[] {
     }
     if (character === '"') {
       index += 1;
-      while (index < text.length && text[index] !== '"') {
+      while (index < text.length && text[index] !== '"' && text[index] !== "\n") {
         const inner = text[index]!;
         if (inner === "\\") {
           const next = text[index + 1];
@@ -305,7 +308,8 @@ export function tokenizeCommands(text: string, depth = 0): ShellCommand[] {
       // `2>&1` is one redirection, not a command ended by a backgrounding `&`.
       // The `&` belongs to the word only while that word is still an operator
       // awaiting its target.
-      if (character === "&" && /^[0-9]*[<>]>?$/.test(value)) {
+      if ((character === "&" && /^[0-9]*[<>]>?$/.test(value))
+        || (character === "|" && !startsQuoted && /^[0-9]*>$/.test(value))) {
         value += character;
         started = true;
         continue;
@@ -354,7 +358,7 @@ export function tokenizeCommands(text: string, depth = 0): ShellCommand[] {
  */
 function isRedirection(token: ShellToken): boolean {
   if (token.startsQuoted) return false;
-  return /^(?:[0-9]*(?:>>?|<>|<<?<?)&?[0-9-]*|&>>?)$/.test(token.value);
+  return /^(?:[0-9]*(?:>>?|>\||<>|<<?<?)&?[0-9-]*|&>>?)$/.test(token.value);
 }
 
 /**

@@ -1,0 +1,19 @@
+id: pm-slack-standup-nafb
+title: Fix PR 56 scalar execution-order bypass
+description: Prevent later scalar assignments from retroactively changing earlier publish audit commands.
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-29T05:04:26.341Z"
+updated_at: "2026-08-29T05:25:22.860Z"
+closed_at: "2026-08-29T05:04:27.829Z"
+completed_at: "2026-08-29T05:04:27.829Z"
+author: pi-agent
+comments[4]{created_at,author,text}:
+  "2026-08-29T05:04:27.368Z",pi-agent,Added quote-aware shell segmentation and an end-to-end no-provenance then provenance reassignment regression.
+  "2026-08-29T05:10:53.614Z",pi-agent,"Follow-up review: the tokenizer now preserves >| as a clobber-redirection operator and removes its target before command classification; added the exact regression."
+  "2026-08-29T05:18:04.952Z",pi-agent,"Review follow-up: restored six append-only PM streams; added composite-action and Dockerfile RUN scanning; bounded unclosed quotes; prevented conditional/background assignment leakage; and preserved quoted pipes."
+  "2026-08-29T05:25:22.860Z",pi-agent,"Final review follow-up: assignments inside conditional and loop blocks no longer supply provenance evidence to later commands; added skipped multiline if regression."
+close_reason: Scalar expansion now follows command execution order with regression coverage.
+body: ""
