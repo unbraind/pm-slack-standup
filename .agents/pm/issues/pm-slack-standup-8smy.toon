@@ -1,0 +1,22 @@
+id: pm-slack-standup-8smy
+title: Keep publish-attestation bindings within their shell scope
+description: "The verifier lets assignments inside multiline substitutions, subshells, and uninvoked functions leak into later top-level publishes, allowing an unattested publish to borrow provenance. Model child scopes and regression-test every known bypass."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-30T16:27:47.562Z"
+updated_at: "2026-08-30T16:32:38.587Z"
+closed_at: "2026-08-30T16:32:37.915Z"
+completed_at: "2026-08-30T16:32:37.915Z"
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-08-30T16:32:37.388Z",pi-agent,"Scoped the segmenter across command substitutions, subshells, and function bodies; nested newlines can no longer persist scalar bindings globally. Added conservative unset handling and explicit regressions for heredoc, discarded binding, continuation, subshell, uninvoked function, and all three multiline child scopes. Revert proof: removing the nested-segment persistence guard made the multiline-substitution assertion fail 0 !== 1; restoring it passed. Coverage gate passes with 255 tests."
+files[2]{path,scope}:
+  scripts/verify-release-publish-attestation.ts,project
+  test/verify-release-publish-attestation.test.ts,project
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,project,pi-agent,"2026-08-30T16:32:36.777Z",local_mutation,fix/refuse-unattested-publish-fallback
+  npm run coverage,project,pi-agent,"2026-08-30T16:32:36.777Z",local_mutation,fix/refuse-unattested-publish-fallback
+close_reason: Child-scope and discarded bindings no longer attest top-level publishes; all known bypass regressions and the coverage gate pass.
+body: ""

@@ -1,9 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Keep publish-attestation bindings within their shell scope ([pm-slack-standup-8smy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-8smy.toon))
+
+## 2026.8.29 - 2026-08-29
+
+### Fixed
+
+- Fix PR 56 scalar execution-order bypass ([pm-slack-standup-nafb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-nafb.toon))
+- The publish-attestation gate misses a publish routed through an unquoted shell variable ([pm-slack-standup-83u3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-83u3.toon))
+
 ## 2026.8.28 - 2026-08-28
 
 ### Fixed
 
+- A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-ofro](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ofro.toon))
 - The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-slack-standup-eeo9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-eeo9.toon))
 - Canonicalize complete standup reads on pm CLI 2026.8.21 ([pm-slack-standup-ozic](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ozic.toon))
 
