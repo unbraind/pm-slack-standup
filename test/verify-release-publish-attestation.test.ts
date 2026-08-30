@@ -903,6 +903,34 @@ test("assignments in skipped multiline control blocks do not leak", () => {
   assert.equal(result.failures.length, 1);
 });
 
+test("the known attestation bypass shapes all fail closed", () => {
+  const bypasses = new Map([
+    ["heredoc body", `cat <<'SCRIPT'\nnpm publish --access public\nSCRIPT`],
+    ["discarded shell binding", `FLAG=--provenance\nunset FLAG\nnpm publish --access public $FLAG`],
+    ["multiline continuation", `npm publish \\\n  --access public`],
+    ["subshell", `(npm publish --access public)`],
+    ["uninvoked function", `release() { npm publish --access public; }`],
+  ]);
+  for (const [name, text] of bypasses) {
+    const result = auditPublishAttestation([{ file: "release.yml", text }]);
+    assert.equal(result.failures.length, 1, `${name} must expose its unattested publish`);
+    assert.match(result.failures[0]!, /does not enable --provenance/, name);
+  }
+});
+
+test("assignments in child shell scopes do not attest a later top-level publish", () => {
+  const childScopes = new Map([
+    ["multiline substitution", ["echo \"$(", "FLAG=--provenance", ")\"", "npm publish $FLAG"]],
+    ["subshell", ["(", "FLAG=--provenance", ")", "npm publish $FLAG"]],
+    ["uninvoked function", ["release() {", "FLAG=--provenance", "}", "npm publish $FLAG"]],
+  ]);
+  for (const [name, lines] of childScopes) {
+    const result = auditPublishAttestation([{ file: "release.yml", text: lines.join("\n") }]);
+    assert.equal(result.failures.length, 1, `${name} binding must remain child-scoped`);
+    assert.match(result.failures[0]!, /does not enable --provenance/);
+  }
+});
+
 test("a quoted greater-than before a pipe cannot hide a publish", () => {
   const result = auditPublishAttestation([{ file: "release.yml", text: `npm publish --provenance\necho ">"|npm publish` }]);
   assert.equal(result.failures.length, 1);

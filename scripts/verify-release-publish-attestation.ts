@@ -201,6 +201,7 @@ export function attestationEnabled(command: ShellCommand): boolean {
  */
 function shellSegments(text: string): string[] {
   const parts: string[] = [];
+  const scopes: Array<{ closer: ")" | "}"; outerQuote: "'" | '"' | undefined }> = [];
   let value = "";
   let quote: "'" | '"' | undefined;
   for (let index = 0; index < text.length; index += 1) {
@@ -210,12 +211,34 @@ function shellSegments(text: string): string[] {
       index += 1;
       continue;
     }
+    // A command or parameter substitution can begin inside double quotes. Its
+    // own quotes are independent, so save the outer quote until its delimiter
+    // closes instead of letting inner newlines look top-level.
+    if (character === "$" && quote !== "'" && (text[index + 1] === "(" || text[index + 1] === "{")) {
+      const closer = text[index + 1] === "(" ? ")" : "}";
+      scopes.push({ closer, outerQuote: quote });
+      quote = undefined;
+      value += character + text[index + 1]!;
+      index += 1;
+      continue;
+    }
     if (character === "'" || character === '"') {
       quote = quote === undefined ? character : quote === character ? undefined : quote;
       value += character;
       continue;
     }
-    if (quote === undefined && (character === ";" || character === "&" || character === "|" || character === "\n")) {
+    if (quote === undefined && (character === "(" || character === "{")) {
+      scopes.push({ closer: character === "(" ? ")" : "}", outerQuote: undefined });
+      value += character;
+      continue;
+    }
+    if (quote === undefined && scopes.at(-1)?.closer === character) {
+      quote = scopes.pop()!.outerQuote;
+      value += character;
+      continue;
+    }
+    if (quote === undefined && scopes.length === 0
+      && (character === ";" || character === "&" || character === "|" || character === "\n")) {
       if (value !== "") parts.push(value);
       const doubled = text[index + 1] === character && (character === "&" || character === "|");
       parts.push(doubled ? character + character : character);
@@ -268,9 +291,24 @@ export function publishInvocationsIn(source: SourceFile): PublishInvocation[] {
     // Defer persistence until the following separator is known: assignments
     // in conditional/loop blocks or before `&`, `&&`, `||`, or a pipe may not
     // affect the later command at all, so they cannot supply audit evidence.
+    // A segment retaining a newline is inside a substitution, subshell, function,
+    // or other nested scope; bindings found there cannot escape to the parent.
     pendingAssignments = assignmentEligible && !insideControl && controlDepth === 0
+      && !segment.includes("\n")
       ? shellScalars(`${segment};`)
       : new Map();
+    // Discarding too early can only produce a conservative failure, whereas
+    // retaining a variable after `unset` can lend its old attestation flag to
+    // a later publish. Child-scope segments are excluded by the newline guard.
+    if (!insideControl && controlDepth === 0 && !segment.includes("\n")) {
+      const command = tokenizeCommands(segment)[0];
+      if (command?.[0]?.value === "unset" && !command[0].startsQuoted
+        && !command.slice(1).some((token) => token.value === "-f")) {
+        for (const token of command.slice(1)) {
+          if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token.value)) scalars.delete(token.value);
+        }
+      }
+    }
     prior += segment;
     return resolved;
   }).join("");
