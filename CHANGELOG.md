@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Group codeql-action bumps into one pull request to end the split-PR deadlock ([pm-slack-standup-dg6j](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dg6j.toon))
+
 ## 2026.8.31 - 2026-08-31
 
 ### Fixed
