@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- The Windows command-line quoting is quadratic on a backslash run, and a workspace path is exactly the string that carries one ([pm-slack-standup-j82b](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-j82b.toon))
+
 ## 2026.9.1 - 2026-09-01
 
 ### Fixed

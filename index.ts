@@ -957,7 +957,36 @@ export function describePmReadFailure(error: Error, limitBytes: number): string 
 function quoteWindowsArg(arg: string): string {
   if (arg === "") return '""';
   if (!/[\t "&|<>()^]/.test(arg)) return arg;
-  return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`;
+  // Built by a single left-to-right pass rather than by two `replace` calls.
+  // The previous expressions were `/(\\*)"/g` and `/(\\*)$/`, and both are
+  // quadratic on a run of backslashes: the engine retries the pattern at every
+  // position in the run, and the greedy `\\*` rescans the rest of the run on
+  // each attempt. CodeQL flagged this as js/polynomial-redos, and the input is
+  // reachable — a Windows workspace path arrives here through `--pm-path`.
+  //
+  // The escaping rules are unchanged, only how they are applied. A run of `n`
+  // backslashes immediately before a `"` becomes `2n + 1` backslashes and a
+  // literal quote, because CommandLineToArgvW collapses `2n` backslashes before
+  // a quote back to `n` and the extra one escapes the quote itself. A run at the
+  // very end doubles for the same reason, since the closing quote this function
+  // appends is also a quote the parser will see. Backslashes anywhere else are
+  // literal and pass through untouched.
+  let quoted = '"';
+  let pendingBackslashes = 0;
+  for (const character of arg) {
+    if (character === "\\") {
+      pendingBackslashes += 1;
+      continue;
+    }
+    if (character === '"') {
+      quoted += "\\".repeat(pendingBackslashes * 2 + 1) + '"';
+      pendingBackslashes = 0;
+      continue;
+    }
+    quoted += "\\".repeat(pendingBackslashes) + character;
+    pendingBackslashes = 0;
+  }
+  return `${quoted}${"\\".repeat(pendingBackslashes * 2)}"`;
 }
 
 /**

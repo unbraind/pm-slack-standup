@@ -514,6 +514,69 @@ test("the win32 launch resolves the command processor through ComSpec and falls 
   }
 });
 
+test("the win32 tail is built in linear time, so a backslash-heavy path cannot stall the launch", () => {
+  // CodeQL js/polynomial-redos witness for the quoting the win32 tail applies.
+  // The escaping used to be two `replace` calls whose `(\\*)` groups are
+  // quadratic on a run of backslashes: the engine retries at every position in
+  // the run and the greedy quantifier rescans the remainder each time.
+  //
+  // The input is reachable rather than theoretical. A Windows workspace path
+  // arrives in this tail through `--pm-path`, and a path is exactly the kind of
+  // string that carries long backslash runs. The leading " x" is what makes the
+  // argument need quoting at all, so the escaping path is genuinely entered.
+  //
+  // The bound is deliberately generous. A single cold measurement on a
+  // contended runner carries JIT warm-up, GC pauses, scheduler noise and
+  // coverage instrumentation, and this suite also runs on a Windows launcher
+  // job, so a tight assertion would measure the runner as much as the code and
+  // could fail on a correct implementation. A bound that flakes gets raised or
+  // deleted the first time it does, which is how a regression test stops
+  // guarding anything. 2000ms cannot be reached by the linear pass on any
+  // runner while still failing decisively against the original expressions,
+  // which took 16202ms on an idle machine.
+  //
+  // The scale-free half is the ratio: doubling the run must not quadruple the
+  // time. That is the actual claim - linear rather than polynomial growth - and
+  // it holds however fast the machine is.
+  const adversarial = " x" + "\\".repeat(100_000);
+  const doubled = " x" + "\\".repeat(200_000);
+  const launch = pmLaunchPlan("pm", "win32");
+
+  launch.args([" warm up"]); // warm the JIT before either measurement
+
+  const startSingle = performance.now();
+  const args = launch.args([adversarial]);
+  const single = performance.now() - startSingle;
+
+  const startDouble = performance.now();
+  launch.args([doubled]);
+  const double = performance.now() - startDouble;
+
+  assert.ok(
+    single < 2000,
+    `building the win32 tail must stay far below the quadratic cost (16202ms before the fix); `
+      + `took ${single.toFixed(2)}ms on a 100k-backslash argument`,
+  );
+  // Below a millisecond the measurement is noise, and dividing by it would
+  // manufacture a huge ratio on an idle machine; two timings that small already
+  // prove the point.
+  if (single >= 1) {
+    assert.ok(
+      double / single < 3,
+      `doubling the backslash run must not multiply the time superlinearly: `
+        + `${single.toFixed(2)}ms then ${double.toFixed(2)}ms (ratio ${(double / single).toFixed(2)})`,
+    );
+  }
+  // The escaping must still be correct, not merely fast: a run of n backslashes
+  // at the end of the element doubles to 2n before the closing quote. A
+  // speed-only assertion would accept a rewrite that silently changed the
+  // quoting.
+  assert.ok(
+    args[3].includes(" x" + "\\".repeat(200_000) + '"'),
+    "a run of n backslashes at the end of the element must double to 2n before the closing quote",
+  );
+});
+
 test("pmLaunchPlan wraps even the bare PATH fallback 'pm' on win32 so PATHEXT resolution happens", () => {
   // On win32 a bare 'pm' cannot be spawned directly either: Node does not do
   // PATHEXT lookup, so the direct spawn would ENOENT. The command processor
