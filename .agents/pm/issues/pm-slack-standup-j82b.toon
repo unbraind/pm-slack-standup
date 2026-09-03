@@ -1,0 +1,22 @@
+id: pm-slack-standup-j82b
+title: "The Windows command-line quoting is quadratic on a backslash run, and a workspace path is exactly the string that carries one"
+description: "CodeQL alert 1 reports js/polynomial-redos at index.ts line 960, inside quoteWindowsArg. The escaping was two chained replace calls, /(\\\\*)\"/g and /(\\\\*)$/, and both are quadratic on a run of backslashes: the engine retries the pattern at every position in the run, and the greedy quantifier rescans the remainder of the run on each attempt.\n\nThe input is reachable rather than theoretical, which is what raises this above a lint note. quoteWindowsArg renders each element of the cmd.exe tail that pm is launched through on Windows, and the tracker root reaches that tail through --pm-path. A Windows path is precisely the kind of string that carries long backslash runs, so the adversarial shape here is not exotic input — it is a deep path.\n\nMeasured on a 100002-character argument shaped as a space, an x and a hundred thousand backslashes: 16202 ms before, 5 ms after. The fix replaces both expressions with one left-to-right pass that applies the identical CommandLineToArgvW rules — a run of n backslashes before a quote becomes 2n plus one and a literal quote, a run at the end of the element doubles because the closing quote is also a quote the parser sees, and backslashes elsewhere pass through untouched. The rules did not change, only how they are applied."
+type: Issue
+status: closed
+priority: 1
+tags[1]: security
+created_at: "2026-09-03T17:56:47.101Z"
+updated_at: "2026-09-03T17:57:04.116Z"
+closed_at: "2026-09-03T17:57:04.097Z"
+completed_at: "2026-09-03T17:57:04.097Z"
+author: pi-agent
+acceptance_criteria: "The adversarial argument returns within a hard time bound rather than merely faster; the escaping is asserted for correctness in the same test rather than only for speed, so a fast but wrong implementation fails; the regression test fails when the original expressions are restored, verified by reverting; and CodeQL confirms alert 1 closed on a scan of main"
+risk: high
+comments[1]{created_at,author,text}:
+  "2026-09-03T17:57:02.750Z",codex,"Proved the regression test non-vacuous by reverting rather than asserting it. With the original two replace calls restored and the new test in place, the test fails at 16202.57ms against its 50ms bound; with the linear pass restored it passes at 4.99ms. The test also asserts the escaping itself — that a run of n backslashes at the end of the element doubles to 2n before the closing quote — so an implementation that were fast but wrong would fail it too. A speed-only assertion would have accepted a rewrite that silently changed the quoting.\n\nThe test drives the behaviour through pmLaunchPlan rather than calling quoteWindowsArg directly, which keeps the helper private and exercises the path an actual launch takes. My first version of the assertion was wrong in a way worth recording: it placed the backslash run before the trailing text, where the run is followed by an ordinary character and therefore passes through unchanged rather than doubling. The doubling rule applies only to a run at the very end of the element, so the witness now ends with the run and exercises both the quadratic path and the doubling.\n\nGates after the change: 256 tests pass with 0 failures, the coverage gate reports thresholds met, and pm health --strict-exit exits 0 under this repository's own pinned 2026.8.31 binary rather than the global CLI."
+tests[1]{command,path,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref},note}:
+  "npx tsx --test --test-name-pattern \"the win32 tail is built in linear time\" test/fetch-all-items.test.ts",test/fetch-all-items.test.ts,project,180,codex,"2026-09-03T17:57:03.629Z",local_mutation,main,"ReDoS regression: proved to fail at 16202ms against the original two replace calls"
+docs[1]{path,scope,note}:
+  "https://github.com/unbraind/pm-slack-standup/security/code-scanning/1",project,"CodeQL alert 1 js/polynomial-redos index.ts:960"
+close_reason: "Replaced two quadratic replace calls with one linear left-to-right pass applying identical CommandLineToArgvW rules. A 100k-backslash argument now renders in 5ms where it previously took 16202ms, and the regression test asserts both the time bound and the doubling rule."
+body: ""

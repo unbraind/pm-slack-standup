@@ -514,6 +514,34 @@ test("the win32 launch resolves the command processor through ComSpec and falls 
   }
 });
 
+test("the win32 tail is built in linear time, so a backslash-heavy path cannot stall the launch", () => {
+  // CodeQL js/polynomial-redos witness for the quoting the win32 tail applies.
+  // The escaping used to be two `replace` calls whose `(\\*)` groups are
+  // quadratic on a run of backslashes: the engine retries at every position in
+  // the run and the greedy quantifier rescans the remainder each time.
+  //
+  // The input is reachable rather than theoretical. A Windows workspace path
+  // arrives in this tail through `--pm-path`, and a path is exactly the kind of
+  // string that carries long backslash runs. The trailing " x" is what makes the
+  // argument need quoting at all, so the escaping path is genuinely entered.
+  const adversarial = " x" + "\\".repeat(100_000);
+  const launch = pmLaunchPlan("pm", "win32");
+  const start = performance.now();
+  const args = launch.args([adversarial]);
+  const elapsed = performance.now() - start;
+  assert.ok(
+    elapsed < 50,
+    `building the win32 tail must stay linear; took ${elapsed.toFixed(2)}ms on a 100k-backslash argument`
+  );
+  // The escaping itself must still be correct, not merely fast: a run of n
+  // backslashes at the end of the element doubles to 2n before the closing
+  // quote, and nothing else in the element changed.
+  assert.ok(
+    args[3].includes(" x" + "\\".repeat(200_000) + '"'),
+    "a run of n backslashes at the end of the element must double to 2n before the closing quote"
+  );
+});
+
 test("pmLaunchPlan wraps even the bare PATH fallback 'pm' on win32 so PATHEXT resolution happens", () => {
   // On win32 a bare 'pm' cannot be spawned directly either: Node does not do
   // PATHEXT lookup, so the direct spawn would ENOENT. The command processor
