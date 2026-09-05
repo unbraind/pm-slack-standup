@@ -1008,10 +1008,28 @@ function quoteWindowsArg(arg: string): string {
  * (`C:\reports\100% done`) and a literal doubled pair (`100%% done`) still
  * launch -- `%%` is a batch-file escape, not a command-line one.
  *
+ * A line break is refused for a different reason, and quoting cannot help with
+ * it either. `quoteWindowsArg` only quotes an argument containing one of
+ * `[\t "&|<>()^]`, so an argument whose only special character is `\r` or `\n`
+ * reaches the tail unquoted -- and even quoted it would not be contained, because
+ * cmd ends the command at the line break and reads what follows as a fresh
+ * command on the same `/c` tail. That is a command boundary rather than a
+ * metacharacter, so there is nothing to escape and the argument is refused.
+ *
  * @param argv - The binary path followed by every pm argument.
- * @throws {CommandError} When an argument contains a `%`-delimited name.
+ * @throws {CommandError} When an argument contains a `%`-delimited name, or a
+ *         carriage return or line feed.
  */
 function assertNoCmdVariableExpansion(argv: readonly string[]): void {
+  const withLineBreak = argv.find((arg) => /[\r\n]/.test(arg));
+  if (withLineBreak !== undefined) {
+    throw new CommandError(
+      `Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(withLineBreak)} contains a `
+      + "line break, and cmd.exe ends the command there and reads the remainder as a separate "
+      + "command, which quoting cannot prevent. Remove the carriage return or line feed from the "
+      + "argument."
+    );
+  }
   // At least one character between the delimiters: `%%` is a literal doubled
   // percent, not a variable reference. The doubling rule is a BATCH FILE
   // convention; on a `cmd /c` command line `%%` is passed through unchanged. A
