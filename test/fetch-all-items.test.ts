@@ -906,6 +906,32 @@ test("the win32 launch refuses an argument cmd.exe would variable-expand", () =>
 });
 
 /**
+ * A line break is a command boundary on a `cmd /c` tail, not a metacharacter, so
+ * quoting cannot contain it — cmd ends the command at the break and reads the
+ * remainder as a fresh command.
+ *
+ * It also slips past the quoting entirely: `quoteWindowsArg` only quotes an
+ * argument containing one of `[\t "&|<>()^]`, and `\r`/`\n` are in neither that
+ * set nor the `%NAME%` refusal, so before this guard such an argument reached the
+ * tail unquoted. Both characters are covered, since a lone `\r` still ends the
+ * line for cmd.
+ */
+test("the win32 launch refuses an argument carrying a line break cmd.exe would split on", () => {
+  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
+  for (const [name, injected] of [["line feed", "\n"], ["carriage return", "\r"]] as const) {
+    assert.throws(
+      () => plan.args(["--pm-path", `C:\\work${injected}whoami`, "list", "--json"]),
+      (err: unknown) => {
+        assert.ok(err instanceof CommandError, `${name} must refuse, not launch a split command line`);
+        assert.match((err as Error).message, /line break/, "the message must say what was refused");
+        return true;
+      },
+      `an argument containing a ${name} must not reach the cmd tail`,
+    );
+  }
+});
+
+/**
  * Only a `%...%` PAIR can name a variable, so an ordinary literal percent in a
  * path must still launch — refusing it would break valid workspaces to guard
  * against a case cmd.exe does not actually expand.
