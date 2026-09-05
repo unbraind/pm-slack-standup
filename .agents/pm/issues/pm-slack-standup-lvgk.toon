@@ -1,0 +1,25 @@
+id: pm-slack-standup-lvgk
+title: "Refuse a line break in a cmd.exe launch argument, which quoting cannot contain"
+description: "quoteWindowsArg only quotes an argument containing one of tab, space, double quote, ampersand, pipe, angle bracket, parenthesis or caret, and the existing refusal covers only percent-delimited names. A carriage return or line feed is in neither set, so it reached the cmd tail unquoted, and cmd ends the command at a line break and reads the remainder as a separate command."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-09-05T18:03:51.515Z"
+updated_at: "2026-09-05T18:14:40.488Z"
+closed_at: "2026-09-05T18:14:40.447Z"
+completed_at: "2026-09-05T18:14:40.447Z"
+claim_principal: claude-orchestrator
+author: claude-orchestrator
+resolution: "Refused carriage return and line feed in a cmd.exe launch argument, since quoting cannot contain a command boundary."
+expected_result: "An argument containing a line break is refused before reaching the cmd tail, and the refusal names what was refused."
+actual_result: "Both carriage return and line feed throw CommandError naming the line break; release:check exits 0 and the guard test fails 1 of 38 when the guard is removed."
+comments[1]{created_at,author,text}:
+  "2026-09-05T18:14:39.761Z",claude-orchestrator,"CodeQL alert js/shell-command-constructed-from-input at index.ts:1149 pointed at the cmd.exe launch tail. The existing hardening is sound for metacharacters: quoteWindowsArg implements the CommandLineToArgvW backslash and quote rules in a single linear pass, and assertNoCmdVariableExpansion fails closed on a percent-delimited name because cmd expands it even inside quotes. Reading those two guards against each other exposed a gap neither covers. quoteWindowsArg only quotes when the argument matches its special-character class, which is tab, space, double quote, ampersand, pipe, angle brackets, parentheses and caret. A carriage return or line feed is not in that class, so an argument whose only special character is a line break was emitted into the tail unquoted. Quoting would not have helped in any case: a line break is a command boundary for cmd rather than a metacharacter, so cmd ends the command there and reads the remainder as a fresh command on the same /c tail. The argument is therefore refused, matching how the percent case is handled. Both carriage return and line feed are covered because a lone carriage return still ends the line. Verified non-vacuous by deleting the guard and re-running the suite: the new test fails 1 of 38, and passes 38 of 38 with the guard restored."
+files[2]{path,scope}:
+  index.ts,project
+  test/fetch-all-items.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  the win32 launch refuses an argument carrying a line break cmd.exe would split on,project,claude-orchestrator,"2026-09-05T18:04:02.499Z",local_mutation,main
+close_reason: "Refused carriage return and line feed in a cmd.exe launch argument, since quoting cannot contain a command boundary."
+body: ""
