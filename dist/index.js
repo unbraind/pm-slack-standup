@@ -741,11 +741,12 @@ export function describePmReadFailure(error, limitBytes) {
  * `"` (which must be escaped anyway, and only reads as one token once quoted),
  * and by each of `& | < > ^ ( )`: cmd.exe treats those as operators when they
  * stand outside quotes and as literals inside them — which is also why quoting
- * is used instead of `^`-escaping, since a quoted `^` is a literal `^`. One
- * limit is shared with Node's own `shell: true` launching: `%` cannot be
- * neutralized this way, because cmd expands `%VAR%` even inside quotes. That
- * is not left to chance -- see {@link assertNoCmdVariableExpansion}, which
- * refuses the launch rather than letting pm read a different workspace.
+ * is used instead of `^`-escaping, since a quoted `^` is a literal `^`. On the
+ * cmd.exe launch path, the caller first refuses literal quotes because cmd does
+ * not recognize the backslash escaping intended for CommandLineToArgvW; it also
+ * refuses line breaks and `%NAME%` pairs because outer quoting cannot contain
+ * them. `!` is not refused because the launch disables delayed expansion with
+ * `/v:off`, making `!` literal. See {@link assertNoCmdVariableExpansion}.
  *
  * @param arg - One argv element to render.
  * @returns The element as it must appear inside a command-line tail.
@@ -787,7 +788,26 @@ function quoteWindowsArg(arg) {
     return `${quoted}${"\\".repeat(pendingBackslashes * 2)}"`;
 }
 /**
- * Refuse a cmd.exe launch whose arguments contain a `%VAR%` cmd would expand.
+ * Refuse a cmd.exe launch whose arguments can escape its outer quoting.
+ *
+ * No argument may contain a literal `"`, a carriage return or line feed, or a
+ * `%NAME%` pair. Everything else cmd treats as syntax — including `&`, `|`,
+ * `<`, `>`, `(`, `)`, and `^` — remains literal inside the outer quote state.
+ * A literal quote cannot be supported by `quoteWindowsArg`: its backslash escape
+ * is for CommandLineToArgvW, which parses only after cmd.exe, while cmd itself
+ * treats that quote as closing its quote state and then executes exposed syntax.
+ *
+ * `!` (delayed expansion) is NOT among the refusals because the launch disables
+ * it: {@link pmLaunchPlan} passes `/v:off` before `/c`, so `!` is literal for
+ * this launch regardless of the machine's `DelayedExpansion` registry setting
+ * or a parent `cmd /v:on`. When delayed expansion is on, `!NAME!` expands
+ * inside the quote state exactly like `%NAME%` does, so `--pm-path
+ * "C:\work\!BUILD!\pm"` would silently become a different path — the same
+ * wrong-workspace-read failure the `%NAME%` refusal exists to prevent. Unlike
+ * `"`, `!` is a legal character in a Windows filename, so refusing it would
+ * reject real paths; `/v:off` makes it literal at no cost to legitimate input.
+ * This guard therefore refuses only the characters the launch switch cannot
+ * neutralize.
  *
  * `quoteWindowsArg` neutralizes every metacharacter cmd honours inside quotes
  * except `%`: cmd expands `%NAME%` even within a quoted string, and there is no
@@ -814,10 +834,17 @@ function quoteWindowsArg(arg) {
  * metacharacter, so there is nothing to escape and the argument is refused.
  *
  * @param argv - The binary path followed by every pm argument.
- * @throws {CommandError} When an argument contains a `%`-delimited name, or a
- *         carriage return or line feed.
+ * @throws {CommandError} When an argument contains a literal double quote, a
+ *         carriage return or line feed, or a `%`-delimited name.
  */
 function assertNoCmdVariableExpansion(argv) {
+    const withQuote = argv.find((arg) => arg.includes('"'));
+    if (withQuote !== undefined) {
+        throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(withQuote)} contains a `
+            + "double quote, and cmd.exe treats it as ending the quoted argument because backslash "
+            + "escaping only applies to the later CommandLineToArgvW parse, so outer quoting cannot "
+            + "contain it. Remove the double quote from the argument or use a Windows path without one.");
+    }
     const withLineBreak = argv.find((arg) => /[\r\n]/.test(arg));
     if (withLineBreak !== undefined) {
         throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(withLineBreak)} contains a `
@@ -849,7 +876,7 @@ function assertNoCmdVariableExpansion(argv) {
  * spawn with EINVAL), CreateProcess rejects the extensionless shim for having
  * no recognized executable extension, and a bare `pm` is not resolved through
  * PATHEXT the way a shell would. So the launch is always the processor with
- * `/d /s /c` and the binary as the first word of the command.
+ * `/d /s /v:off /c` and the binary as the first word of the command.
  *
  * How the command tail after `/c` is built is the subtle part, and it is why
  * `PmLaunch` composes the whole argv rather than leaving a caller to append
@@ -875,10 +902,25 @@ function assertNoCmdVariableExpansion(argv) {
  * strip removes exactly the outer pair (the first character and the last
  * quote character are now both ours), and the inner per-element quoting
  * survives verbatim for the parser on the other side. Unlike `shell: true`,`
- * no raw string is ever handed to a shell: every element is escaped by this
- * package before it reaches the command line, so a metacharacter inside an
- * argument is data to `pm`, never cmd syntax — `shell: true` is what joins
- * caller strings verbatim and must not be reintroduced.
+ * no raw string is ever handed to a shell. Before composition, every argument
+ * is checked against the boundary outer quoting cannot contain: no argument may
+ * include a literal `"`, `\r`, `\n`, or a `%NAME%` pair. With those refused,
+ * every other metacharacter remains inside cmd's quote state and is data to
+ * `pm`, never cmd syntax — `shell: true` is what joins caller strings verbatim
+ * and must not be reintroduced.
+ *
+ * `/v:off` disables delayed expansion for this launch, so `!` is literal
+ * regardless of the machine's `DelayedExpansion` registry setting or a parent
+ * `cmd /v:on`. Delayed expansion is off by default, but it can be switched on
+ * machine-wide via `HKLM\Software\Microsoft\Command\Processor\DelayedExpansion`
+ * or inherited from a parent `cmd /v:on`, and when it is on `!NAME!` expands
+ * inside the quote state exactly like `%NAME%` does — so `--pm-path
+ * "C:\work\!BUILD!\pm"` would silently become a different path, and pm would
+ * read a DIFFERENT workspace while reporting success, the precise failure the
+ * `%NAME%` refusal already exists to prevent. `/v:off` is preferred over a
+ * `!NAME!` refusal: `!` is a legal character in a Windows filename (unlike `"`),
+ * so refusing it would reject real paths, while the switch makes `!` literal for
+ * this launch at no cost to legitimate input.
  *
  * `/d` additionally skips the AutoRun registry hook, so machine-level cmd
  * configuration cannot alter the launch.
@@ -916,6 +958,7 @@ export function pmLaunchPlan(bin, platform = process.platform) {
             return [
                 "/d",
                 "/s",
+                "/v:off",
                 "/c",
                 `"${[bin, ...pmArgs].map(quoteWindowsArg).join(" ")}"`,
             ];

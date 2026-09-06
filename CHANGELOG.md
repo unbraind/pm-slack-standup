@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Disable cmd.exe delayed expansion on the Windows pm launch path ([pm-slack-standup-bqr8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bqr8.toon))
+- Refuse quote-breaking arguments in the Windows cmd.exe launch ([pm-slack-standup-15ap](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-15ap.toon))
 - Refuse a line break in a cmd.exe launch argument, which quoting cannot contain ([pm-slack-standup-lvgk](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-lvgk.toon))
 
 ## 2026.9.5 - 2026-09-05
