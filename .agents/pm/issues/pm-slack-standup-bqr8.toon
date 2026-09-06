@@ -1,0 +1,15 @@
+id: pm-slack-standup-bqr8
+title: Disable cmd.exe delayed expansion on the Windows pm launch path
+description: "pmLaunchPlan builds [\"/d\", \"/s\", \"/c\", tail] with no /v:off. assertNoCmdVariableExpansion refuses literal \", \\r/\\n, and %NAME% pairs but does not refuse or neutralise !NAME!. Delayed expansion is off by default but can be switched on machine-wide via HKLM\\Software\\Microsoft\\Command Processor\\DelayedExpansion or inherited from a parent cmd /v:on. When on, !NAME! expands inside the quote state exactly like %NAME%, so --pm-path \"C:\\work\\!BUILD!\\pm\" silently becomes a different path, pm reads a different workspace, and the standup is built from it while reporting success — the precise failure the %NAME% refusal already exists to prevent. The fix inserts /v:off before /c so ! is literal regardless of the machine registry setting, preferred over a !NAME! refusal because ! is a legal Windows filename character."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-09-06T05:25:21.239Z"
+updated_at: "2026-09-06T05:25:34.797Z"
+closed_at: "2026-09-06T05:25:34.785Z"
+completed_at: "2026-09-06T05:25:34.785Z"
+claim_principal: pi-agent
+author: pi-agent
+close_reason: "Inserted /v:off before /c in pmLaunchPlan's win32 argv so delayed expansion is disabled for the launch regardless of the machine's DelayedExpansion registry setting or a parent cmd /v:on. Updated doc comments on pmLaunchPlan, assertNoCmdVariableExpansion, and quoteWindowsArg to state the complete boundary: the launch disables delayed expansion so ! is literal, and no argument may contain a literal quote, line break, or %NAME% pair. Preferred /v:off over a !NAME! refusal because ! is a legal Windows filename character. Updated existing win32 launch tests for the new /v:off argv element; added two regression tests asserting /v:off appears before /c and that !NAME! still launches verbatim. Source-only revert (git stash of index.ts) produced exactly the two new tests failing: '/v:off must be present in the launch argv' and 'the !NAME! pair must survive verbatim into the tail'. Build, test, typecheck, coverage, docstring, and changelog:check gates passed."
+body: ""

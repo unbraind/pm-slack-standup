@@ -322,7 +322,7 @@ export interface PmLaunch {
     /**
      * The complete `spawnSync` argv for one pm invocation carrying these
      * arguments: the pm arguments themselves on POSIX, and on win32
-     * `["/d", "/s", "/c", tail]` where `tail` is ONE argv element holding the
+     * `["/d", "/s", "/v:off", "/c", tail]` where `tail` is ONE argv element holding the
      * binary and every pm argument — each quote-escaped per the
      * CommandLineToArgvW rules — wrapped in the single outer pair of quotes
      * that cmd's `/s` handling is arranged to strip (see {@link pmLaunchPlan}).
@@ -349,7 +349,7 @@ export interface PmLaunch {
  * spawn with EINVAL), CreateProcess rejects the extensionless shim for having
  * no recognized executable extension, and a bare `pm` is not resolved through
  * PATHEXT the way a shell would. So the launch is always the processor with
- * `/d /s /c` and the binary as the first word of the command.
+ * `/d /s /v:off /c` and the binary as the first word of the command.
  *
  * How the command tail after `/c` is built is the subtle part, and it is why
  * `PmLaunch` composes the whole argv rather than leaving a caller to append
@@ -381,6 +381,19 @@ export interface PmLaunch {
  * every other metacharacter remains inside cmd's quote state and is data to
  * `pm`, never cmd syntax — `shell: true` is what joins caller strings verbatim
  * and must not be reintroduced.
+ *
+ * `/v:off` disables delayed expansion for this launch, so `!` is literal
+ * regardless of the machine's `DelayedExpansion` registry setting or a parent
+ * `cmd /v:on`. Delayed expansion is off by default, but it can be switched on
+ * machine-wide via `HKLM\Software\Microsoft\Command\Processor\DelayedExpansion`
+ * or inherited from a parent `cmd /v:on`, and when it is on `!NAME!` expands
+ * inside the quote state exactly like `%NAME%` does — so `--pm-path
+ * "C:\work\!BUILD!\pm"` would silently become a different path, and pm would
+ * read a DIFFERENT workspace while reporting success, the precise failure the
+ * `%NAME%` refusal already exists to prevent. `/v:off` is preferred over a
+ * `!NAME!` refusal: `!` is a legal character in a Windows filename (unlike `"`),
+ * so refusing it would reject real paths, while the switch makes `!` literal for
+ * this launch at no cost to legitimate input.
  *
  * `/d` additionally skips the AutoRun registry hook, so machine-level cmd
  * configuration cannot alter the launch.
