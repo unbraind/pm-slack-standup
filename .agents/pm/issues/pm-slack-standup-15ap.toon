@@ -1,0 +1,25 @@
+id: pm-slack-standup-15ap
+title: Refuse quote-breaking arguments in the Windows cmd.exe launch
+description: "Execution confirmed that pmLaunchPlan(\"C:\\\\tools\\\\pm.exe\", \"win32\") with --pm-path C:\\\\work\\\\a\"&calc&\"b constructs a cmd /s /c tail whose outer quotes are stripped and whose embedded double quotes break cmd.exe quote state, leaving command separators outside quotes. Backslash escapes the quote only for CommandLineToArgvW, which parses after cmd.exe; cmd.exe itself does not treat backslash as an escape, so calc can execute as a separate command."
+type: Issue
+status: closed
+priority: 1
+tags: []
+created_at: "2026-09-06T05:07:21.385Z"
+updated_at: "2026-09-06T05:11:12.951Z"
+closed_at: "2026-09-06T05:11:12.209Z"
+completed_at: "2026-09-06T05:11:12.209Z"
+author: pi-agent
+comments[2]{created_at,author,text}:
+  "2026-09-06T05:07:45.838Z",pi-agent,"Confirmed by execution: an argument C:\\work\\a\"&calc&\"b becomes a /c tail where cmd /s strips the outer quote pair, then cmd.exe sees the embedded literal quotes because backslash is not its escape character; the resulting ampersands are parsed outside quote state. quoteWindowsArg is correct only for the later CommandLineToArgvW layer, so the cmd.exe layer must refuse literal double quotes."
+  "2026-09-06T05:10:33.511Z",pi-agent,"Implemented the cmd-layer boundary: literal double quotes are refused before tail construction because cmd.exe parses them before CommandLineToArgvW and ignores backslash as an escape. Added a direct exploit refusal and an independent cmd quote-state simulation. With only index.ts stashed, npm test exited 1 with 2 failures: the simulator observed & outside quote state and the explicit refusal test failed."
+files[2]{path,scope}:
+  index.ts,project
+  test/fetch-all-items.test.ts,project
+tests[4]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  "npm run build && npm run build:test && npm test",project,pi-agent,"2026-09-06T05:10:31.209Z",local_mutation,security/refuse-quote-breaking-cmd-argument
+  npm run typecheck,project,pi-agent,"2026-09-06T05:10:31.731Z",local_mutation,security/refuse-quote-breaking-cmd-argument
+  npm run coverage,project,pi-agent,"2026-09-06T05:10:32.296Z",local_mutation,security/refuse-quote-breaking-cmd-argument
+  npm run docstring,project,pi-agent,"2026-09-06T05:10:32.898Z",local_mutation,security/refuse-quote-breaking-cmd-argument
+close_reason: "Refused literal double quotes before cmd.exe tail construction; documented the cmd.exe-before-CommandLineToArgvW parser boundary; added direct exploit refusal and quote-state property regressions; source-only revert produced exactly 2 failing tests; build, test, typecheck, coverage, and docstring gates passed."
+body: ""

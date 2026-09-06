@@ -728,12 +728,14 @@ test("win32 wraps the spaced extensionless shim in the same outer-quoted tail", 
   ]);
 });
 
-test("every cmd metacharacter round-trips through the win32 tail per the CommandLineToArgvW rules", () => {
+test("every permitted cmd metacharacter round-trips through the win32 tail per the CommandLineToArgvW rules", () => {
   const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd";
-  // Spec case 2: each metacharacter, embedded in a realistic tracker root. A
-  // metacharacter outside quotes would be cmd syntax; the quoter must wrap
-  // every one of these, and the re-parse must recover the original argv.
-  for (const ch of [" ", "\t", "&", "|", "<", ">", "^", "(", ")", '"']) {
+  // Spec case 2: each permitted metacharacter, embedded in a realistic tracker
+  // root. A metacharacter outside quotes would be cmd syntax; the quoter must
+  // wrap every one of these, and the re-parse must recover the original argv.
+  // A literal double quote is deliberately absent because cmd.exe parses before
+  // CommandLineToArgvW and cannot contain that character with backslash escaping.
+  for (const ch of [" ", "\t", "&", "|", "<", ">", "^", "(", ")"]) {
     const root = `C:\\Users\\Some User ${ch} part\\tracker`;
     const pmArgs = ["--path", root, "list", "--all", "--json", "--include-body"];
     const argv = pmLaunchPlan(bin, "win32").args(pmArgs);
@@ -748,16 +750,13 @@ test("every cmd metacharacter round-trips through the win32 tail per the Command
   }
 });
 
-test("backslash and quote interactions in the win32 tail follow the documented doubling rules", () => {
+test("backslash interactions with generated quotes in the win32 tail follow the documented doubling rules", () => {
   const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd";
-  // Backslash runs directly before a quote (or before the closing quote we
-  // append) must double, or a root ending in a backslash would eat the
-  // closing quote and swallow the NEXT argument into the path.
+  // Backslash runs directly before the closing quote we append must double, or
+  // a root ending in a backslash would eat that quote and swallow the NEXT
+  // argument into the path. Literal input quotes are refused at the cmd layer.
   const cases = [
     "C:\\Users\\Some User\\tracker\\",          // trailing backslash before the closing quote
-    'C:\\Users\\O"Brien\\tracker',               // embedded quote
-    'C:\\Users\\weird\\"quoted\\"\\end',        // backslash-run directly before quotes
-    'C:\\Users\\a\\b\\"',                      // run of backslashes then a trailing quote
     "",                                        // empty argument must survive as ""
     "plain",                                   // no quoting needed at all
   ];
@@ -771,6 +770,48 @@ test("backslash and quote interactions in the win32 tail follow the documented d
       [bin, ...pmArgs],
       `round trip for ${JSON.stringify(root)}`
     );
+  }
+});
+
+test("cmd metacharacters never escape quote state in an accepted win32 /c tail", () => {
+  const plan = pmLaunchPlan("C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd", "win32");
+  const metacharacterArguments = [
+    "C:\\work\\amp&ersand",
+    "C:\\work\\pipe|name",
+    "C:\\work\\input<name",
+    "C:\\work\\output>name",
+    "C:\\work\\care^t",
+    "C:\\work\\paren(name)",
+    "C:\\work\\all&|<>^chars",
+    'C:\\work\\a"&calc&"b',
+  ];
+
+  for (const argument of metacharacterArguments) {
+    let tail: string;
+    try {
+      tail = plan.args(["--pm-path", argument, "list", "--all", "--json"])[3];
+    } catch (err: unknown) {
+      assert.ok(err instanceof CommandError, "only the explicit cmd boundary guard may refuse a case");
+      assert.ok(argument.includes('"'), "a metacharacter-only argument must produce a tail to inspect");
+      continue;
+    }
+    assert.ok(tail.startsWith('"') && tail.endsWith('"'), "the /s outer quote pair must be present");
+    const afterCmdStripsOuterPair = tail.slice(1, -1);
+    let quoted = false;
+    for (const character of afterCmdStripsOuterPair) {
+      // This deliberately models cmd.exe, not CommandLineToArgvW: backslash has
+      // no escape meaning here, and every literal double quote toggles state.
+      if (character === '"') {
+        quoted = !quoted;
+      } else if (/[&|<>^]/.test(character)) {
+        assert.equal(
+          quoted,
+          true,
+          `${JSON.stringify(character)} escaped cmd quote state in ${JSON.stringify(afterCmdStripsOuterPair)}`,
+        );
+      }
+    }
+    assert.equal(quoted, false, "generated element quotes must be balanced after the outer pair is stripped");
   }
 });
 
@@ -900,6 +941,26 @@ test("the win32 launch refuses an argument cmd.exe would variable-expand", () =>
       assert.ok(err instanceof CommandError, "must refuse, not silently launch an expanded path");
       assert.match((err as Error).message, /%BUILD%/, "the message must name the offending argument");
       assert.match((err as Error).message, /different workspace/, "and say what proceeding would cost");
+      return true;
+    },
+  );
+});
+
+/**
+ * cmd.exe parses before CommandLineToArgvW and does not treat backslash as an
+ * escape character, so the `\"` generated for a literal quote closes cmd's
+ * quote state and exposes following metacharacters as command syntax.
+ */
+test("the win32 launch refuses an argument whose double quote would break cmd quote state", () => {
+  const plan = pmLaunchPlan("C:\\tools\\pm.exe", "win32");
+  const injected = 'C:\\work\\a"&calc&"b';
+  assert.throws(
+    () => plan.args(["--pm-path", injected]),
+    (err: unknown) => {
+      assert.ok(err instanceof CommandError, "must refuse before constructing an injectable /c tail");
+      assert.match((err as Error).message, /double quote/, "the message must name what is refused");
+      assert.match((err as Error).message, /cmd\.exe/, "the message must identify the parser that cannot contain it");
+      assert.match((err as Error).message, /Remove the double quote/, "the message must tell the caller what to do");
       return true;
     },
   );

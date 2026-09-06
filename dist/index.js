@@ -741,11 +741,11 @@ export function describePmReadFailure(error, limitBytes) {
  * `"` (which must be escaped anyway, and only reads as one token once quoted),
  * and by each of `& | < > ^ ( )`: cmd.exe treats those as operators when they
  * stand outside quotes and as literals inside them — which is also why quoting
- * is used instead of `^`-escaping, since a quoted `^` is a literal `^`. One
- * limit is shared with Node's own `shell: true` launching: `%` cannot be
- * neutralized this way, because cmd expands `%VAR%` even inside quotes. That
- * is not left to chance -- see {@link assertNoCmdVariableExpansion}, which
- * refuses the launch rather than letting pm read a different workspace.
+ * is used instead of `^`-escaping, since a quoted `^` is a literal `^`. On the
+ * cmd.exe launch path, the caller first refuses literal quotes because cmd does
+ * not recognize the backslash escaping intended for CommandLineToArgvW; it also
+ * refuses line breaks and `%NAME%` pairs because outer quoting cannot contain
+ * them. See {@link assertNoCmdVariableExpansion}.
  *
  * @param arg - One argv element to render.
  * @returns The element as it must appear inside a command-line tail.
@@ -787,7 +787,14 @@ function quoteWindowsArg(arg) {
     return `${quoted}${"\\".repeat(pendingBackslashes * 2)}"`;
 }
 /**
- * Refuse a cmd.exe launch whose arguments contain a `%VAR%` cmd would expand.
+ * Refuse a cmd.exe launch whose arguments can escape its outer quoting.
+ *
+ * No argument may contain a literal `"`, a carriage return or line feed, or a
+ * `%NAME%` pair. Everything else cmd treats as syntax — including `&`, `|`,
+ * `<`, `>`, `(`, `)`, and `^` — remains literal inside the outer quote state.
+ * A literal quote cannot be supported by `quoteWindowsArg`: its backslash escape
+ * is for CommandLineToArgvW, which parses only after cmd.exe, while cmd itself
+ * treats that quote as closing its quote state and then executes exposed syntax.
  *
  * `quoteWindowsArg` neutralizes every metacharacter cmd honours inside quotes
  * except `%`: cmd expands `%NAME%` even within a quoted string, and there is no
@@ -814,10 +821,17 @@ function quoteWindowsArg(arg) {
  * metacharacter, so there is nothing to escape and the argument is refused.
  *
  * @param argv - The binary path followed by every pm argument.
- * @throws {CommandError} When an argument contains a `%`-delimited name, or a
- *         carriage return or line feed.
+ * @throws {CommandError} When an argument contains a literal double quote, a
+ *         carriage return or line feed, or a `%`-delimited name.
  */
 function assertNoCmdVariableExpansion(argv) {
+    const withQuote = argv.find((arg) => arg.includes('"'));
+    if (withQuote !== undefined) {
+        throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(withQuote)} contains a `
+            + "double quote, and cmd.exe treats it as ending the quoted argument because backslash "
+            + "escaping only applies to the later CommandLineToArgvW parse, so outer quoting cannot "
+            + "contain it. Remove the double quote from the argument or use a Windows path without one.");
+    }
     const withLineBreak = argv.find((arg) => /[\r\n]/.test(arg));
     if (withLineBreak !== undefined) {
         throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(withLineBreak)} contains a `
@@ -875,10 +889,12 @@ function assertNoCmdVariableExpansion(argv) {
  * strip removes exactly the outer pair (the first character and the last
  * quote character are now both ours), and the inner per-element quoting
  * survives verbatim for the parser on the other side. Unlike `shell: true`,`
- * no raw string is ever handed to a shell: every element is escaped by this
- * package before it reaches the command line, so a metacharacter inside an
- * argument is data to `pm`, never cmd syntax — `shell: true` is what joins
- * caller strings verbatim and must not be reintroduced.
+ * no raw string is ever handed to a shell. Before composition, every argument
+ * is checked against the boundary outer quoting cannot contain: no argument may
+ * include a literal `"`, `\r`, `\n`, or a `%NAME%` pair. With those refused,
+ * every other metacharacter remains inside cmd's quote state and is data to
+ * `pm`, never cmd syntax — `shell: true` is what joins caller strings verbatim
+ * and must not be reintroduced.
  *
  * `/d` additionally skips the AutoRun registry hook, so machine-level cmd
  * configuration cannot alter the launch.

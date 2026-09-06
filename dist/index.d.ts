@@ -375,10 +375,12 @@ export interface PmLaunch {
  * strip removes exactly the outer pair (the first character and the last
  * quote character are now both ours), and the inner per-element quoting
  * survives verbatim for the parser on the other side. Unlike `shell: true`,`
- * no raw string is ever handed to a shell: every element is escaped by this
- * package before it reaches the command line, so a metacharacter inside an
- * argument is data to `pm`, never cmd syntax — `shell: true` is what joins
- * caller strings verbatim and must not be reintroduced.
+ * no raw string is ever handed to a shell. Before composition, every argument
+ * is checked against the boundary outer quoting cannot contain: no argument may
+ * include a literal `"`, `\r`, `\n`, or a `%NAME%` pair. With those refused,
+ * every other metacharacter remains inside cmd's quote state and is data to
+ * `pm`, never cmd syntax — `shell: true` is what joins caller strings verbatim
+ * and must not be reintroduced.
  *
  * `/d` additionally skips the AutoRun registry hook, so machine-level cmd
  * configuration cannot alter the launch.
