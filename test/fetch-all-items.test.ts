@@ -547,6 +547,7 @@ test("the win32 tail is built in linear time, so a backslash-heavy path cannot s
   let args: string[] = [];
   // Repeat paired measurements so scheduler pauses and collection do not
   // determine the ratio. Alternate their order to avoid a systematic JIT bias.
+  launch.args([adversarial]); // Warm the quoting path before measuring.
   for (let round = 0; round < 5; round += 1) {
     for (const [input, samples] of round % 2 === 0
       ? [[adversarial, singleSamples], [doubled, doubleSamples]] as const
