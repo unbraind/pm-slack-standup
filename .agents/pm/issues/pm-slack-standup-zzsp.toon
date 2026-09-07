@@ -1,0 +1,12 @@
+id: pm-slack-standup-zzsp
+title: "resolvePmBin's fallback test asserts what is on the host above the fixture, not what the function does"
+description: "test/fetch-all-items.test.ts, 'resolvePmBin falls back to pm on PATH when no local node_modules/.bin/pm exists', creates a fixture under tmpdir() and expects resolvePmBin to walk to the filesystem root without finding a local pm binary.\n\nThat is an assertion about the HOST above the fixture, not about the function. On this development machine /tmp/node_modules/.bin/pm existed - a symlink to ../@unbrained/pm-cli/dist/cli.js, created 2026-09-06 by an npx/bunx execution probe - so the walk found it:\n\n  Expected values to be strictly equal:\n  + actual   '/tmp/node_modules/.bin/pm'\n  - expected 'pm'\n\nConfirmed pre-existing and environmental: it fails on origin/main with all local changes stashed, and passes once the artifact is moved aside. CI has never seen it because a fresh runner has a clean /tmp.\n\nThis is the SECOND instance of the class found in one session from the SAME artifact. The same probe also left /tmp/package.json, which breaks pm-changelog's release-context suite the same way (pmc-6eau). One stray npm project rooted at the OS temp directory silently changes the verdict of tests in two repositories, and in both cases the failure message names the production value rather than the unmet precondition, so the reader's first hypothesis is a regression that did not happen.\n\nBoth repositories arrived here independently, which suggests the pattern rather than the instance is the thing to fix: a test that walks upward from a fixture is asserting something about every directory above it, and that is not a property any suite can own. Skipping on an unsuitable host is not acceptable - a skipped test reports as a pass."
+type: Issue
+status: open
+priority: 2
+tags[2]: flake,testing
+created_at: "2026-09-07T11:47:40.287Z"
+updated_at: "2026-09-07T11:47:40.287Z"
+author: claude
+acceptance_criteria: "The test's verdict does not depend on the contents of directories above the fixture; Where the precondition cannot be guaranteed, the failure names the precondition rather than the production value"
+body: ""

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- Consume the canonical attestation gate instead of carrying a copy of it ([pm-slack-standup-0jq7](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-0jq7.toon))
+
 ## 2026.9.6 - 2026-09-06
 
 ### Fixed
