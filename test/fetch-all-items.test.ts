@@ -542,24 +542,25 @@ test("the win32 tail is built in linear time, so a backslash-heavy path cannot s
   const doubled = " x" + "\\".repeat(200_000);
   const launch = pmLaunchPlan("pm", "win32");
 
-  launch.args([" warm up"]); // warm the JIT before either measurement
-
-  const startSingle = performance.now();
-  const args = launch.args([adversarial]);
-  const single = performance.now() - startSingle;
-
-  const startDouble = performance.now();
-  launch.args([doubled]);
-  const double = performance.now() - startDouble;
-
-  assert.ok(
-    single < 2000,
-    `building the win32 tail must stay far below the quadratic cost (16202ms before the fix); `
-      + `took ${single.toFixed(2)}ms on a 100k-backslash argument`,
-  );
-  // Below a millisecond the measurement is noise, and dividing by it would
-  // manufacture a huge ratio on an idle machine; two timings that small already
-  // prove the point.
+  const singleSamples: number[] = [];
+  const doubleSamples: number[] = [];
+  let args: string[] = [];
+  // Repeat paired measurements so scheduler pauses and collection do not
+  // determine the ratio. Alternate their order to avoid a systematic JIT bias.
+  for (let round = 0; round < 5; round += 1) {
+    for (const [input, samples] of round % 2 === 0
+      ? [[adversarial, singleSamples], [doubled, doubleSamples]] as const
+      : [[doubled, doubleSamples], [adversarial, singleSamples]] as const) {
+      const start = performance.now();
+      const rendered = launch.args([input]);
+      const elapsed = performance.now() - start;
+      assert.ok(elapsed < 2000, `building the win32 tail must stay below 2000ms; took ${elapsed.toFixed(2)}ms`);
+      samples.push(elapsed);
+      if (input === adversarial) args = rendered;
+    }
+  }
+  const single = Math.min(...singleSamples);
+  const double = Math.min(...doubleSamples);
   if (single >= 1) {
     assert.ok(
       double / single < 3,
