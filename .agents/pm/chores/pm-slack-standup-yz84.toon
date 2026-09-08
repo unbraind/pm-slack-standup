@@ -1,0 +1,26 @@
+id: pm-slack-standup-yz84
+title: Certify the CLI and SDK on PM 2026.9.7
+description: "Upgrade the development CLI and SDK to published 2026.9.7 and pm-changelog to published 2026.9.6. Re-run real package quality and acceptance gates against the exact installed dependencies, preserving the manifest compatibility floor unless runtime behavior requires a higher minimum. Companion tracking: pm-cli-companion item pm-cli-website-6yiv."
+type: Chore
+status: in_progress
+priority: 2
+tags[3]: cli,compatibility,sdk
+created_at: "2026-09-07T20:41:37.731Z"
+updated_at: "2026-09-07T21:33:52.470Z"
+assignee: codex-pm-ecosystem
+claim_principal: codex-pm-ecosystem
+author: codex-pm-ecosystem
+acceptance_criteria: Exact installed dependency versions are verified; package checks and real CLI acceptance pass without weakened gates; independent coverage and privacy limitations remain explicit
+comments[2]:
+  - created_at: "2026-09-07T21:05:31.579Z"
+    author: codex-pm-ecosystem
+    text: "2026-09-07 UTC correction: the full release:check passed using installed CLI/SDK 2026.9.7 and pm-changelog 2026.9.6. The coverage-suite report is 197 tests / 197 passed / 0 failed / 0 skipped. A separate later nested acceptance reports one test and is not the package suite total. Reported line/branch/function coverage: ℹ all files |  90.15 |    88.38 |   91.41 | . Complete four-dimensional all-source coverage and independent production/privacy/review gates remain open."
+    edited_at: "2026-09-07T21:33:52.470Z"
+  - created_at: "2026-09-07T21:19:26.326Z"
+    author: codex-pm-ecosystem
+    text: "2026-09-07 UTC review correction: Greptile: added an untimed warm-up of the actual backslash-heavy quoting path before the repeated measurements. Retained the absolute deadline, original growth bound and exact output assertion; the adversarial test passes."
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  "npm run release:check",project,1200,codex-pm-ecosystem,"2026-09-07T20:41:40.104Z",local_mutation,chore/certify-pm-cli-2026-9-7
+docs[1]{path,scope,note}:
+  "https://github.com/unbraind/pm-cli/releases/tag/v2026.9.7",project,Published CLI and SDK release
+body: ""
