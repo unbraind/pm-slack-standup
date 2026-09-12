@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Certify the CLI and SDK on PM 2026.9.7 ([pm-slack-standup-yz84](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-yz84.toon))
+- Certify pm CLI 2026.9.12 and the pm-ops 2026.9.11 auditor ([pm-slack-standup-d99b](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-d99b.toon))
+
 ## 2026.9.11 - 2026-09-11
 
 ### Other
