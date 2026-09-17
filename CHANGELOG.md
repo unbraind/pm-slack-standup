@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Certify pm CLI 2026.9.17 ([pm-slack-standup-5qt2](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-5qt2.toon))
+
 ## 2026.9.13 - 2026-09-13
 
 ### Other
@@ -46,20 +52,15 @@
 
 ### Fixed
 
-- Keep publish-attestation bindings within their shell scope ([pm-slack-standup-8smy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-8smy.toon))
-
-## 2026.8.29 - 2026-08-29
-
-### Fixed
-
 - Fix PR 56 scalar execution-order bypass ([pm-slack-standup-nafb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-nafb.toon))
 - The publish-attestation gate misses a publish routed through an unquoted shell variable ([pm-slack-standup-83u3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-83u3.toon))
+- A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-ofro](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ofro.toon))
+- Keep publish-attestation bindings within their shell scope ([pm-slack-standup-8smy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-8smy.toon))
 
 ## 2026.8.28 - 2026-08-28
 
 ### Fixed
 
-- A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-ofro](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ofro.toon))
 - The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-slack-standup-eeo9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-eeo9.toon))
 - Canonicalize complete standup reads on pm CLI 2026.8.21 ([pm-slack-standup-ozic](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ozic.toon))
 
@@ -67,11 +68,16 @@
 
 - The identity gate deadlocks the one remediation its own failure message prescribes ([pm-slack-standup-yzns](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-yzns.toon))
 
-## 2026.8.16 - 2026-08-16
+## 2026.8.17 - 2026-08-17
 
 ### Fixed
 
 - The manifest declared a pm CLI floor of 2026.6.7 while peerDependencies required 2026.7.29, so the CLI enforced a weaker minimum than npm ([pm-slack-standup-glnl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-glnl.toon))
+
+## 2026.8.16 - 2026-08-16
+
+### Fixed
+
 - A quoted final argument makes cmd /s strip the quotes that protect the executable path in the win32 pm launch ([pm-slack-standup-ogys](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ogys.toon))
 - The .cmd shim resolvePmBin selects on win32 cannot be launched by its only caller ([pm-slack-standup-20gw](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-20gw.toon))
 - A truncated list-all envelope produces a partial standup that reads as a quiet day ([pm-slack-standup-5q1f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-5q1f.toon))
@@ -105,7 +111,7 @@
 
 - Resolve pm-changelog to the release that derives release dates in UTC ([pm-slack-standup-1sqq](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-1sqq.toon))
 
-## 2026.7.31 - 2026-07-31
+## 2026.8.1 - 2026-08-01
 
 ### Fixed
 
