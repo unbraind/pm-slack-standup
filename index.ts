@@ -2400,7 +2400,7 @@ let exportStdoutViaService = false;
 
 export default defineExtension({
   name: "pm-slack-standup",
-  version: "2026.9.13",
+  version: "2026.9.18",
 
   activate(api) {
     const standupFlags = [
