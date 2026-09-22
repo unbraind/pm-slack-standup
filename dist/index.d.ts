@@ -565,6 +565,19 @@ export declare function groupItems(items: PmItem[], groupBy: GroupBy): Array<[st
  * `plain` drops emphasis punctuation; `markdown` uses `#`/`**`/`-`.
  */
 export declare function buildTextMessage(data: StandupData, opts: StandupOptions): string;
+/**
+ * One entry in a Slack Block Kit `blocks` array.
+ *
+ * This is the public, open contract: every block carries a `type`, and the
+ * index signature accepts any Block Kit shape Slack supports (for example
+ * `actions`), so consumer code built on it keeps compiling. The interfaces
+ * below extend it with the exact shapes this package emits (header, section,
+ * context, divider).
+ */
+export interface SlackBlock {
+    type: string;
+    [key: string]: unknown;
+}
 /** Plain-text object Slack requires on a `header` block. */
 export interface SlackPlainText {
     type: "plain_text";
@@ -577,38 +590,31 @@ export interface SlackMrkdwn {
     text: string;
 }
 /** Slack Block Kit header. `text` is plain_text and capped at 150 characters. */
-export interface SlackHeaderBlock {
+export interface SlackHeaderBlock extends SlackBlock {
     type: "header";
     text: SlackPlainText;
 }
 /** Slack Block Kit section. `text` is mrkdwn and capped at 3000 characters. */
-export interface SlackSectionBlock {
+export interface SlackSectionBlock extends SlackBlock {
     type: "section";
     text: SlackMrkdwn;
 }
 /** Slack Block Kit context row of mrkdwn elements. */
-export interface SlackContextBlock {
+export interface SlackContextBlock extends SlackBlock {
     type: "context";
     elements: SlackMrkdwn[];
 }
 /** Slack Block Kit divider. */
-export interface SlackDividerBlock {
+export interface SlackDividerBlock extends SlackBlock {
     type: "divider";
 }
-/**
- * One entry in a Slack Block Kit `blocks` array.
- *
- * The union is exactly the shapes this package emits: header, section,
- * context, and divider. Callers narrow on `type` instead of casting.
- */
-export type SlackBlock = SlackHeaderBlock | SlackSectionBlock | SlackContextBlock | SlackDividerBlock;
 /**
  * JSON body posted to a Slack incoming webhook.
  *
  * `text` is the notification fallback; `blocks` is the Block Kit payload;
  * `mrkdwn` asks Slack to interpret the fallback as mrkdwn.
  */
-export interface SlackPostPayload {
+export interface SlackPostPayload extends Record<string, unknown> {
     text: string;
     blocks: SlackBlock[];
     mrkdwn: boolean;
@@ -646,7 +652,7 @@ export interface PostResultEntry {
     error?: string;
 }
 /** A poster sends one Slack webhook payload. Injectable for testing. */
-export type Poster = (webhookUrl: string, payload: SlackPostPayload) => Promise<void>;
+export type Poster = (webhookUrl: string, payload: Record<string, unknown>) => Promise<void>;
 /**
  * Resolve the ordered list of post targets from `--webhook`/env + `--channel`
  * + `--channels`. Each `--channels` token is either a `#name` (posted to the

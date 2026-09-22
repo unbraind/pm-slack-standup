@@ -53,6 +53,7 @@ import {
   type SlackContextBlock,
   type SlackHeaderBlock,
   type SlackSectionBlock,
+  type SlackBlock,
   CommandError,
 } from "../index.ts";
 import { expectCommandError } from "./test-helpers.ts";
@@ -1305,4 +1306,19 @@ test("--compact without --include-blockers stays marker-free (backward compatibl
   const data = buildStandupData(items, baseOpts);
   const msg = buildTextMessage(data, { ...baseOpts, compact: true });
   assert.ok(!/🚨/.test(msg), "compact mode without --include-blockers must not add markers");
+});
+
+test("the public Slack types stay open for consumer-built blocks and posters", async () => {
+  // Compile-time contract (tsc runs over tests): a block type this package never
+  // emits and a poster typed on the pre-2026.9.21 Record payload must both still
+  // type-check, so narrowing either export is caught as a breaking change.
+  const actions: SlackBlock = { type: "actions", elements: [{ type: "button", text: "Ack" }] };
+  const seen: Array<Record<string, unknown>> = [];
+  const recordPoster = async (_url: string, payload: Record<string, unknown>): Promise<void> => {
+    seen.push(payload);
+  };
+  const poster: Poster = recordPoster;
+  await poster("https://hooks.slack.test/x", { text: "t", blocks: [actions], mrkdwn: true });
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0]?.blocks, [actions]);
 });
