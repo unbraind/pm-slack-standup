@@ -50,7 +50,12 @@ import {
   type StandupOptions,
   type SectionCounts,
   type Poster,
+  type SlackContextBlock,
+  type SlackHeaderBlock,
+  type SlackSectionBlock,
+  CommandError,
 } from "../index.ts";
+import { expectCommandError } from "./test-helpers.ts";
 
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -71,6 +76,65 @@ function item(p: Partial<PmItem>): PmItem {
   return { id: p.id ?? "pm-x", title: p.title ?? "T", status: p.status ?? "open", ...p };
 }
 
+/**
+ * A fixed timestamp plus ISO strings for "yesterday" and "today" relative to
+ * it, used by the yesterday/today split tests. The anchor is 2026-06-04T18:00Z
+ * so the local-day split is deterministic under the test TZ (UTC).
+ *
+ * @returns The anchor `now` epoch ms, `yest` and `tod` ISO strings.
+ */
+function yesterdayTodayFixture(): { now: number; yest: string; tod: string } {
+  const now = Date.parse("2026-06-04T18:00:00Z");
+  const yest = new Date(now - 86_400_000).toISOString();
+  const tod = new Date(now - 3_600_000).toISOString();
+  return { now, yest, tod };
+}
+
+/**
+ * The four-item array used by both the `buildStandupData` bucketing test and
+ * the `currentCounts` test: one in-progress, one blocked, one open with a
+ * priority, and one recently closed item.
+ *
+ * @returns A fresh array of four {@link PmItem}s.
+ */
+function bucketingItems(): PmItem[] {
+  return [
+    item({ id: "1", status: "in_progress" }),
+    item({ id: "2", status: "blocked" }),
+    item({ id: "3", status: "open", priority: 1 }),
+    item({ id: "4", status: "closed", updated_at: "2026-06-05T00:00:00Z" }),
+  ];
+}
+
+/**
+ * Two in-progress items assigned to alice and bob, used by the team-filter
+ * data test and the team-rendered-output test.
+ *
+ * @returns A fresh array of two assigned {@link PmItem}s.
+ */
+function teamItems(): PmItem[] {
+  return [
+    item({ id: "1", status: "in_progress", title: "A", assignee: "alice" }),
+    item({ id: "2", status: "in_progress", title: "B", assignee: "bob" }),
+  ];
+}
+
+/**
+ * Build standup data from a single in-progress item and compute a trend with a
+ * fixed prior (blocked 2, up_next 1), used by the trend rendering and compact
+ * trend tests.
+ *
+ * @returns The `data` and `trend` delta array.
+ */
+function trendFixture(): { data: ReturnType<typeof buildStandupData>; trend: ReturnType<typeof computeDeltas> } {
+  const data = buildStandupData([item({ status: "in_progress", title: "A" })], baseOpts);
+  const trend = computeDeltas(
+    { in_progress: 0, blocked: 2, done: 0, up_next: 1 },
+    currentCounts(data)
+  );
+  return { data, trend };
+}
+
 // --- parseFormat -----------------------------------------------------------
 test("parseFormat accepts the four formats + aliases", () => {
   assert.equal(parseFormat(undefined), "slack");
@@ -84,7 +148,7 @@ test("parseFormat accepts the four formats + aliases", () => {
 });
 
 test("parseFormat rejects unknown with USAGE exit code", () => {
-  assert.throws(() => parseFormat("yaml"), (e: any) => e.exitCode === 2 && /Unknown --format/.test(e.message));
+  assert.throws(() => parseFormat("yaml"), expectCommandError(2, /Unknown --format/));
 });
 
 // --- parseGroupBy ----------------------------------------------------------
@@ -93,7 +157,7 @@ test("parseGroupBy supports status|assignee|sprint|type", () => {
   assert.equal(parseGroupBy("assignee"), "assignee");
   assert.equal(parseGroupBy("sprint"), "sprint");
   assert.equal(parseGroupBy("type"), "type");
-  assert.throws(() => parseGroupBy("foo"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseGroupBy("foo"), expectCommandError(2));
 });
 
 // --- parseSections ---------------------------------------------------------
@@ -101,14 +165,14 @@ test("parseSections defaults to all, dedupes, preserves order, aliases", () => {
   assert.deepEqual(parseSections(undefined), [...ALL_SECTIONS]);
   assert.deepEqual(parseSections("blocked,in_progress"), ["blocked", "in_progress"]);
   assert.deepEqual(parseSections("wip,wip,next"), ["in_progress", "up_next"]);
-  assert.throws(() => parseSections("nope"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSections("nope"), expectCommandError(2));
 });
 
 // --- parseDays / resolveSinceMs / withinWindow -----------------------------
 test("parseDays parses numbers and rejects non-numeric", () => {
   assert.equal(parseDays(undefined), undefined);
   assert.equal(parseDays("7"), 7);
-  assert.throws(() => parseDays("abc"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseDays("abc"), expectCommandError(2));
 });
 
 test("resolveSinceMs: --since, --days, and the more-restrictive combination", () => {
@@ -119,7 +183,7 @@ test("resolveSinceMs: --since, --days, and the more-restrictive combination", ()
   // since=June 1 vs days=3 (June 7) -> June 7 is later/more restrictive
   assert.equal(resolveSinceMs("2026-06-01T00:00:00Z", 3, now), now - 3 * 86_400_000);
   // an invalid --days is still a hard USAGE error
-  assert.throws(() => resolveSinceMs(undefined, -1, now), (e: any) => e.exitCode === 2);
+  assert.throws(() => resolveSinceMs(undefined, -1, now), expectCommandError(2));
 });
 
 test("resolveSinceMs warns (does not throw) on an unparseable --since and ignores it", () => {
@@ -150,10 +214,10 @@ test("resolveUpNextCount: default 3, explicit N, --all-open => Infinity, invalid
   // --all-open wins over any --up-next value
   assert.equal(resolveUpNextCount("5", true), Infinity);
   assert.equal(resolveUpNextCount(undefined, true), Infinity);
-  assert.throws(() => resolveUpNextCount("0", false), (e: any) => e.exitCode === 2);
-  assert.throws(() => resolveUpNextCount("-2", false), (e: any) => e.exitCode === 2);
-  assert.throws(() => resolveUpNextCount("2.5", false), (e: any) => e.exitCode === 2);
-  assert.throws(() => resolveUpNextCount("abc", false), (e: any) => e.exitCode === 2);
+  assert.throws(() => resolveUpNextCount("0", false), expectCommandError(2));
+  assert.throws(() => resolveUpNextCount("-2", false), expectCommandError(2));
+  assert.throws(() => resolveUpNextCount("2.5", false), expectCommandError(2));
+  assert.throws(() => resolveUpNextCount("abc", false), expectCommandError(2));
 });
 
 test("buildStandupData honors upNextCount and --all-open shows the whole backlog", () => {
@@ -206,7 +270,7 @@ test("milestone grouping renders milestone buckets + (no milestone) label in tex
 test("Block Kit footer notes milestone grouping", () => {
   const data = buildStandupData([item({ status: "in_progress", milestone: "v1" })], baseOpts);
   const { blocks } = buildBlockKit(data, { ...baseOpts, groupBy: "milestone" });
-  const footer = blocks[blocks.length - 1] as any;
+  const footer = blocks[blocks.length - 1] as SlackContextBlock;
   assert.match(footer.elements[0].text, /grouped by milestone/);
 });
 
@@ -262,10 +326,7 @@ test("groupItems groups by assignee/sprint/type with _none fallback, sorted", ()
 // --- buildStandupData ------------------------------------------------------
 test("buildStandupData buckets by status and windows Done", () => {
   const items = [
-    item({ id: "1", status: "in_progress" }),
-    item({ id: "2", status: "blocked" }),
-    item({ id: "3", status: "open", priority: 1 }),
-    item({ id: "4", status: "closed", updated_at: "2026-06-05T00:00:00Z" }),
+    ...bucketingItems(),
     item({ id: "5", status: "closed", updated_at: "2026-05-01T00:00:00Z" }),
   ];
   const noDone = buildStandupData(items, baseOpts);
@@ -323,7 +384,7 @@ test("buildBlockKit produces a valid blocks array with header + sections + foote
   const { blocks, fallback } = buildBlockKit(data, baseOpts);
   assert.ok(Array.isArray(blocks));
   assert.equal(blocks[0].type, "header");
-  assert.equal((blocks[0] as any).text.type, "plain_text");
+  assert.equal((blocks[0] as SlackHeaderBlock).text.type, "plain_text");
   const types = blocks.map((b) => b.type);
   assert.ok(types.includes("section"));
   assert.ok(types.includes("divider"));
@@ -349,7 +410,7 @@ test("Block Kit truncates section text to Slack's 3000-char limit", () => {
   const { blocks } = buildBlockKit(data, baseOpts);
   for (const b of blocks) {
     if (b.type === "section") {
-      assert.ok(((b as any).text.text as string).length <= 3000);
+      assert.ok(((b as SlackSectionBlock).text.text as string).length <= 3000);
     }
   }
 });
@@ -430,9 +491,7 @@ test("localDayKey renders a local YYYY-MM-DD", () => {
 });
 
 test("buildStandupData splits Done into yesterday/today by local day", () => {
-  const now = Date.parse("2026-06-04T18:00:00Z");
-  const yest = new Date(now - 86_400_000).toISOString();
-  const tod = new Date(now - 3_600_000).toISOString();
+  const { now, yest, tod } = yesterdayTodayFixture();
   const items = [
     item({ id: "y", status: "closed", title: "Closed yesterday", updated_at: yest }),
     item({ id: "t", status: "closed", title: "Closed today", updated_at: tod }),
@@ -447,9 +506,7 @@ test("buildStandupData splits Done into yesterday/today by local day", () => {
 });
 
 test("yesterday split renders distinct Done Yesterday / Done Today headings", () => {
-  const now = Date.parse("2026-06-04T18:00:00Z");
-  const yest = new Date(now - 86_400_000).toISOString();
-  const tod = new Date(now - 3_600_000).toISOString();
+  const { now, yest, tod } = yesterdayTodayFixture();
   const items = [
     item({ id: "y", status: "closed", title: "Yfix", updated_at: yest }),
     item({ id: "t", status: "closed", title: "Tfix", updated_at: tod }),
@@ -471,7 +528,7 @@ test("parseSectionLabels parses title-only and emoji+title, rejects unknown keys
   });
   // alias keys (wip) resolve to canonical
   assert.deepEqual(parseSectionLabels("wip=Doing"), { in_progress: { title: "Doing" } });
-  assert.throws(() => parseSectionLabels("nope=X"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSectionLabels("nope=X"), expectCommandError(2));
 });
 
 test("section label overrides apply to rendered headings", () => {
@@ -512,7 +569,7 @@ test("postStandupTargets posts to each target and reports per-target results", a
   const data = buildStandupData([item({ status: "in_progress" })], baseOpts);
   const calls: Array<{ url: string; text: unknown }> = [];
   const poster: Poster = async (url, payload) => {
-    calls.push({ url, text: (payload as any).text });
+    calls.push({ url, text: payload.text });
   };
   const targets = resolvePostTargets("https://hook", undefined, ["#a", "#b"]);
   const results = await postStandupTargets(targets, data, baseOpts, poster);
@@ -548,12 +605,12 @@ test("preflightSlackCredentials aborts (USAGE) when a post is requested but no w
   try {
     assert.throws(
       () => preflightSlackCredentials({}),
-      (e: any) => e.exitCode === 2 && /no webhook is configured/i.test(e.message)
+      expectCommandError(2, /no webhook is configured/i)
     );
     // bare #name channel still requires the base webhook → aborts
     assert.throws(
       () => preflightSlackCredentials({ channels: "#team" }),
-      (e: any) => e.exitCode === 2
+      expectCommandError(2)
     );
   } finally {
     if (saved !== undefined) process.env["PM_SLACK_WEBHOOK"] = saved;
@@ -607,12 +664,7 @@ test("postStandupTargets captures a failing poster without throwing", async () =
 // --- trend comparison (--compare) ------------------------------------------
 test("currentCounts maps standup data to per-section counts", () => {
   const data = buildStandupData(
-    [
-      item({ id: "1", status: "in_progress" }),
-      item({ id: "2", status: "blocked" }),
-      item({ id: "3", status: "open", priority: 1 }),
-      item({ id: "4", status: "closed", updated_at: "2026-06-05T00:00:00Z" }),
-    ],
+    bucketingItems(),
     { ...baseOpts, includeDone: true }
   );
   assert.deepEqual(currentCounts(data), {
@@ -785,11 +837,7 @@ test("readPriorCounts warns + returns undefined for malformed JSON / wrong shape
 });
 
 test("trend renders directional indicators in markdown + plain text output", () => {
-  const data = buildStandupData([item({ status: "in_progress", title: "A" })], baseOpts);
-  const trend = computeDeltas(
-    { in_progress: 0, blocked: 2, done: 0, up_next: 1 },
-    currentCounts(data)
-  );
+  const { data, trend } = trendFixture();
   const md = buildTextMessage(data, { ...baseOpts, format: "markdown", trend });
   assert.match(md, /Trend vs prior:/);
   assert.match(md, /In Progress ▲\+1/);
@@ -813,7 +861,7 @@ test("trend renders as a second context element in Block Kit footer", () => {
     currentCounts(data)
   );
   const { blocks } = buildBlockKit(data, { ...baseOpts, trend });
-  const footer = blocks[blocks.length - 1] as any;
+  const footer = blocks[blocks.length - 1] as SlackContextBlock;
   assert.equal(footer.type, "context");
   assert.equal(footer.elements.length, 2);
   assert.match(footer.elements[0].text, /pm-slack-standup/);
@@ -823,7 +871,7 @@ test("trend renders as a second context element in Block Kit footer", () => {
 
   // no trend → single footer element (backward compatible)
   const { blocks: plainBlocks } = buildBlockKit(data, baseOpts);
-  const plainFooter = plainBlocks[plainBlocks.length - 1] as any;
+  const plainFooter = plainBlocks[plainBlocks.length - 1] as SlackContextBlock;
   assert.equal(plainFooter.elements.length, 1);
 });
 
@@ -970,7 +1018,7 @@ test("history footer renders in text output below the trend line and in Block Ki
   assert.match(md, /_History \(2 snapshots → now\):.*_/);
 
   const { blocks } = buildBlockKit(data, { ...baseOpts, trend, history });
-  const footer = blocks[blocks.length - 1] as any;
+  const footer = blocks[blocks.length - 1] as SlackContextBlock;
   assert.equal(footer.type, "context");
   assert.equal(footer.elements.length, 3);
   assert.match(footer.elements[2].text, /History \(2 snapshots → now\)/);
@@ -1010,8 +1058,7 @@ test("parseTeam splits, trims, de-dupes", () => {
 
 test("buildStandupData filters to team assignees and hides unassigned items", () => {
   const items = [
-    item({ id: "1", status: "in_progress", title: "A", assignee: "alice" }),
-    item({ id: "2", status: "in_progress", title: "B", assignee: "bob" }),
+    ...teamItems(),
     item({ id: "3", status: "in_progress", title: "C" }), // no assignee
     item({ id: "4", status: "open", title: "D", assignee: "alice", priority: 1 }),
   ];
@@ -1025,10 +1072,7 @@ test("buildStandupData filters to team assignees and hides unassigned items", ()
 });
 
 test("--team is reflected in rendered text output", () => {
-  const items = [
-    item({ id: "1", status: "in_progress", title: "A", assignee: "alice" }),
-    item({ id: "2", status: "in_progress", title: "B", assignee: "bob" }),
-  ];
+  const items = teamItems();
   const msg = buildTextMessage(buildStandupData(items, { ...baseOpts, team: ["bob"] }), {
     ...baseOpts,
     team: ["bob"],
@@ -1065,7 +1109,7 @@ test("--include-blockers highlights blocked rows in Block Kit sections", () => {
   const { blocks } = buildBlockKit(data, { ...baseOpts, includeBlockers: true });
   const sectionTexts = blocks
     .filter((b) => b.type === "section")
-    .map((b) => (b as any).text.text as string);
+    .map((b) => (b as SlackSectionBlock).text.text as string);
   assert.ok(
     sectionTexts.some((t) => /🚨.*Stuck/.test(t)),
     "a section block should highlight the blocked row"
@@ -1115,17 +1159,13 @@ test("--compact collapses Block Kit into a single section block", () => {
   const { blocks } = buildBlockKit(data, { ...baseOpts, compact: true });
   const sections = blocks.filter((b) => b.type === "section");
   assert.equal(sections.length, 1, "compact Block Kit should use one section block");
-  const text = (sections[0] as any).text.text;
+  const text = (sections[0] as SlackSectionBlock).text.text;
   assert.match(text, /In Progress \(1\): A/);
   assert.match(text, /Blocked \(1\): B/);
 });
 
 test("--compact still renders the trend footer", () => {
-  const data = buildStandupData([item({ status: "in_progress", title: "A" })], baseOpts);
-  const trend = computeDeltas(
-    { in_progress: 0, blocked: 2, done: 0, up_next: 1 },
-    currentCounts(data)
-  );
+  const { data, trend } = trendFixture();
   const msg = buildTextMessage(data, { ...baseOpts, compact: true, trend });
   assert.match(msg, /Trend vs prior:/);
 });
@@ -1148,10 +1188,10 @@ test("parseSchedule accepts HH:MM daily and 5-field cron", () => {
 test("parseSchedule rejects garbage with USAGE exit code", () => {
   assert.equal(parseSchedule(undefined), undefined);
   assert.equal(parseSchedule(""), undefined);
-  assert.throws(() => parseSchedule("not-a-time"), (e: any) => e.exitCode === 2);
-  assert.throws(() => parseSchedule("25:00"), (e: any) => e.exitCode === 2);
-  assert.throws(() => parseSchedule("* * * *"), (e: any) => e.exitCode === 2); // 4 fields
-  assert.throws(() => parseSchedule("99 * * * *"), (e: any) => e.exitCode === 2); // bad minute
+  assert.throws(() => parseSchedule("not-a-time"), expectCommandError(2));
+  assert.throws(() => parseSchedule("25:00"), expectCommandError(2));
+  assert.throws(() => parseSchedule("* * * *"), expectCommandError(2)); // 4 fields
+  assert.throws(() => parseSchedule("99 * * * *"), expectCommandError(2)); // bad minute
 });
 
 test("nextFireTime for daily HH:MM returns the next local occurrence", () => {
@@ -1199,15 +1239,15 @@ test("nextFireTime for `*/15 * * * *` lands on a 15-minute boundary", () => {
 
 test("parseSchedule rejects cron ranges with empty bounds (-5, 0-)", () => {
   // Number("") === 0 would previously accept these as 0-5 / 0-0.
-  assert.throws(() => parseSchedule("-5 * * * *"), (e: any) => e.exitCode === 2);
-  assert.throws(() => parseSchedule("0- * * * *"), (e: any) => e.exitCode === 2);
-  assert.throws(() => parseSchedule("0-59 0- * * *"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSchedule("-5 * * * *"), expectCommandError(2));
+  assert.throws(() => parseSchedule("0- * * * *"), expectCommandError(2));
+  assert.throws(() => parseSchedule("0-59 0- * * *"), expectCommandError(2));
 });
 
 test("parseSchedule rejects a cron step with an empty base (/5)", () => {
   // Number("") === 0 would previously accept `/5` as `0/5`.
-  assert.throws(() => parseSchedule("/5 * * * *"), (e: any) => e.exitCode === 2);
-  assert.throws(() => parseSchedule("*/ * * * *"), (e: any) => e.exitCode === 2);
+  assert.throws(() => parseSchedule("/5 * * * *"), expectCommandError(2));
+  assert.throws(() => parseSchedule("*/ * * * *"), expectCommandError(2));
 });
 
 test("parseSchedule still accepts valid step/range cron expressions", () => {
@@ -1256,7 +1296,7 @@ test("--compact --include-blockers surfaces the 🚨 marker in Block Kit", () =>
   const { blocks } = buildBlockKit(data, { ...baseOpts, compact: true, includeBlockers: true });
   const sections = blocks.filter((b) => b.type === "section");
   assert.equal(sections.length, 1);
-  const text = (sections[0] as any).text.text as string;
+  const text = (sections[0] as SlackSectionBlock).text.text as string;
   assert.match(text, /🚨 Blocked in compact BK/);
 });
 

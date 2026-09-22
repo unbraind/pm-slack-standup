@@ -52,6 +52,19 @@ export class CommandError extends Error {
     }
 }
 /**
+ * Whether a value is absent the way `== null` treats it: `null` or `undefined`.
+ *
+ * Call sites that used to write `== null` / `!= null` go through this predicate
+ * so a missing option and an explicit JSON null still take the same default,
+ * without a loose equality that the lint gate rejects.
+ *
+ * @param value - The option or field to test.
+ * @returns True when the value is `null` or `undefined`.
+ */
+function isNullish(value) {
+    return value === null || value === undefined;
+}
+/**
  * The four standup sections in their canonical render order.
  *
  * Used as the default selection and to iterate sections in a stable order
@@ -289,7 +302,7 @@ export function parseMentionMap(spec) {
  * Kit `blocks` JSON). Unknown values raise a USAGE CommandError.
  */
 export function parseFormat(raw) {
-    if (raw == null)
+    if (isNullish(raw))
         return "slack";
     const v = raw.trim().toLowerCase();
     if (v === "" || v === "slack")
@@ -313,7 +326,7 @@ export function parseFormat(raw) {
  * @returns The resolved grouping field.
  */
 export function parseGroupBy(raw) {
-    if (raw == null)
+    if (isNullish(raw))
         return "status";
     const v = raw.trim().toLowerCase();
     if (v === "" || v === "status")
@@ -419,15 +432,7 @@ export function parseSectionLabels(spec) {
  * both (a name is shown in the message; a URL is POSTed to). Empty → [].
  */
 export function parseChannels(spec) {
-    if (!spec || !spec.trim())
-        return [];
-    const out = [];
-    for (const raw of spec.split(/[,;]/)) {
-        const token = raw.trim();
-        if (token && !out.includes(token))
-            out.push(token);
-    }
-    return out;
+    return splitSpecList(spec);
 }
 /** True when a channel token is a full webhook URL rather than a name. */
 export function isWebhookUrl(token) {
@@ -439,6 +444,18 @@ export function isWebhookUrl(token) {
  * filter the standup to items assigned to one of the named team members.
  */
 export function parseTeam(spec) {
+    return splitSpecList(spec);
+}
+/**
+ * Split a comma-or-semicolon spec into an ordered, trimmed, de-duped list.
+ *
+ * Shared by `--channels` and `--team`. An empty or whitespace-only spec is
+ * no list, not a one-element list of the empty string.
+ *
+ * @param spec - The raw flag value, or undefined when the flag was omitted.
+ * @returns The tokens in first-seen order.
+ */
+function splitSpecList(spec) {
     if (!spec || !spec.trim())
         return [];
     const out = [];
@@ -613,7 +630,7 @@ export function nextFireTime(spec, now = Date.now()) {
  */
 export function resolveSinceMs(since, days, now = Date.now(), warn = (m) => console.error(m)) {
     let bound = NaN;
-    if (since != null && since.trim() !== "") {
+    if (!isNullish(since) && since.trim() !== "") {
         const ms = Date.parse(since);
         if (isNaN(ms)) {
             warn(`warning: ignoring unparseable --since '${since}' (expected an ISO date/time, e.g. 2026-06-01). ` +
@@ -623,7 +640,7 @@ export function resolveSinceMs(since, days, now = Date.now(), warn = (m) => cons
             bound = ms;
         }
     }
-    if (days != null) {
+    if (!isNullish(days)) {
         if (!Number.isFinite(days) || days < 0) {
             throw new CommandError(`Invalid --days value '${days}' (expected a non-negative number).`, EXIT_CODE.USAGE);
         }
@@ -641,7 +658,7 @@ export function resolveSinceMs(since, days, now = Date.now(), warn = (m) => cons
 export function resolveUpNextCount(upNextRaw, allOpen, fallback = DEFAULT_UP_NEXT) {
     if (allOpen)
         return Infinity;
-    if (upNextRaw == null || upNextRaw.trim() === "")
+    if (isNullish(upNextRaw) || upNextRaw.trim() === "")
         return fallback;
     const n = Number(upNextRaw.trim());
     if (!Number.isInteger(n) || n < 1) {
@@ -661,7 +678,7 @@ export function resolveUpNextCount(upNextRaw, allOpen, fallback = DEFAULT_UP_NEX
  * @returns The parsed day count, or `undefined` when no value was given.
  */
 export function parseDays(raw) {
-    if (raw == null || raw.trim() === "")
+    if (isNullish(raw) || raw.trim() === "")
         return undefined;
     const n = Number(raw.trim());
     if (!Number.isFinite(n)) {
@@ -1150,18 +1167,25 @@ export function localDayKey(item) {
     const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
     if (isNaN(ts))
         return "";
-    const d = new Date(ts);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return formatLocalDay(new Date(ts));
 }
 /** Local-day key (YYYY-MM-DD) for a given epoch-ms instant. */
 export function localDayKeyOf(ms) {
-    const d = new Date(ms);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+    return formatLocalDay(new Date(ms));
+}
+/**
+ * Format an instant as a local YYYY-MM-DD key.
+ *
+ * Shared by the item-activity key and the epoch-ms key so the host timezone
+ * and zero-padding cannot drift between those two call sites.
+ *
+ * @param date - The instant to format in the host's local timezone.
+ * @returns The `YYYY-MM-DD` key.
+ */
+function formatLocalDay(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
 }
 /**
@@ -1174,7 +1198,7 @@ export function buildStandupData(items, opts, sinceMs = NaN, now = Date.now()) {
     // with no assignee are hidden when a team filter is active. No filter → all.
     const team = opts.team;
     const visible = team && team.length > 0
-        ? items.filter((i) => i.assignee != null && team.includes(i.assignee))
+        ? items.filter((i) => !isNullish(i.assignee) && team.includes(i.assignee))
         : items;
     const isDone = (i) => DONE_STATUSES.has(statusOf(i));
     // An item is "blocked" for standup purposes when its status is blocked/
@@ -1295,7 +1319,7 @@ function mentionFor(item, mentionMap) {
 export function itemText(item, mentionMap, withPriority = false) {
     const label = typeLabel(item);
     const title = label ? `${label} ${item.title}` : item.title;
-    const prio = withPriority && item.priority != null ? ` (priority ${item.priority})` : "";
+    const prio = withPriority && !isNullish(item.priority) ? ` (priority ${item.priority})` : "";
     const context = [];
     if (typeof item.blocked_by === "string" && item.blocked_by.trim()) {
         context.push(`blocked by ${item.blocked_by.trim()}`);
@@ -2022,6 +2046,48 @@ export function renderTrendLine(deltas) {
 // the host runtime lacks `registerService`, the exporter falls back to writing
 // stdout directly (legacy behavior, envelope included).
 let exportStdoutViaService = false;
+/**
+ * Flags the `standup` command and the `standup` exporter both accept, in the
+ * order both registrations already published them.
+ *
+ * A fresh array on every call so one registration cannot mutate the other's
+ * flag objects. The two call sites are the only reason this list exists.
+ *
+ * @returns The shared window, grouping, and mention flags.
+ */
+function sharedWindowFlags() {
+    return [
+        { long: "--include-done", description: "Include recently-closed items in a Done section" },
+        { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
+        { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
+        { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
+        { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
+        { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
+        { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
+        { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
+        { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+    ];
+}
+/**
+ * The section-label flag, identical on the command and the exporter.
+ *
+ * @returns A fresh flag definition.
+ */
+function sectionLabelsFlag() {
+    return { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" };
+}
+/**
+ * Presentation flags shared by the command and the exporter, in published order.
+ *
+ * @returns Fresh flag definitions for blocker highlighting, team filter, and compact rendering.
+ */
+function sharedPresentationFlags() {
+    return [
+        { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
+        { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
+        { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
+    ];
+}
 export default defineExtension({
     name: "pm-slack-standup",
     version: "2026.9.19",
@@ -2031,23 +2097,13 @@ export default defineExtension({
             { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
             { long: "--dry-run", description: "Build and print the message in the chosen format WITHOUT posting to Slack" },
             { long: "--format", value_name: "fmt", description: "Output format: slack (mrkdwn, default) | blockkit | blocks (Block Kit JSON) | markdown | plain" },
-            { long: "--include-done", description: "Include recently-closed items in a Done section" },
-            { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
-            { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
-            { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
-            { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
-            { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
-            { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
-            { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
-            { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+            ...sharedWindowFlags(),
             { long: "--channels", value_name: "list", description: "Post the same standup to multiple targets: comma list of #channel names and/or webhook URLs" },
             { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
-            { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
+            sectionLabelsFlag(),
             { long: "--compare", value_name: "path", description: "Show trend deltas vs a PRIOR standup JSON file, or vs a snapshot DIRECTORY (from 'standup export --history-dir') for multi-snapshot history; local read, never posts" },
             { long: "--schedule", value_name: "when", description: "Schedule the post instead of sending now: HH:MM (daily, local) or a 5-field cron expression (min hour dom mon dow); the process waits until the next fire time" },
-            { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
-            { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
-            { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
+            ...sharedPresentationFlags(),
         ];
         // Typed against the SDK's real `CommandHandlerContext` so this closure
         // is contract-checked against the same shape `registerCommand`'s `run`
@@ -2092,7 +2148,9 @@ export default defineExtension({
                     let remaining = waitMs;
                     while (remaining > 0) {
                         const chunk = Math.min(remaining, MAX_CHUNK_MS);
-                        await new Promise((res) => setTimeout(res, chunk));
+                        await new Promise((res) => {
+                            setTimeout(res, chunk);
+                        });
                         remaining -= chunk;
                     }
                 }
@@ -2312,20 +2370,10 @@ export default defineExtension({
             { long: "--format", value_name: "fmt", description: "Export format: md (markdown, default) | json (counts + sections + Block Kit payload)" },
             { long: "--output", value_name: "file", description: "Write the export to this file instead of stdout" },
             { long: "--history-dir", value_name: "dir", description: "Also write a dated JSON snapshot to <dir>/standup-YYYY-MM-DD.json (for 'pm standup --compare <dir>' trends)" },
-            { long: "--include-done", description: "Include recently-closed items in a Done section" },
-            { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
-            { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
-            { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
-            { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
-            { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
-            { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
-            { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
-            { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+            ...sharedWindowFlags(),
             { long: "--channel", value_name: "name", description: "Channel name recorded in the exported document" },
-            { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
-            { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
-            { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
-            { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
+            sectionLabelsFlag(),
+            ...sharedPresentationFlags(),
         ];
         api.registerExporter("standup", async (ctx) => {
             const rawFormat = (readStrOption(ctx.options, "format") ?? "md").toLowerCase();

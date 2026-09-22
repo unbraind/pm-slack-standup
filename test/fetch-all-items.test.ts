@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
+import extension, {
   fetchAllItems,
   describePmReadFailure,
   pmJsonMaxBuffer,
@@ -12,8 +12,8 @@ import {
   COMPLETE_LIST_COMMAND_ARGUMENTS,
 } from "../index.ts";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
-import extension from "../index.ts";
 import { completeListEnvelope } from "./complete-list-fixture.ts";
+import { expectCommandError } from "./test-helpers.ts";
 
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -131,6 +131,27 @@ function expectedComSpec(): string {
   return process.env["ComSpec"] || "cmd.exe";
 }
 
+/**
+ * Create a temporary directory with both `pm` (POSIX shebang) and `pm.cmd`
+ * (Windows batch) shims in `node_modules/.bin`, and return the module URL the
+ * resolver expects plus the paths needed for assertions. Both shims are
+ * written as npm installs them, so the resolver's platform-specific choice can
+ * be exercised without a real install.
+ *
+ * @param prefix - Prefix for the temporary directory name.
+ * @returns The temp `dir`, the `binDir` containing the shims, and the
+ *          `moduleUrl` to pass to `resolvePmBin`.
+ */
+function setupBothShims(prefix: string): { dir: string; binDir: string; moduleUrl: string } {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  const binDir = join(dir, "node_modules", ".bin");
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
+  writeFileSync(join(binDir, "pm.cmd"), "@echo off\r\n", { encoding: "utf-8", mode: 0o755 });
+  const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
+  return { dir, binDir, moduleUrl };
+}
+
 test("resolvePmBin resolves the project-local node_modules/.bin/pm shim from this module", () => {
   const launch = resolvePmBin(import.meta.url, "linux");
   // Walking up from this test file reaches the package root, whose
@@ -168,13 +189,7 @@ test("fetchAllItems throws a CommandError when the pm subprocess exits non-zero,
     const bin = fakePmBin(dir, "nonzero", { stderrText: "tracker_not_initialized boom", exitCode: 7 });
     assert.throws(
       () => fetchAllItems("/anywhere", bin),
-      (e: unknown) => {
-        assert.ok(e instanceof CommandError, "should throw a CommandError");
-        const err = e as CommandError;
-        assert.equal(err.exitCode, 1);
-        assert.match(err.message, /tracker_not_initialized boom/);
-        return true;
-      }
+      expectCommandError(1, /tracker_not_initialized boom/)
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -236,15 +251,7 @@ test("fetchAllItems throws on the ENOBUFS shape (status null, empty stderr) with
     const bin = fakePmBin(dir, "overrun", { maxBuffer: 1024 });
     assert.throws(
       () => fetchAllItems("/anywhere", bin),
-      (e: unknown) => {
-        assert.ok(e instanceof CommandError, "should throw a CommandError");
-        const err = e as CommandError;
-        assert.equal(err.exitCode, 1);
-        // The overrun message must name the ceiling, not surface an empty reason.
-        assert.match(err.message, /exceeded the 1024 byte read buffer/);
-        assert.match(err.message, /PM_JSON_MAX_BUFFER/);
-        return true;
-      }
+      expectCommandError(1, /exceeded the 1024 byte read buffer/, /PM_JSON_MAX_BUFFER/)
     );
   } finally {
     if (saved === undefined) delete process.env["PM_JSON_MAX_BUFFER"];
@@ -413,14 +420,9 @@ test("fetchAllItems names the exit status when pm exits non-zero with empty stde
 // shape collapses back to the bare (unlaunchable) shim path.
 
 test("resolvePmBin produces the cmd.exe launch for the .cmd shim on win32 (npm's both-shims layout)", () => {
-  const dir = mkdtempSync(join(tmpdir(), "standup-shim-cmd-"));
+  const { dir, binDir, moduleUrl } = setupBothShims("standup-shim-cmd-");
   try {
-    const binDir = join(dir, "node_modules", ".bin");
-    mkdirSync(binDir, { recursive: true });
     // Both shims present, as npm installs them, so the .cmd choice is the assertion.
-    writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
-    writeFileSync(join(binDir, "pm.cmd"), "@echo off\r\n", { encoding: "utf-8", mode: 0o755 });
-    const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
     const launch = resolvePmBin(moduleUrl, "win32");
     // The exact spawn for a read: cmd.exe is the executable, and the /d /s /v:off /c
     // switches precede the ENTIRE command tail as one outer-quoted argv
@@ -464,18 +466,13 @@ test("resolvePmBin wraps the extensionless shim in cmd.exe on win32 when only it
 });
 
 test("resolvePmBin keeps the direct shebang-shim launch on POSIX with the argv verbatim", () => {
-  const dir = mkdtempSync(join(tmpdir(), "standup-shim-posix-"));
+  const { dir, binDir, moduleUrl } = setupBothShims("standup-shim-posix-");
   try {
-    const binDir = join(dir, "node_modules", ".bin");
-    mkdirSync(binDir, { recursive: true });
     // Both shims present; on POSIX the extensionless one is chosen AND launched
     // directly — byte-for-byte the invocation this package has always used:
     // command plus the pm arguments as discrete argv elements, and the spawn
     // option values unchanged (windowsVerbatimArguments false is Node's
     // default per-element quoting).
-    writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
-    writeFileSync(join(binDir, "pm.cmd"), "@echo off\r\n", { encoding: "utf-8", mode: 0o755 });
-    const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
     const launch = resolvePmBin(moduleUrl, "linux");
     assert.deepEqual(
       [launch.command, ...launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"])],

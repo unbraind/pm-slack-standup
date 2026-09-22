@@ -181,7 +181,7 @@ export declare function parseMentionMap(spec: string | undefined): Record<string
  * legacy `text` alias (== `plain`) and `blocks` (== `blockkit`, the Slack Block
  * Kit `blocks` JSON). Unknown values raise a USAGE CommandError.
  */
-export declare function parseFormat(raw: string | undefined): Format;
+export declare function parseFormat(raw: string | null | undefined): Format;
 /**
  * Parse the `--group-by` value into a {@link GroupBy}, defaulting to `status`.
  *
@@ -192,7 +192,7 @@ export declare function parseFormat(raw: string | undefined): Format;
  * @param raw - The raw `--group-by` value, possibly undefined.
  * @returns The resolved grouping field.
  */
-export declare function parseGroupBy(raw: string | undefined): GroupBy;
+export declare function parseGroupBy(raw: string | null | undefined): GroupBy;
 /**
  * Parse a `--sections` spec (comma/semicolon list) into an ordered, de-duped
  * list of section keys. Empty spec → all sections in default order. An
@@ -261,14 +261,14 @@ export declare function nextFireTime(spec: ScheduleSpec, now?: number): number;
  * silently scoping the Done section to nothing. A `warn` sink is injectable
  * for testing.
  */
-export declare function resolveSinceMs(since: string | undefined, days: number | undefined, now?: number, warn?: (msg: string) => void): number;
+export declare function resolveSinceMs(since: string | null | undefined, days: number | null | undefined, now?: number, warn?: (msg: string) => void): number;
 /**
  * Resolve how many "Up Next" items to show. `--all-open` (boolean) wins and
  * returns Infinity (show the whole open backlog). Otherwise `--up-next <n>` is
  * a positive integer count; an absent value uses the default. A non-positive
  * or non-integer `--up-next` is a USAGE error rather than a silent fallback.
  */
-export declare function resolveUpNextCount(upNextRaw: string | undefined, allOpen: boolean, fallback?: number): number;
+export declare function resolveUpNextCount(upNextRaw: string | null | undefined, allOpen: boolean, fallback?: number): number;
 /**
  * Parse the `--days` value into a number of days, or undefined when omitted.
  *
@@ -280,7 +280,7 @@ export declare function resolveUpNextCount(upNextRaw: string | undefined, allOpe
  * @param raw - The raw `--days` value, possibly undefined.
  * @returns The parsed day count, or `undefined` when no value was given.
  */
-export declare function parseDays(raw: string | undefined): number | undefined;
+export declare function parseDays(raw: string | null | undefined): number | undefined;
 /**
  * Translate a raw `writeFileSync` failure into a friendly {@link CommandError}
  * (so the exporter aborts with a clean exit 1 + actionable message rather than
@@ -565,16 +565,53 @@ export declare function groupItems(items: PmItem[], groupBy: GroupBy): Array<[st
  * `plain` drops emphasis punctuation; `markdown` uses `#`/`**`/`-`.
  */
 export declare function buildTextMessage(data: StandupData, opts: StandupOptions): string;
+/** Plain-text object Slack requires on a `header` block. */
+export interface SlackPlainText {
+    type: "plain_text";
+    text: string;
+    emoji?: boolean;
+}
+/** Mrkdwn text object used by section and context blocks. */
+export interface SlackMrkdwn {
+    type: "mrkdwn";
+    text: string;
+}
+/** Slack Block Kit header. `text` is plain_text and capped at 150 characters. */
+export interface SlackHeaderBlock {
+    type: "header";
+    text: SlackPlainText;
+}
+/** Slack Block Kit section. `text` is mrkdwn and capped at 3000 characters. */
+export interface SlackSectionBlock {
+    type: "section";
+    text: SlackMrkdwn;
+}
+/** Slack Block Kit context row of mrkdwn elements. */
+export interface SlackContextBlock {
+    type: "context";
+    elements: SlackMrkdwn[];
+}
+/** Slack Block Kit divider. */
+export interface SlackDividerBlock {
+    type: "divider";
+}
 /**
  * One entry in a Slack Block Kit `blocks` array.
  *
- * Every block carries a `type` and format-specific fields; the index signature
- * keeps the loose structure the Slack API expects without enumerating every
- * block shape this package emits (header, section, context, divider, actions).
+ * The union is exactly the shapes this package emits: header, section,
+ * context, and divider. Callers narrow on `type` instead of casting.
  */
-export interface SlackBlock {
-    type: string;
-    [key: string]: unknown;
+export type SlackBlock = SlackHeaderBlock | SlackSectionBlock | SlackContextBlock | SlackDividerBlock;
+/**
+ * JSON body posted to a Slack incoming webhook.
+ *
+ * `text` is the notification fallback; `blocks` is the Block Kit payload;
+ * `mrkdwn` asks Slack to interpret the fallback as mrkdwn.
+ */
+export interface SlackPostPayload {
+    text: string;
+    blocks: SlackBlock[];
+    mrkdwn: boolean;
 }
 /**
  * Build a Slack Block Kit `blocks` array: a header, a section per selected
@@ -608,8 +645,8 @@ export interface PostResultEntry {
     ok: boolean;
     error?: string;
 }
-/** A poster sends one payload to one webhook. Injectable for testing. */
-export type Poster = (webhookUrl: string, payload: Record<string, unknown>) => Promise<void>;
+/** A poster sends one Slack webhook payload. Injectable for testing. */
+export type Poster = (webhookUrl: string, payload: SlackPostPayload) => Promise<void>;
 /**
  * Resolve the ordered list of post targets from `--webhook`/env + `--channel`
  * + `--channels`. Each `--channels` token is either a `#name` (posted to the

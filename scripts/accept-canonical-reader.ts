@@ -5,35 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { COMPLETE_LIST_COMMAND_ARGUMENTS, fetchAllItems, type PmLaunch } from "../index.ts";
-
-/** Complete response emitted by the fake host for the whole-tracker read. */
-function completeEnvelope(): Record<string, unknown> {
-  return {
-    items: [{ id: "fixture-1", title: "Tracked standup work", status: "in_progress" }],
-    count: 1,
-    total: 1,
-    has_more: false,
-    truncated: false,
-    next_cursor: null,
-    filters: { status: "all", include_body: true, no_truncate: true, strict_read: true, runtime_filters: {} },
-    limit: null,
-    requested_limit: null,
-    effective_limit: null,
-    source: null,
-    completeness: { status: "complete", unreadable_item_count: 0, unreadable_directory_count: 0 },
-    projection: { mode: "full", fields: null },
-    omission_receipt: { has_omissions: false, omitted_field_group_count: 0, omitted_field_groups: [] },
-    read_output: {
-      contract_version: 1,
-      command: "list",
-      requested_dimensions: ["include", "amount", "cost"],
-      within_budget: true,
-      strings_compacted: false,
-      rows_compacted: false,
-      result_omitted: false,
-    },
-  };
-}
+import { completeListEnvelope } from "../test/complete-list-fixture.ts";
 
 test("canonical reader acceptance issues exactly one complete-list read", () => {
   const root = mkdtempSync(join(tmpdir(), "pm-slack-standup-canonical-reader-"));
@@ -45,7 +17,11 @@ test("canonical reader acceptance issues exactly one complete-list read", () => 
 appendFileSync(process.env.PM_STANDUP_ARGS_FILE, JSON.stringify(process.argv.slice(2)) + "\\n");
 process.stdout.write(process.env.PM_STANDUP_FAKE_RESPONSE);
 `, "utf8");
-  process.env.PM_STANDUP_FAKE_RESPONSE = JSON.stringify(completeEnvelope());
+  process.env.PM_STANDUP_FAKE_RESPONSE = JSON.stringify(
+    completeListEnvelope({
+      items: [{ id: "fixture-1", title: "Tracked standup work", status: "in_progress" }],
+    }),
+  );
   process.env.PM_STANDUP_ARGS_FILE = argsFile;
   const launch: PmLaunch = {
     command: process.execPath,
