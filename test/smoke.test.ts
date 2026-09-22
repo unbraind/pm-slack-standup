@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createExtensionTestHarness, runRegisteredServiceOverrideForTest, type ExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
+import type { ExtensionApi } from "@unbrained/pm-cli/sdk/authoring";
 
 import extension from "../index.ts";
 
@@ -30,7 +31,7 @@ test("extension registers at least one capability", () => {
     registerSearchProvider: noop, registerVectorStoreAdapter: noop,
     hooks: { beforeCommand: noop, afterCommand: noop, onWrite: noop, onRead: noop, onIndex: noop },
   };
-  extension.activate(api as any);
+  extension.activate(api as unknown as ExtensionApi);
   assert.ok(registered.includes("command:standup"), "should register the standup command");
   assert.ok(registered.includes("command:slack-standup"), "should register the alias command");
   assert.ok(registered.includes("exporter"), "should register the standup exporter");

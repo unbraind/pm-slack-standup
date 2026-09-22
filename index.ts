@@ -8,6 +8,7 @@ import { certifyCompleteListResult, inspectCompleteListResult } from "@unbrained
 import type {
   CommandHandlerContext,
   ExtensionModule,
+  FlagDefinition,
 } from "@unbrained/pm-cli/sdk/authoring";
 
 /**
@@ -59,6 +60,20 @@ export class CommandError extends Error {
     this.name = "CommandError";
     this.exitCode = exitCode;
   }
+}
+
+/**
+ * Whether a value is absent the way `== null` treats it: `null` or `undefined`.
+ *
+ * Call sites that used to write `== null` / `!= null` go through this predicate
+ * so a missing option and an explicit JSON null still take the same default,
+ * without a loose equality that the lint gate rejects.
+ *
+ * @param value - The option or field to test.
+ * @returns True when the value is `null` or `undefined`.
+ */
+function isNullish(value: unknown): value is null | undefined {
+  return value === null || value === undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -454,8 +469,8 @@ export function parseMentionMap(spec: string | undefined): Record<string, string
  * legacy `text` alias (== `plain`) and `blocks` (== `blockkit`, the Slack Block
  * Kit `blocks` JSON). Unknown values raise a USAGE CommandError.
  */
-export function parseFormat(raw: string | undefined): Format {
-  if (raw == null) return "slack";
+export function parseFormat(raw: string | null | undefined): Format {
+  if (isNullish(raw)) return "slack";
   const v = raw.trim().toLowerCase();
   if (v === "" || v === "slack") return "slack";
   if (v === "blockkit" || v === "block-kit" || v === "blocks") return "blockkit";
@@ -477,8 +492,8 @@ export function parseFormat(raw: string | undefined): Format {
  * @param raw - The raw `--group-by` value, possibly undefined.
  * @returns The resolved grouping field.
  */
-export function parseGroupBy(raw: string | undefined): GroupBy {
-  if (raw == null) return "status";
+export function parseGroupBy(raw: string | null | undefined): GroupBy {
+  if (isNullish(raw)) return "status";
   const v = raw.trim().toLowerCase();
   if (v === "" || v === "status") return "status";
   if (v === "assignee" || v === "owner") return "assignee";
@@ -585,13 +600,7 @@ export function parseSectionLabels(
  * both (a name is shown in the message; a URL is POSTed to). Empty → [].
  */
 export function parseChannels(spec: string | undefined): string[] {
-  if (!spec || !spec.trim()) return [];
-  const out: string[] = [];
-  for (const raw of spec.split(/[,;]/)) {
-    const token = raw.trim();
-    if (token && !out.includes(token)) out.push(token);
-  }
-  return out;
+  return splitSpecList(spec);
 }
 
 /** True when a channel token is a full webhook URL rather than a name. */
@@ -605,6 +614,19 @@ export function isWebhookUrl(token: string): boolean {
  * filter the standup to items assigned to one of the named team members.
  */
 export function parseTeam(spec: string | undefined): string[] {
+  return splitSpecList(spec);
+}
+
+/**
+ * Split a comma-or-semicolon spec into an ordered, trimmed, de-duped list.
+ *
+ * Shared by `--channels` and `--team`. An empty or whitespace-only spec is
+ * no list, not a one-element list of the empty string.
+ *
+ * @param spec - The raw flag value, or undefined when the flag was omitted.
+ * @returns The tokens in first-seen order.
+ */
+function splitSpecList(spec: string | undefined): string[] {
   if (!spec || !spec.trim()) return [];
   const out: string[] = [];
   for (const raw of spec.split(/[,;]/)) {
@@ -798,13 +820,13 @@ export function nextFireTime(spec: ScheduleSpec, now: number = Date.now()): numb
  * for testing.
  */
 export function resolveSinceMs(
-  since: string | undefined,
-  days: number | undefined,
+  since: string | null | undefined,
+  days: number | null | undefined,
   now: number = Date.now(),
   warn: (msg: string) => void = (m) => console.error(m)
 ): number {
   let bound = NaN;
-  if (since != null && since.trim() !== "") {
+  if (!isNullish(since) && since.trim() !== "") {
     const ms = Date.parse(since);
     if (isNaN(ms)) {
       warn(
@@ -815,7 +837,7 @@ export function resolveSinceMs(
       bound = ms;
     }
   }
-  if (days != null) {
+  if (!isNullish(days)) {
     if (!Number.isFinite(days) || days < 0) {
       throw new CommandError(`Invalid --days value '${days}' (expected a non-negative number).`, EXIT_CODE.USAGE);
     }
@@ -832,12 +854,12 @@ export function resolveSinceMs(
  * or non-integer `--up-next` is a USAGE error rather than a silent fallback.
  */
 export function resolveUpNextCount(
-  upNextRaw: string | undefined,
+  upNextRaw: string | null | undefined,
   allOpen: boolean,
   fallback: number = DEFAULT_UP_NEXT
 ): number {
   if (allOpen) return Infinity;
-  if (upNextRaw == null || upNextRaw.trim() === "") return fallback;
+  if (isNullish(upNextRaw) || upNextRaw.trim() === "") return fallback;
   const n = Number(upNextRaw.trim());
   if (!Number.isInteger(n) || n < 1) {
     throw new CommandError(
@@ -859,8 +881,8 @@ export function resolveUpNextCount(
  * @param raw - The raw `--days` value, possibly undefined.
  * @returns The parsed day count, or `undefined` when no value was given.
  */
-export function parseDays(raw: string | undefined): number | undefined {
-  if (raw == null || raw.trim() === "") return undefined;
+export function parseDays(raw: string | null | undefined): number | undefined {
+  if (isNullish(raw) || raw.trim() === "") return undefined;
   const n = Number(raw.trim());
   if (!Number.isFinite(n)) {
     throw new CommandError(`Invalid --days value '${raw}' (expected a number).`, EXIT_CODE.USAGE);
@@ -1409,19 +1431,27 @@ export function blockedAgeDays(item: PmItem, now: number = Date.now()): number |
 export function localDayKey(item: PmItem): string {
   const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
   if (isNaN(ts)) return "";
-  const d = new Date(ts);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return formatLocalDay(new Date(ts));
 }
 
 /** Local-day key (YYYY-MM-DD) for a given epoch-ms instant. */
 export function localDayKeyOf(ms: number): string {
-  const d = new Date(ms);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  return formatLocalDay(new Date(ms));
+}
+
+/**
+ * Format an instant as a local YYYY-MM-DD key.
+ *
+ * Shared by the item-activity key and the epoch-ms key so the host timezone
+ * and zero-padding cannot drift between those two call sites.
+ *
+ * @param date - The instant to format in the host's local timezone.
+ * @returns The `YYYY-MM-DD` key.
+ */
+function formatLocalDay(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
@@ -1441,7 +1471,7 @@ export function buildStandupData(
   const team = opts.team;
   const visible =
     team && team.length > 0
-      ? items.filter((i) => i.assignee != null && team.includes(i.assignee!))
+      ? items.filter((i) => !isNullish(i.assignee) && team.includes(i.assignee))
       : items;
   const isDone = (i: PmItem) => DONE_STATUSES.has(statusOf(i));
   // An item is "blocked" for standup purposes when its status is blocked/
@@ -1593,7 +1623,7 @@ function mentionFor(item: PmItem, mentionMap: Record<string, string>): string {
 export function itemText(item: PmItem, mentionMap: Record<string, string>, withPriority = false): string {
   const label = typeLabel(item);
   const title = label ? `${label} ${item.title}` : item.title;
-  const prio = withPriority && item.priority != null ? ` (priority ${item.priority})` : "";
+  const prio = withPriority && !isNullish(item.priority) ? ` (priority ${item.priority})` : "";
   const context: string[] = [];
   if (typeof item.blocked_by === "string" && item.blocked_by.trim()) {
     context.push(`blocked by ${item.blocked_by.trim()}`);
@@ -1814,13 +1844,64 @@ export function buildTextMessage(data: StandupData, opts: StandupOptions): strin
 /**
  * One entry in a Slack Block Kit `blocks` array.
  *
- * Every block carries a `type` and format-specific fields; the index signature
- * keeps the loose structure the Slack API expects without enumerating every
- * block shape this package emits (header, section, context, divider, actions).
+ * This is the public, open contract: every block carries a `type`, and the
+ * index signature accepts any Block Kit shape Slack supports (for example
+ * `actions`), so consumer code built on it keeps compiling. The interfaces
+ * below extend it with the exact shapes this package emits (header, section,
+ * context, divider).
  */
 export interface SlackBlock {
   type: string;
   [key: string]: unknown;
+}
+
+/** Plain-text object Slack requires on a `header` block. */
+export interface SlackPlainText {
+  type: "plain_text";
+  text: string;
+  emoji?: boolean;
+}
+
+/** Mrkdwn text object used by section and context blocks. */
+export interface SlackMrkdwn {
+  type: "mrkdwn";
+  text: string;
+}
+
+/** Slack Block Kit header. `text` is plain_text and capped at 150 characters. */
+export interface SlackHeaderBlock extends SlackBlock {
+  type: "header";
+  text: SlackPlainText;
+}
+
+/** Slack Block Kit section. `text` is mrkdwn and capped at 3000 characters. */
+export interface SlackSectionBlock extends SlackBlock {
+  type: "section";
+  text: SlackMrkdwn;
+}
+
+/** Slack Block Kit context row of mrkdwn elements. */
+export interface SlackContextBlock extends SlackBlock {
+  type: "context";
+  elements: SlackMrkdwn[];
+}
+
+/** Slack Block Kit divider. */
+export interface SlackDividerBlock extends SlackBlock {
+  type: "divider";
+}
+
+
+/**
+ * JSON body posted to a Slack incoming webhook.
+ *
+ * `text` is the notification fallback; `blocks` is the Block Kit payload;
+ * `mrkdwn` asks Slack to interpret the fallback as mrkdwn.
+ */
+export interface SlackPostPayload extends Record<string, unknown> {
+  text: string;
+  blocks: SlackBlock[];
+  mrkdwn: boolean;
 }
 
 function mrkdwnList(items: PmItem[], opts: StandupOptions, withPriority = false): string {
@@ -1907,7 +1988,7 @@ export function buildBlockKit(data: StandupData, opts: StandupOptions): { blocks
     opts.since ? `since ${opts.since}` : null,
     groupNote[opts.groupBy],
   ].filter(Boolean);
-  const footerElements: Array<{ type: string; text: string }> = [
+  const footerElements: SlackMrkdwn[] = [
     { type: "mrkdwn", text: `🤖 pm-slack-standup · ${footerBits.join(" · ")}` },
   ];
   // Trend footer (from `--compare`): a second context element so the
@@ -1996,7 +2077,7 @@ export interface PostResultEntry {
   error?: string;
 }
 
-/** A poster sends one payload to one webhook. Injectable for testing. */
+/** A poster sends one Slack webhook payload. Injectable for testing. */
 export type Poster = (webhookUrl: string, payload: Record<string, unknown>) => Promise<void>;
 
 /**
@@ -2398,33 +2479,68 @@ export function renderTrendLine(deltas: SectionDelta[]): string {
 // stdout directly (legacy behavior, envelope included).
 let exportStdoutViaService = false;
 
+/**
+ * Flags the `standup` command and the `standup` exporter both accept, in the
+ * order both registrations already published them.
+ *
+ * A fresh array on every call so one registration cannot mutate the other's
+ * flag objects. The two call sites are the only reason this list exists.
+ *
+ * @returns The shared window, grouping, and mention flags.
+ */
+function sharedWindowFlags(): FlagDefinition[] {
+  return [
+    { long: "--include-done", description: "Include recently-closed items in a Done section" },
+    { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
+    { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
+    { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
+    { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
+    { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
+    { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
+    { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
+    { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+  ];
+}
+
+/**
+ * The section-label flag, identical on the command and the exporter.
+ *
+ * @returns A fresh flag definition.
+ */
+function sectionLabelsFlag(): FlagDefinition {
+  return { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" };
+}
+
+/**
+ * Presentation flags shared by the command and the exporter, in published order.
+ *
+ * @returns Fresh flag definitions for blocker highlighting, team filter, and compact rendering.
+ */
+function sharedPresentationFlags(): FlagDefinition[] {
+  return [
+    { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
+    { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
+    { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
+  ];
+}
+
 export default defineExtension({
   name: "pm-slack-standup",
   version: "2026.9.19",
 
   activate(api) {
-    const standupFlags = [
+    const standupFlags: FlagDefinition[] = [
       { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
       { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
       { long: "--dry-run", description: "Build and print the message in the chosen format WITHOUT posting to Slack" },
       { long: "--format", value_name: "fmt", description: "Output format: slack (mrkdwn, default) | blockkit | blocks (Block Kit JSON) | markdown | plain" },
-      { long: "--include-done", description: "Include recently-closed items in a Done section" },
-      { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
-      { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
-      { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
-      { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
-      { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
-      { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
-      { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
-      { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+      ...sharedWindowFlags(),
       { long: "--channels", value_name: "list", description: "Post the same standup to multiple targets: comma list of #channel names and/or webhook URLs" },
       { long: "--fallback-to-stdout", description: "If the Slack post fails, print the rendered standup to stdout instead of exiting non-zero" },
-      { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
+      sectionLabelsFlag(),
       { long: "--compare", value_name: "path", description: "Show trend deltas vs a PRIOR standup JSON file, or vs a snapshot DIRECTORY (from 'standup export --history-dir') for multi-snapshot history; local read, never posts" },
       { long: "--schedule", value_name: "when", description: "Schedule the post instead of sending now: HH:MM (daily, local) or a 5-field cron expression (min hour dom mon dow); the process waits until the next fire time" },
-      { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
-      { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
-      { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
+      ...sharedPresentationFlags(),
     ];
 
     // Typed against the SDK's real `CommandHandlerContext` so this closure
@@ -2477,7 +2593,9 @@ export default defineExtension({
           let remaining = waitMs;
           while (remaining > 0) {
             const chunk = Math.min(remaining, MAX_CHUNK_MS);
-            await new Promise<void>((res) => setTimeout(res, chunk));
+            await new Promise<void>((res) => {
+              setTimeout(res, chunk);
+            });
             remaining -= chunk;
           }
         }
@@ -2713,24 +2831,14 @@ export default defineExtension({
     // the full Block Kit payload so it can be POSTed elsewhere or archived.
     // (No collision with the `pm standup` command — different invocation.)
     // -----------------------------------------------------------------------
-    const exporterFlags = [
+    const exporterFlags: FlagDefinition[] = [
       { long: "--format", value_name: "fmt", description: "Export format: md (markdown, default) | json (counts + sections + Block Kit payload)" },
       { long: "--output", value_name: "file", description: "Write the export to this file instead of stdout" },
       { long: "--history-dir", value_name: "dir", description: "Also write a dated JSON snapshot to <dir>/standup-YYYY-MM-DD.json (for 'pm standup --compare <dir>' trends)" },
-      { long: "--include-done", description: "Include recently-closed items in a Done section" },
-      { long: "--since", value_name: "iso", description: "ISO date/time window; scopes the Done section to items updated since then" },
-      { long: "--days", value_name: "n", description: "Relative window: scope Done to items updated in the last N days" },
-      { long: "--group-by", value_name: "field", description: "Group section items by status (default) | assignee | sprint | type | milestone" },
-      { long: "--up-next", value_name: "n", description: "How many open items the Up Next section shows (default 3)" },
-      { long: "--all-open", description: "Show ALL open items in Up Next (no truncation); overrides --up-next" },
-      { long: "--sections", value_name: "list", description: "Comma list of sections to render: in_progress,blocked,done,up_next" },
-      { long: "--mention-map", value_name: "map", description: "Map pm authors to Slack handles, e.g. 'alice=@alice,bob=@bob'" },
-      { long: "--yesterday", description: "Split the Done section into 'Done Yesterday' / 'Done Today' by local day (implies --include-done)" },
+      ...sharedWindowFlags(),
       { long: "--channel", value_name: "name", description: "Channel name recorded in the exported document" },
-      { long: "--section-labels", value_name: "map", description: "Override section titles/emoji, e.g. 'in_progress=Rolling,blocked=🔥 On Fire'" },
-      { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
-      { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
-      { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
+      sectionLabelsFlag(),
+      ...sharedPresentationFlags(),
     ];
 
     api.registerExporter(
