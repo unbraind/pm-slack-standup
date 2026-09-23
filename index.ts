@@ -2526,7 +2526,7 @@ function sharedPresentationFlags(): FlagDefinition[] {
 
 export default defineExtension({
   name: "pm-slack-standup",
-  version: "2026.9.19",
+  version: "2026.9.23",
 
   activate(api) {
     const standupFlags: FlagDefinition[] = [
