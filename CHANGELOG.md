@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A publish that npm accepts late is reported as failed and the GitHub Release is skipped on bun mirror lag ([pm-slack-standup-ykpv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ykpv.toon))
+
+### Other
+
+- Certify pm CLI 2026.9.23 and adopt the guarded pm-ops merge-driver launcher ([pm-slack-standup-19up](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-19up.toon))
+
 ## 2026.9.18 - 2026-09-18
 
 ### Other
