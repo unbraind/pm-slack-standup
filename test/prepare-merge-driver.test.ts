@@ -32,10 +32,9 @@ const declaredDrivers = [
 /**
  * Create a consumer checkout: a fresh Git repository carrying this
  * repository's `.gitattributes` and tracker settings. `pmOps` selects what
- * `node_modules/pm-ops` is: absent (an omit-dev install), the pinned package,
- * or a stale pm-ops whose exports predate the launcher entry.
+ * `node_modules/pm-ops` is: absent, pinned, stale, or damaged.
  */
-function checkout(name: string, pmOps: "absent" | "pinned" | "stale"): string {
+function checkout(name: string, pmOps: "absent" | "pinned" | "stale" | "damaged-directory" | "dangling-link"): string {
   const directory = join(scratch, name);
   mkdirSync(join(directory, ".agents", "pm"), { recursive: true });
   assert.equal(spawnSync("git", ["init", "-q"], { cwd: directory }).status, 0);
@@ -52,6 +51,13 @@ function checkout(name: string, pmOps: "absent" | "pinned" | "stale"): string {
       join(directory, "node_modules", "pm-ops", "package.json"),
       JSON.stringify({ name: "pm-ops", type: "module", exports: { "./merge-driver": "./merge-driver.js" } }),
     );
+  }
+  if (pmOps === "damaged-directory") {
+    mkdirSync(join(directory, "node_modules", "pm-ops"), { recursive: true });
+  }
+  if (pmOps === "dangling-link") {
+    mkdirSync(join(directory, "node_modules"));
+    symlinkSync(join(directory, "missing-pm-ops"), join(directory, "node_modules", "pm-ops"), "dir");
   }
   return directory;
 }
@@ -107,6 +113,16 @@ test("a pm-ops too old to export the launcher entry fails the install", posixOnl
   const result = prepare(checkout("stale", "stale"), hostPath);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /ERR_PACKAGE_PATH_NOT_EXPORTED/);
+});
+
+test("a damaged pm-ops entry without package.json fails instead of masquerading as omit-dev", posixOnly, () => {
+  for (const shape of ["damaged-directory", "dangling-link"] as const) {
+    const directory = checkout(shape, shape);
+    const result = prepare(directory, hostPath);
+    assert.notEqual(result.status, 0, `${shape}: ${result.stderr}`);
+    assert.doesNotMatch(result.stderr, /skipping merge-driver install/);
+    assert.deepEqual(registeredDrivers(directory), []);
+  }
 });
 
 test("a failing pm merge install fails the install with the same status", posixOnly, () => {

@@ -1,12 +1,12 @@
 id: pm-slack-standup-7t31
 title: Require exact all-source 100/100/100/100 coverage and strict quality gates
-description: "The current coverage gate skips scripts and reports only index.ts at 89.97 percent lines, 88.32 percent branches, and 91.27 percent functions. It has no independently reported statements result, and release:check does not enforce ESLint, duplication, mutation, or broader static and security analyzers. This blocks any exact all-source or production-ready claim."
+description: "The current V8 coverage gate measures only index.ts at 90.44% lines, 88.38% branches, and 91.79% functions, with no separately reported statements result. release:check now enforces canonical pm-ops ESLint lint and zero-duplication checks plus the docstring gate, but executable scripts remain outside coverage and the mutation and broader static/security gate criteria remain incomplete. This blocks an all-source 100/100/100/100 or production-ready claim."
 type: Issue
 status: open
 priority: 1
 tags[4]: coverage,quality-gate,release-blocker,tdd
 created_at: "2026-08-21T10:11:53.131Z"
-updated_at: "2026-09-28T21:07:57.383Z"
+updated_at: "2026-09-28T21:23:29.863Z"
 author: codex
 estimated_minutes: 720
 acceptance_criteria: "Inventory every executable TypeScript and JavaScript source; replace or explicitly justify JavaScript; measure statements, branches, functions, and lines across every executable source at exact 100 percent; make the gate fail when a source is added or removed from measurement; add strict lint, duplication and security/static gates with no blanket suppression; mutation-check the gate; keep tests behavior-driven and non-duplicative"
@@ -21,7 +21,7 @@ severity: high
 environment: "main 2d0077a, Node V8 coverage"
 repro_steps: Run npm run coverage and inspect coverage-gate DEFAULT_SKIP_DIRS plus package thresholds.
 expected_result: All executable repository source is measured at exact 100/100/100/100 and every strict quality gate is mandatory.
-actual_result: "The current branch still measures only index.ts at 89.97 percent lines, 88.32 percent branches, and 91.27 percent functions. Five executable TypeScript files now pass the docstring gate with 73 documented declarations, but scripts remain outside coverage, statements are not independent, and ESLint, duplication, mutation, and broader security/static gates remain absent."
+actual_result: "The 2026.9.28 CLI/SDK certification candidate passes 206 tests, 81 documented declarations, and zero duplicated lines. Coverage still reports only index.ts at 90.44/88.38/91.79 (lines/branches/functions), with no separate statements result. Mutation and broader security/static gate acceptance remain open."
 affected_version: pm-slack-standup 2026.8.17
 component: quality and release gates
 customer_impact: "A green release gate can coexist with untested source and below-mandate coverage, so it cannot support a production-ready claim."

@@ -1,13 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Fixed
-
-- Fix release publish ordering before protected main push ([pm-slack-standup-dwjl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dwjl.toon))
-- The release job authenticated with a stored npm token that expired, so publishing stopped while every other gate stayed green ([pm-slack-standup-wu9h](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wu9h.toon))
-- A release run bumped and committed a new version every night while publishing was impossible, because the only externally-failable step runs last ([pm-slack-standup-vfh4](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-vfh4.toon))
-
 ## 2026.9.26 - 2026-09-26
 
 ### Fixed
@@ -79,6 +71,8 @@
 
 ### Fixed
 
+- The release job authenticated with a stored npm token that expired, so publishing stopped while every other gate stayed green ([pm-slack-standup-wu9h](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wu9h.toon))
+- A release run bumped and committed a new version every night while publishing was impossible, because the only externally-failable step runs last ([pm-slack-standup-vfh4](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-vfh4.toon))
 - The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-slack-standup-eeo9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-eeo9.toon))
 - Canonicalize complete standup reads on pm CLI 2026.8.21 ([pm-slack-standup-ozic](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ozic.toon))
 
@@ -111,6 +105,7 @@
 
 ### Fixed
 
+- Fix release publish ordering before protected main push ([pm-slack-standup-dwjl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dwjl.toon))
 - The mandatory docstring gate could skip its own scan and still exit zero ([pm-slack-standup-cg85](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-cg85.toon))
 
 ### Other

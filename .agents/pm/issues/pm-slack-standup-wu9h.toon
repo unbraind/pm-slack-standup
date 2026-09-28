@@ -6,17 +6,18 @@ status: closed
 priority: 0
 tags[3]: npm,release,supply-chain
 created_at: "2026-08-26T19:33:45.640Z"
-updated_at: "2026-09-28T21:06:55.700Z"
+updated_at: "2026-09-28T21:23:40.218Z"
 deadline: "2026-09-02T00:00:00.000Z"
 closed_at: "2026-09-28T21:06:55.625Z"
 completed_at: "2026-09-28T21:06:55.625Z"
 author: claude
 estimated_minutes: 90
 acceptance_criteria: No release workflow references NODE_AUTH_TOKEN NPM_TOKEN or secrets.NPM outside a comment; the publish job carries id-token write; npm is raised to at least 11.5.1 before the publish step because the npm bundled with node 22 cannot exchange an OIDC token; a test fails closed if a stored token is reintroduced or the npm upgrade is removed
+release: 2026.8.28
 resolution: Stored npm token was replaced by a trusted publisher; successful live release used OIDC.
 expected_result: The release workflow publishes without a stored npm credential and refuses a missing or rejected OIDC identity before mutation.
 actual_result: Workflow 36230459197 passed OIDC preflight and npm publish; npm registry serves 2026.9.26 and current guard tests pass.
-fixed_version: 2026.9.26
+fixed_version: 2026.8.28
 comments[1]{created_at,author,text}:
   "2026-08-26T19:33:45.640Z",claude,"Guards verified as non-vacuous: reintroducing NODE_AUTH_TOKEN fails the OIDC test and deleting the npm upgrade step fails the npm-version test, while the unmodified tree passes both."
 notes[2]{created_at,author,text}:
