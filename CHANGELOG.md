@@ -5,6 +5,9 @@
 ### Fixed
 
 - A publish that npm accepts late is reported as failed and the GitHub Release is skipped on bun mirror lag ([pm-slack-standup-ykpv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ykpv.toon))
+- Fix release publish ordering before protected main push ([pm-slack-standup-dwjl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dwjl.toon))
+- The release job authenticated with a stored npm token that expired, so publishing stopped while every other gate stayed green ([pm-slack-standup-wu9h](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wu9h.toon))
+- A release run bumped and committed a new version every night while publishing was impossible, because the only externally-failable step runs last ([pm-slack-standup-vfh4](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-vfh4.toon))
 
 ### Other
 

@@ -6,7 +6,7 @@ status: open
 priority: 1
 tags[4]: coverage,quality-gate,release-blocker,tdd
 created_at: "2026-08-21T10:11:53.131Z"
-updated_at: "2026-09-22T05:10:25.678Z"
+updated_at: "2026-09-28T21:07:57.383Z"
 author: codex
 estimated_minutes: 720
 acceptance_criteria: "Inventory every executable TypeScript and JavaScript source; replace or explicitly justify JavaScript; measure statements, branches, functions, and lines across every executable source at exact 100 percent; make the gate fail when a source is added or removed from measurement; add strict lint, duplication and security/static gates with no blanket suppression; mutation-check the gate; keep tests behavior-driven and non-duplicative"
@@ -27,8 +27,9 @@ component: quality and release gates
 customer_impact: "A green release gate can coexist with untested source and below-mandate coverage, so it cannot support a production-ready claim."
 comments[1]{created_at,author,text}:
   "2026-09-22T05:10:25.678Z",pi-agent,"Not closed by the 2026.9.21 certify task pm-slack-standup-add0. That task delivers the canonical pm-ops lint and duplication gates only. This item still requires exact 100/100/100/100 all-source coverage, mutation checking, and the broader security/static analyzers named in its acceptance criteria."
-notes[1]{created_at,author,text}:
+notes[2]{created_at,author,text}:
   "2026-08-21T11:48:16.531Z",codex,CodeRabbit exact-head review verified that the description still carried the older 89.66/87.74/90.76 baseline. This append-only update aligns the blocker description with the final measured 89.97/88.32/91.27 result without changing its open status.
+  "2026-09-28T21:07:57.383Z",codex,"2026-09-28 certification candidate (pm-slack-standup-74w8): release gate now runs canonical pm-ops lint, duplication and docstring checks, but V8 coverage still reports only index.ts at 90.44% lines, 88.38% branches, 91.79% functions; no independently reported statements dimension or whole-source coverage. This open item remains the readiness blocker. The package upgrade PR does not claim 100/100/100/100."
 files[2]{path,scope,note}:
   package.json,project,Coverage thresholds and release gate
   scripts/coverage-gate.ts,project,Current index-only V8 gate
