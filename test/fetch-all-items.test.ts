@@ -523,15 +523,32 @@ test("a 200k-backslash win32 path is quoted correctly within the bounded launch 
   // argument need quoting at all, so the escaping path is genuinely entered.
   //
   // The original quadratic expressions took 16202ms for this 200k witness on
-  // an idle machine. The 2000ms bound still rejects that implementation by a
-  // wide margin. A ratio of two millisecond-scale timings depends on JIT and
-  // scheduler noise, so the absolute adversarial bound is the meaningful gate.
+  // an idle machine. The 2000ms bound rejects that implementation by a wide
+  // margin; batched medians also check growth without dividing two tiny times.
   const adversarial = " x" + "\\".repeat(200_000);
   const launch = pmLaunchPlan("pm", "win32");
+  for (let index = 0; index < 10; index++) launch.args([" x" + "\\".repeat(1_000)]);
   const start = performance.now();
   const args = launch.args([adversarial]);
   const elapsed = performance.now() - start;
   assert.ok(elapsed < 2000, `building the win32 tail must stay below 2000ms; took ${elapsed.toFixed(2)}ms`);
+  const shorter = " x" + "\\".repeat(20_000);
+  const shortTimes: number[] = [];
+  const longTimes: number[] = [];
+  for (let trial = 0; trial < 3; trial++) {
+    const shortStart = performance.now();
+    for (let iteration = 0; iteration < 25; iteration++) launch.args([shorter]);
+    shortTimes.push(performance.now() - shortStart);
+    const longStart = performance.now();
+    for (let iteration = 0; iteration < 25; iteration++) launch.args([adversarial]);
+    longTimes.push(performance.now() - longStart);
+  }
+  shortTimes.sort((left, right) => left - right);
+  longTimes.sort((left, right) => left - right);
+  assert.ok(
+    longTimes[1] / shortTimes[1] < 30,
+    `tenfold input growth must stay below thirtyfold runtime growth; medians ${shortTimes[1].toFixed(2)}ms and ${longTimes[1].toFixed(2)}ms`,
+  );
   // The escaping must still be correct, not merely fast: a run of n backslashes
   // at the end of the element doubles to 2n before the closing quote. A
   // speed-only assertion would accept a rewrite that silently changed the
