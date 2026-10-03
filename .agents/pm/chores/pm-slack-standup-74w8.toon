@@ -1,0 +1,69 @@
+id: pm-slack-standup-74w8
+title: Certify pm-slack-standup on CLI SDK 2026.9.28 and current release helpers
+description: "Upgrade exact @unbrained/pm-cli, pm-ops, and pm-changelog pins with lockfile; verify package tracker, full release gate, packed npm and Bun behavior, current OIDC release path, and PR reviews."
+type: Chore
+status: in_progress
+priority: 1
+tags[4]: certification,cli,release,sdk
+created_at: "2026-09-28T21:11:27.527Z"
+updated_at: "2026-10-03T00:00:47.081Z"
+author: codex
+acceptance_criteria: Exact pins and lockfile use latest published versions; full release gate and tracker strict health pass; packed Node/npm and Bun real-command acceptance pass; GitHub checks and review state are recorded for the exact pushed head.
+actual_result: "npm ci and npm run release:check PASS: 207/207 tests, zero skipped; measured index.ts coverage 90.44/88.23/91.79 lines/branches/functions with unchanged 83/87/87 floors; 81 documented declarations. Independent statements, whole-source 100 percent, mutation and broader static/security acceptance remain unmeasured/unaccepted in pm-slack-standup-7t31. Canonical-reader acceptance and all five packed npm/Bun current/minimum/global scenarios pass. Audit all/production zero; strict CI health, pm validate, Bun install and CI fresh-dist comparison pass. Linked packaging tests pass 2/2 and focused PATH fallback test 1/1 passes after failing red on a populated temporary ancestor. The fixture now owns all four searched directories and a shim just outside the bound, preserving real fallback assertions without touching other workspaces. Retained 207 count correction and original 206 history event preserved; all JSONL prefixes unchanged. Note projections support edit/delete in pinned CLI; immutable history is retained. Final-head CI and substantive reviews remain separate; both items released in_progress, never closed."
+comments[4]{created_at,author,text}:
+  "2026-10-02T18:25:02.591Z",pi-land-a,"Merge-readiness verification pass by pi-land-a (fleet PR landing session): exact head 919fc0a is up to date with origin/main (merge-base equals main tip), mergeable and CLEAN; Node 22, Node 26, CodeQL, Windows packed acceptance, Greptile, Semgrep and Hound CI are green; all five review threads are resolved; Greptile passed on this head. CodeRabbit's prior full-review requests for this head were rate limited, so the review window was re-requested. Sourcery budget exhausted (quota notice, not a review); Gemini not active. The all-source coverage blocker remains separately open under pm-slack-standup-7t31."
+  "2026-10-02T23:44:57.045Z",codex-sol,"Restart codex-sol: preserving all four retained PM files from stopped pi-grok agent, including actual_result 207 correction and technical note refusal. Rebase autostash restored the retained edits; current main already incorporated. JSONL prefixes stay unchanged. Revalidate full release gate/strict CI health/Bun and committed dist. Mutable-note contract supports edit/delete; preserve earlier events. Existing terminal release incident items are retained without new closures."
+  "2026-10-02T23:48:08.196Z",codex-sol,"First full gate failed one existing fallback fixture because a shared temporary ancestor now has a PM binary. Scoped test failed before the fix. Resolver intentionally probes four ancestors; changed only the fixture to own all four searched directories and place a real shim just outside the bound. This deterministically verifies PATH fallback and bounded search without reading/modifying other workspaces. Scoped test passes; no production code, skips or thresholds changed. Rerunning full gate."
+  "2026-10-03T00:00:46.566Z",codex-sol,"npm ci and npm run release:check PASS: 207/207 tests, zero skipped; measured index.ts coverage 90.44/88.23/91.79 lines/branches/functions with unchanged 83/87/87 floors; 81 documented declarations. Independent statements, whole-source 100 percent, mutation and broader static/security acceptance remain unmeasured/unaccepted in pm-slack-standup-7t31. Canonical-reader acceptance and all five packed npm/Bun current/minimum/global scenarios pass. Audit all/production zero; strict CI health, pm validate, Bun install and CI fresh-dist comparison pass. Linked packaging tests pass 2/2 and focused PATH fallback test 1/1 passes after failing red on a populated temporary ancestor. The fixture now owns all four searched directories and a shim just outside the bound, preserving real fallback assertions without touching other workspaces. Retained 207 count correction and original 206 history event preserved; all JSONL prefixes unchanged. Note projections support edit/delete in pinned CLI; immutable history is retained. Final-head CI and substantive reviews remain separate; both items released in_progress, never closed."
+notes[5]{created_at,author,text}:
+  "2026-09-28T21:11:37.684Z",codex,"2026-09-28 UTC candidate evidence: exact dev pins @unbrained/pm-cli 2026.9.28, pm-ops 2026.9.28, pm-changelog 2026.9.25; published pm-ops prepare template copied byte-for-byte. npm run release:check passed 206/206 tests, zero failures/skips in test summary, 81 documented declarations across 11 files, 0/8756 duplicated lines across 26 sources, zero production npm audit vulnerabilities, changelog date and publish attestation checks. Packed acceptance passed npm-current, bun-current, npm-minimum, bun-minimum, npm-global-current; current host 2026.9.28 and minimum 2026.8.20. Strict PM health passes with one stale-item and one historical provenance advisory. Coverage gate measured only index.ts: lines 90.44%, branches 88.38%, functions 91.79%; whole-source 100/100/100/100 remains blocked by pm-slack-standup-7t31. Three incident items closed after live release run 36230459197; regenerated CHANGELOG.md with pm-changelog."
+  "2026-09-28T21:17:04.791Z",codex,"2026-09-28 UTC exact-head CI on 642a802 failed Node 22 and 26 changelog:check while local Node 24 passed. Cause was an incomplete local tag set: local checkout lacked v2026.09.26, but GitHub CI fetched it and correctly generated an Unreleased section for the three post-tag incident closures. Fetched tags from origin, regenerated CHANGELOG.md with pm-changelog, and rechecked against the complete tag set. This is a local evidence-quality correction, not a Node-version runtime failure; new commit and exact-head gate are required."
+  "2026-09-28T21:24:16.474Z",codex,"2026-09-28 review/CI corrections: CodeRabbit correctly found stale description and actual_result in open coverage blocker pm-slack-standup-7t31; updated both via pm update. Greptile correctly found the publication validation version was not the first containing fix; git tag --contains and published releases prove protected-PR ordering first shipped v2026.08.10, OIDC and pre-mutation guard first shipped v2026.08.28. Corrected fixed_version and release fields; regenerate full-tag changelog. Greptile also requested a real damaged-install branch test; added directory-without-package.json and dangling-link consumer checkouts. Node 26 CI 5f74369 failed a ratio of 2.11ms and 6.87ms in a performance test; retain the adversarial 200k input, 2s absolute bound, and exact 400k-backslash quoting assertion while removing the noisy millisecond-scale ratio. Focused Node 26 tests pass. New full release gate and exact-head CI/reviews required."
+  "2026-09-28T21:38:31.976Z",codex,"2026-09-28 Greptile exact-head 33bedcc review found the single cold timing check did not meet the repository performance-test guidance. Reworked the same 200k-backslash adversarial test with 10 warm-ups, a 2s absolute bound, 25-invocation batches across three trials, median 20k-versus-200k input growth under 30x, and exact 400k-backslash output assertion. Focused local Node 22 and 26 suites each pass 42/42; full Node 26 release:check passes 207/207, five packed npm/Bun scenarios, 81 documented declarations, 0/8755 duplicate lines, and zero production audit vulnerabilities. This is candidate evidence; new exact-head CI and bot reviews remain required."
+  "2026-10-02T21:14:38.022Z",pi-grok,"Refused CodeRabbit's request to restore the literal-prefix notes and append a second correction. pm item notes supports --edit and --delete, so notes are current-state fields, not an append-only log. History events 6-8 already preserve the prefixed text, the removal, and the corrected restoration without rewriting earlier JSONL lines. Restoring author=codex,text= into the current projection would undo that correction."
+files[6]:
+  - path: .github/workflows/release.yml
+    scope: project
+  - path: package-lock.json
+    scope: project
+  - path: package.json
+    scope: project
+  - path: test/fetch-all-items.test.ts
+    scope: project
+    note: Bounded adversarial Windows quoting regression
+  - path: test/packaging.test.ts
+    scope: project
+  - path: test/prepare-merge-driver.test.ts
+    scope: project
+    note: Damaged installed pm-ops rejection in real Git consumer checkouts
+tests[3]:
+  - command: "npm run release:check"
+    path: .
+    scope: project
+    timeout_seconds: 1800
+    provenance:
+      author: codex
+      created_at: "2026-09-28T21:11:27.527Z"
+      source_kind: local_mutation
+      source_ref: chore/pm-slack-standup-cli-sdk-2026-9-28
+  - command: node --test test/packaging.test.ts
+    scope: project
+    provenance:
+      author: codex-sol
+      created_at: "2026-10-02T23:44:59.059Z"
+      source_kind: local_mutation
+      source_ref: land-97
+  - command: "node --test --test-name-pattern=\"falls back to.*PATH\" test/fetch-all-items.test.ts"
+    scope: project
+    provenance:
+      author: codex-sol
+      created_at: "2026-10-02T23:48:09.327Z"
+      source_kind: local_mutation
+      source_ref: land-97
+docs[2]:
+  - path: "https://github.com/unbraind/pm-slack-standup/actions/runs/36230459197"
+    scope: project
+    note: Successful npm OIDC Bun and GitHub release run
+  - path: README.md
+    scope: project
+body: ""
