@@ -167,11 +167,18 @@ test("resolvePmBin resolves the project-local node_modules/.bin/pm shim from thi
   assert.equal(launch.windowsVerbatimArguments, false);
 });
 
-test("resolvePmBin falls back to 'pm' on PATH when no local node_modules/.bin/pm exists", () => {
+test("resolvePmBin falls back to 'pm' on PATH when its four searched ancestors have no shim", () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-pmbin-fallback-"));
   try {
-    // A module URL inside a temp tree with no node_modules must fall back.
-    const fakeModuleUrl = pathToFileURL(join(dir, "index.js")).href;
+    // Keep all four probed directories inside the owned fixture. A real shim
+    // just outside that search window proves the bounded lookup ignores it,
+    // independently of any installed shims in the shared temporary ancestors.
+    const nested = join(dir, "one", "two", "three", "four");
+    mkdirSync(nested, { recursive: true });
+    const outsideBin = join(dir, "node_modules", ".bin");
+    mkdirSync(outsideBin, { recursive: true });
+    writeFileSync(join(outsideBin, "pm"), "#!/bin/sh\n", "utf-8");
+    const fakeModuleUrl = pathToFileURL(join(nested, "index.js")).href;
     const launch = resolvePmBin(fakeModuleUrl, "linux");
     assert.equal(launch.command, "pm");
     assert.deepEqual(launch.args(["--path", "/tracker"]), ["--path", "/tracker"]);
