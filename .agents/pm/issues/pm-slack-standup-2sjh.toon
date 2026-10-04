@@ -1,0 +1,14 @@
+id: pm-slack-standup-2sjh
+title: Restore a clean full audit after the unpatched braces advisory is resolved
+description: "Certification pm-slack-standup-74w8 has clean production audit and no open repository Dependabot alerts, but full npm audit reports 4 high findings through fast-glob 3.3.3 -> micromatch 4.0.8 -> braces 3.0.3, including pm-ops 2026.10.4. GHSA-vfj7-8cjw-p6xm explicitly has no patched version and registry versions stop at 3.0.3. Consume a compatible published fix or canonical scanner replacement, preserve real glob/duplication behavior and all gates, then prove npm audit --omit=dev and npm audit clean. Do not suppress advisory, replace braces with incompatible brace-expansion, or downgrade the required canonical gate to claim clean."
+type: Issue
+status: open
+priority: 1
+tags[4]: audit,certification,release-blocker,security
+created_at: "2026-10-04T11:38:47.097Z"
+updated_at: "2026-10-04T11:39:23.539Z"
+author: codex-sol
+actual_result: "npm audit --omit=dev: found 0 vulnerabilities. npm audit: 4 high (braces, micromatch, fast-glob, pm-ops), GHSA-vfj7-8cjw-p6xm; braces latest/published maximum 3.0.3, advisory patched versions None. Full audit cleanliness remains blocked; no incompatible override or downgrade applied."
+files[1]{path,scope,note}:
+  package-lock.json,project,Observed unpatched dependency chain
+body: ""
