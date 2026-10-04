@@ -167,11 +167,18 @@ test("resolvePmBin resolves the project-local node_modules/.bin/pm shim from thi
   assert.equal(launch.windowsVerbatimArguments, false);
 });
 
-test("resolvePmBin falls back to 'pm' on PATH when no local node_modules/.bin/pm exists", () => {
+test("resolvePmBin falls back to 'pm' on PATH when its four searched ancestors have no shim", () => {
   const dir = mkdtempSync(join(tmpdir(), "standup-pmbin-fallback-"));
   try {
-    // A module URL inside a temp tree with no node_modules must fall back.
-    const fakeModuleUrl = pathToFileURL(join(dir, "index.js")).href;
+    // Keep all four probed directories inside the owned fixture. A real shim
+    // just outside that search window proves the bounded lookup ignores it,
+    // independently of any installed shims in the shared temporary ancestors.
+    const nested = join(dir, "one", "two", "three", "four");
+    mkdirSync(nested, { recursive: true });
+    const outsideBin = join(dir, "node_modules", ".bin");
+    mkdirSync(outsideBin, { recursive: true });
+    writeFileSync(join(outsideBin, "pm"), "#!/bin/sh\n", "utf-8");
+    const fakeModuleUrl = pathToFileURL(join(nested, "index.js")).href;
     const launch = resolvePmBin(fakeModuleUrl, "linux");
     assert.equal(launch.command, "pm");
     assert.deepEqual(launch.args(["--path", "/tracker"]), ["--path", "/tracker"]);
@@ -511,7 +518,7 @@ test("the win32 launch resolves the command processor through ComSpec and falls 
   }
 });
 
-test("the win32 tail is built in linear time, so a backslash-heavy path cannot stall the launch", () => {
+test("a 200k-backslash win32 path is quoted correctly within the bounded launch time", () => {
   // CodeQL js/polynomial-redos witness for the quoting the win32 tail applies.
   // The escaping used to be two `replace` calls whose `(\\*)` groups are
   // quadratic on a run of backslashes: the engine retries at every position in
@@ -522,56 +529,39 @@ test("the win32 tail is built in linear time, so a backslash-heavy path cannot s
   // string that carries long backslash runs. The leading " x" is what makes the
   // argument need quoting at all, so the escaping path is genuinely entered.
   //
-  // The bound is deliberately generous. A single cold measurement on a
-  // contended runner carries JIT warm-up, GC pauses, scheduler noise and
-  // coverage instrumentation, and this suite also runs on a Windows launcher
-  // job, so a tight assertion would measure the runner as much as the code and
-  // could fail on a correct implementation. A bound that flakes gets raised or
-  // deleted the first time it does, which is how a regression test stops
-  // guarding anything. 2000ms cannot be reached by the linear pass on any
-  // runner while still failing decisively against the original expressions,
-  // which took 16202ms on an idle machine.
-  //
-  // The scale-free half is the ratio: doubling the run must not quadruple the
-  // time. That is the actual claim - linear rather than polynomial growth - and
-  // it holds however fast the machine is.
-  const adversarial = " x" + "\\".repeat(100_000);
-  const doubled = " x" + "\\".repeat(200_000);
+  // The original quadratic expressions took 16202ms for this 200k witness on
+  // an idle machine. The 2000ms bound rejects that implementation by a wide
+  // margin; batched medians also check growth without dividing two tiny times.
+  const adversarial = " x" + "\\".repeat(200_000);
   const launch = pmLaunchPlan("pm", "win32");
-
-  const singleSamples: number[] = [];
-  const doubleSamples: number[] = [];
-  let args: string[] = [];
-  // Repeat paired measurements so scheduler pauses and collection do not
-  // determine the ratio. Alternate their order to avoid a systematic JIT bias.
-  launch.args([adversarial]); // Warm the quoting path before measuring.
-  for (let round = 0; round < 5; round += 1) {
-    for (const [input, samples] of round % 2 === 0
-      ? [[adversarial, singleSamples], [doubled, doubleSamples]] as const
-      : [[doubled, doubleSamples], [adversarial, singleSamples]] as const) {
-      const start = performance.now();
-      const rendered = launch.args([input]);
-      const elapsed = performance.now() - start;
-      assert.ok(elapsed < 2000, `building the win32 tail must stay below 2000ms; took ${elapsed.toFixed(2)}ms`);
-      samples.push(elapsed);
-      if (input === adversarial) args = rendered;
-    }
+  for (let index = 0; index < 10; index++) launch.args([" x" + "\\".repeat(1_000)]);
+  const start = performance.now();
+  const args = launch.args([adversarial]);
+  const elapsed = performance.now() - start;
+  assert.ok(elapsed < 2000, `building the win32 tail must stay below 2000ms; took ${elapsed.toFixed(2)}ms`);
+  const shorter = " x" + "\\".repeat(20_000);
+  const shortTimes: number[] = [];
+  const longTimes: number[] = [];
+  for (let trial = 0; trial < 3; trial++) {
+    const shortStart = performance.now();
+    for (let iteration = 0; iteration < 25; iteration++) launch.args([shorter]);
+    shortTimes.push(performance.now() - shortStart);
+    const longStart = performance.now();
+    for (let iteration = 0; iteration < 25; iteration++) launch.args([adversarial]);
+    longTimes.push(performance.now() - longStart);
   }
-  const single = Math.min(...singleSamples);
-  const double = Math.min(...doubleSamples);
-  if (single >= 1) {
-    assert.ok(
-      double / single < 3,
-      `doubling the backslash run must not multiply the time superlinearly: `
-        + `${single.toFixed(2)}ms then ${double.toFixed(2)}ms (ratio ${(double / single).toFixed(2)})`,
-    );
-  }
+  shortTimes.sort((left, right) => left - right);
+  longTimes.sort((left, right) => left - right);
+  assert.ok(
+    longTimes[1] / shortTimes[1] < 30,
+    `tenfold input growth must stay below thirtyfold runtime growth; medians ${shortTimes[1].toFixed(2)}ms and ${longTimes[1].toFixed(2)}ms`,
+  );
   // The escaping must still be correct, not merely fast: a run of n backslashes
   // at the end of the element doubles to 2n before the closing quote. A
   // speed-only assertion would accept a rewrite that silently changed the
   // quoting.
   assert.ok(
-    args[4].includes(" x" + "\\".repeat(200_000) + '"'),
+    args[4].includes(" x" + "\\".repeat(400_000) + '"'),
     "a run of n backslashes at the end of the element must double to 2n before the closing quote",
   );
 });
