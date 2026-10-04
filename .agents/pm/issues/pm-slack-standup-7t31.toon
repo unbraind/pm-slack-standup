@@ -6,7 +6,7 @@ status: in_progress
 priority: 1
 tags[4]: coverage,quality-gate,release-blocker,tdd
 created_at: "2026-08-21T10:11:53.131Z"
-updated_at: "2026-10-04T17:59:34.003Z"
+updated_at: "2026-10-04T18:07:50.829Z"
 assignee: codex-sol
 claim_principal: codex-sol
 author: codex
@@ -65,4 +65,6 @@ tests[2]:
       created_at: "2026-10-04T17:52:28.449Z"
       source_kind: local_mutation
       source_ref: test/cover-every-standup-path
+docs[1]{path,scope}:
+  docs/all-source-coverage.md,project
 body: ""
