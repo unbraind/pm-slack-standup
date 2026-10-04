@@ -6,11 +6,11 @@ status: in_progress
 priority: 1
 tags[4]: certification,cli,release,sdk
 created_at: "2026-09-28T21:11:27.527Z"
-updated_at: "2026-10-04T12:16:16.540Z"
+updated_at: "2026-10-04T12:34:03.265Z"
 author: codex
 acceptance_criteria: Exact pins and lockfile use latest published versions; full release gate and tracker strict health pass; packed Node/npm and Bun real-command acceptance pass; GitHub checks and review state are recorded for the exact pushed head.
 actual_result: "Review-corrected full locked npm run release:check PASS: 208/208 tests, zero skips; canonical launcher scoped/linked 8/8; duplication 0/8790 lines across 26 sources; 81 documented declarations; canonical-reader and all 5 packed npm/Bun current/minimum/global scenarios PASS. Coverage unchanged at 90.44/88.23/91.79 across index.ts only; scripts and independent statements remain unmeasured in pm-slack-standup-7t31. Production audit/pack/changelog/date/attestation PASS; full audit remains 4 high unpatched braces findings in pm-slack-standup-2sjh. Original real-tracker packed npm/native Bun dogfood PASS: 89 input items, same section data, byte-identical 3175-byte Markdown, scratch deleted. Strict health PASS with unchanged advisories. pm-github 2026.10.4 installed locally, zero-case read-only preview 0/0/0; runtime payload excluded from Git, reviewed upstream apply limitations recorded in pm-slack-standup-bhg0. All pins exact; alerts []. NOT READY for audit/coverage requirements; final-head CI and substantive bot reviews remain separate."
-comments[10]{created_at,author,text}:
+comments[11]{created_at,author,text}:
   "2026-10-02T18:25:02.591Z",pi-land-a,"Merge-readiness verification pass by pi-land-a (fleet PR landing session): exact head 919fc0a is up to date with origin/main (merge-base equals main tip), mergeable and CLEAN; Node 22, Node 26, CodeQL, Windows packed acceptance, Greptile, Semgrep and Hound CI are green; all five review threads are resolved; Greptile passed on this head. CodeRabbit's prior full-review requests for this head were rate limited, so the review window was re-requested. Sourcery budget exhausted (quota notice, not a review); Gemini not active. The all-source coverage blocker remains separately open under pm-slack-standup-7t31."
   "2026-10-02T23:44:57.045Z",codex-sol,"Restart codex-sol: preserving all four retained PM files from stopped pi-grok agent, including actual_result 207 correction and technical note refusal. Rebase autostash restored the retained edits; current main already incorporated. JSONL prefixes stay unchanged. Revalidate full release gate/strict CI health/Bun and committed dist. Mutable-note contract supports edit/delete; preserve earlier events. Existing terminal release incident items are retained without new closures."
   "2026-10-02T23:48:08.196Z",codex-sol,"First full gate failed one existing fallback fixture because a shared temporary ancestor now has a PM binary. Scoped test failed before the fix. Resolver intentionally probes four ancestors; changed only the fixture to own all four searched directories and place a real shim just outside the bound. This deterministically verifies PATH fallback and bounded search without reading/modifying other workspaces. Scoped test passes; no production code, skips or thresholds changed. Rerunning full gate."
@@ -21,6 +21,7 @@ comments[10]{created_at,author,text}:
   "2026-10-04T12:10:49.717Z",codex-sol,"Review round 1: adding the real malformed NODE_PATH file regression for the canonical launcher filesystem-error refusal; canonical template remains byte-identical. Generated managed pm-github distribution is clone-local/ignored and its exact install command and read-only zero-case preview remain documented. Valid upstream apply-path findings are scoped out of this consumer PR, not fixed or write-tested. Full audit and existing coverage blockers remain open."
   "2026-10-04T12:15:28.646Z",codex-sol,"Review corrections validated: full locked release gate 208/208 zero skips, duplication 0/8790 lines, all 5 packed scenarios green, launcher linked 8/8. Published pm-github apply-path concerns are valid but outside consumer scope; follow-up pm-slack-standup-bhg0 remains open. Audit and coverage blockers preserved. Releasing claim for orchestrator."
   "2026-10-04T12:16:15.958Z",codex-sol,"Correct linked selection: --only-index 4 executes the launcher suite and passes 8/8. An accidental --only-last selected the already-passed full gate and was cancelled while waiting for the shared heavy lock, before executing tests. No duplicate full-gate result is claimed."
+  "2026-10-04T12:34:02.652Z",codex-sol,"CodeRabbit PR #105 portability finding reproduced test-first with a fresh disposable missing parent: flock fails before command execution; mkdir -p parent followed by the same flock succeeds. Updated linked full-gate command to mkdir -p /tmp/claude-1000 && flock /tmp/claude-1000/heavy-gate.lock npm run release:check, preserving the exact mandatory shared lock and full unchanged npm gate. Linked runtime context is now explicitly tracker/source for the full tracker-reading gate. No source, thresholds or test assertions changed; previous full gate 208/208 remains source validation, and final-head CI will run again."
 notes[5]{created_at,author,text}:
   "2026-09-28T21:11:37.684Z",codex,"2026-09-28 UTC candidate evidence: exact dev pins @unbrained/pm-cli 2026.9.28, pm-ops 2026.9.28, pm-changelog 2026.9.25; published pm-ops prepare template copied byte-for-byte. npm run release:check passed 206/206 tests, zero failures/skips in test summary, 81 documented declarations across 11 files, 0/8756 duplicated lines across 26 sources, zero production npm audit vulnerabilities, changelog date and publish attestation checks. Packed acceptance passed npm-current, bun-current, npm-minimum, bun-minimum, npm-global-current; current host 2026.9.28 and minimum 2026.8.20. Strict PM health passes with one stale-item and one historical provenance advisory. Coverage gate measured only index.ts: lines 90.44%, branches 88.38%, functions 91.79%; whole-source 100/100/100/100 remains blocked by pm-slack-standup-7t31. Three incident items closed after live release run 36230459197; regenerated CHANGELOG.md with pm-changelog."
   "2026-09-28T21:17:04.791Z",codex,"2026-09-28 UTC exact-head CI on 642a802 failed Node 22 and 26 changelog:check while local Node 24 passed. Cause was an incomplete local tag set: local checkout lacked v2026.09.26, but GitHub CI fetched it and correctly generated an Unreleased section for the three post-tag incident closures. Fetched tags from origin, regenerated CHANGELOG.md with pm-changelog, and rechecked against the complete tag set. This is a local evidence-quality correction, not a Node-version runtime failure; new commit and exact-head gate are required."
@@ -87,17 +88,17 @@ tests[5]:
       source_kind: local_mutation
       source_ref: chore/pm-slack-standup-pm-cli-2026-10-4
     note: Published merge-driver launcher acceptance
-  - command: "flock /tmp/claude-1000/heavy-gate.lock npm run release:check"
+  - command: "mkdir -p /tmp/claude-1000 && flock /tmp/claude-1000/heavy-gate.lock npm run release:check"
     scope: project
     timeout_seconds: 2400
-    pm_context_mode: schema
+    pm_context_mode: tracker
     workspace_context_mode: source
     provenance:
       author: codex-sol
-      created_at: "2026-10-04T11:38:12.002Z"
+      created_at: "2026-10-04T12:34:02.014Z"
       source_kind: local_mutation
       source_ref: chore/pm-slack-standup-pm-cli-2026-10-4
-    note: "Full current CI release gate, no threshold reductions"
+    note: Create parent before opening mandatory shared host heavy lock; portable preflight verified with real disposable filesystem
 docs[3]:
   - path: docs/certification-2026.10.4.md
     scope: project
