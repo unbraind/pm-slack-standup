@@ -77,8 +77,8 @@ export function runGate(root: string): number {
     }
     for (const metric of metrics) {
       const threshold = config.thresholds[metric];
-      if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
-        throw new Error(`coverageGate.thresholds.${metric} must be a finite percentage`);
+      if (threshold !== 100) {
+        throw new Error(`coverageGate.thresholds.${metric} must be exactly 100 percent`);
       }
     }
     const sources = collectSources(canonicalRoot);

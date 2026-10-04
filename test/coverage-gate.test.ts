@@ -83,7 +83,7 @@ test("invalid configuration and empty source inventories fail closed", () => {
       writeFileSync(manifestPath, JSON.stringify({ type: "module", coverageGate: config }));
       assert.equal(runGate(root), 1);
     }
-    for (const threshold of [-1, 101, null]) {
+    for (const threshold of [-1, 0, 99.99, 101, null]) {
       writeFileSync(manifestPath, JSON.stringify({ type: "module", coverageGate: {
         ...manifest.coverageGate, thresholds: { ...manifest.coverageGate.thresholds, statements: threshold },
       } }));
