@@ -1,12 +1,14 @@
 id: pm-slack-standup-7t31
 title: Require exact all-source 100/100/100/100 coverage and strict quality gates
-description: "The current V8 coverage gate measures only index.ts at 90.44% lines, 88.38% branches, and 91.79% functions, with no separately reported statements result. release:check now enforces canonical pm-ops ESLint lint and zero-duplication checks plus the docstring gate, but executable scripts remain outside coverage and the mutation and broader static/security gate criteria remain incomplete. This blocks an all-source 100/100/100/100 or production-ready claim."
+description: "The current V8 coverage gate measures only index.ts at 90.44% lines, 88.23% branches, and 91.79% functions, with no separately reported statements result. release:check now enforces canonical pm-ops ESLint lint and zero-duplication checks plus the docstring gate, but executable scripts remain outside coverage and the mutation and broader static/security gate criteria remain incomplete. This blocks an all-source 100/100/100/100 or production-ready claim."
 type: Issue
 status: in_progress
 priority: 1
 tags[4]: coverage,quality-gate,release-blocker,tdd
 created_at: "2026-08-21T10:11:53.131Z"
-updated_at: "2026-10-03T00:00:48.681Z"
+updated_at: "2026-10-04T08:50:03.993Z"
+assignee: pi-glm
+claim_principal: pi-glm
 author: codex
 estimated_minutes: 720
 acceptance_criteria: "Inventory every executable TypeScript and JavaScript source; replace or explicitly justify JavaScript; measure statements, branches, functions, and lines across every executable source at exact 100 percent; make the gate fail when a source is added or removed from measurement; add strict lint, duplication and security/static gates with no blanket suppression; mutation-check the gate; keep tests behavior-driven and non-duplicative"
@@ -25,10 +27,11 @@ actual_result: "npm ci and npm run release:check PASS: 207/207 tests, zero skipp
 affected_version: pm-slack-standup 2026.8.17
 component: quality and release gates
 customer_impact: "A green release gate can coexist with untested source and below-mandate coverage, so it cannot support a production-ready claim."
-comments[3]{created_at,author,text}:
+comments[4]{created_at,author,text}:
   "2026-09-22T05:10:25.678Z",pi-agent,"Not closed by the 2026.9.21 certify task pm-slack-standup-add0. That task delivers the canonical pm-ops lint and duplication gates only. This item still requires exact 100/100/100/100 all-source coverage, mutation checking, and the broader security/static analyzers named in its acceptance criteria."
   "2026-10-02T21:14:35.906Z",pi-grok,"Current-state actual_result now reports the later 21:38 certification run of 207/207. The 206-test result remains in the append-only history event from 2026-09-28T21:23:29.863Z. Later commits after that run do not add tests."
   "2026-10-03T00:00:48.172Z",codex-sol,"npm ci and npm run release:check PASS: 207/207 tests, zero skipped; measured index.ts coverage 90.44/88.23/91.79 lines/branches/functions with unchanged 83/87/87 floors; 81 documented declarations. Independent statements, whole-source 100 percent, mutation and broader static/security acceptance remain unmeasured/unaccepted in pm-slack-standup-7t31. Canonical-reader acceptance and all five packed npm/Bun current/minimum/global scenarios pass. Audit all/production zero; strict CI health, pm validate, Bun install and CI fresh-dist comparison pass. Linked packaging tests pass 2/2 and focused PATH fallback test 1/1 passes after failing red on a populated temporary ancestor. The fixture now owns all four searched directories and a shim just outside the bound, preserving real fallback assertions without touching other workspaces. Retained 207 count correction and original 206 history event preserved; all JSONL prefixes unchanged. Note projections support edit/delete in pinned CLI; immutable history is retained. Final-head CI and substantive reviews remain separate; both items released in_progress, never closed."
+  "2026-10-04T08:50:03.993Z",pi-glm,"cubic-dev-ai finding (PR 97 third round): the description still labeled the superseded 88.38 percent branch figure as current while actual_result reports 88.23. Fixed through the pm CLI in 923e16c: the description's current coverage baseline now states the measured 90.44/88.23/91.79 lines/branches/functions. Historical receipts in the immutable JSONL history are unchanged; the projection edit is appended as a new history event. Full gate re-validated at 923e16c: npm ci and npm run release:check PASS — 207/207 tests, zero skipped; measured index.ts coverage exactly 90.44/88.23/91.79 with unchanged 83/87/87 floors; 81 documented declarations; lint, duplication, canonical-reader, audit:prod, pack, all five packed npm/Bun scenarios, changelog:check, release-changelog-date and publish-attestation green. Independent statements, whole-source 100 percent, mutation and broader static/security acceptance remain unmeasured/unaccepted here."
 notes[2]{created_at,author,text}:
   "2026-08-21T11:48:16.531Z",codex,CodeRabbit exact-head review verified that the description still carried the older 89.66/87.74/90.76 baseline. This append-only update aligns the blocker description with the final measured 89.97/88.32/91.27 result without changing its open status.
   "2026-09-28T21:07:57.383Z",codex,"2026-09-28 certification candidate (pm-slack-standup-74w8): release gate now runs canonical pm-ops lint, duplication and docstring checks, but V8 coverage still reports only index.ts at 90.44% lines, 88.38% branches, 91.79% functions; no independently reported statements dimension or whole-source coverage. This open item remains the readiness blocker. The package upgrade PR does not claim 100/100/100/100."
