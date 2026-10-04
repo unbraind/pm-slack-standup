@@ -23,7 +23,7 @@ interface CoverageConfig {
 
 /** Only dependencies, fixtures, generated output and tracker data are outside authored source. */
 const nonSourceDirectories = new Set([
-  "node_modules", "test", "tests", "dist", "dist-test", "coverage", ".git", ".agents", ".github",
+  "node_modules", "test", "tests", "dist", "dist-test", "coverage", ".git", ".agents",
 ]);
 const metrics = ["lines", "statements", "branches", "functions"] as const;
 const c8 = createRequire(import.meta.url).resolve("c8/bin/c8.js");
@@ -87,12 +87,11 @@ export function runGate(root: string): number {
     }));
     const environment: NodeJS.ProcessEnv = { ...process.env, TZ: "UTC" };
     delete environment.NODE_TEST_CONTEXT;
-    const output = execFileSync(process.execPath, [c8, "--config", settings, process.execPath,
+    execFileSync(process.execPath, [c8, "--config", settings, process.execPath,
       "--test", "--test-reporter=spec", ...config.tests], {
-      cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
+      cwd: root, stdio: "inherit",
       env: environment,
     });
-    process.stdout.write(output);
     const summary = JSON.parse(readFileSync(join(reportDir, "coverage-summary.json"), "utf8")) as Record<string, unknown>;
     const reported = Object.keys(summary).filter((file) => file !== "total")
       .map((file) => relative(root, file).split(sep).join("/")).sort();

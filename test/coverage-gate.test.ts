@@ -7,7 +7,7 @@ import test from "node:test";
 import { collectSources, runGate, runIfMain } from "../scripts/coverage-gate.ts";
 
 /** Create an isolated package whose authored files and tests are independently controlled. */
-function fixture(): string {
+function fixture(check: (root: string) => void): void {
   const root = mkdtempSync(join(tmpdir(), "standup-coverage-gate-"));
   mkdirSync(join(root, "test"));
   mkdirSync(join(root, "scripts"));
@@ -19,35 +19,33 @@ function fixture(): string {
   writeFileSync(join(root, "scripts", "operation.ts"), "export const operation = 'complete';\n");
   writeFileSync(join(root, "test", "fixture.test.ts"),
     "import assert from 'node:assert/strict'; import test from 'node:test'; import { message } from '../index.ts'; import { operation } from '../scripts/operation.ts'; test('observable exports', () => { assert.equal(message, 'ready'); assert.equal(operation, 'complete'); });\n");
-  return root;
+  try { check(root); } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
 test("coverage inventories operational scripts and independently reports all four dimensions", () => {
-  const root = fixture();
-  try {
+  fixture((root) => {
+    writeFileSync(join(root, ".c8rc.json"), JSON.stringify({ include: ["index.ts"], all: false, lines: 0 }));
     assert.deepEqual(collectSources(root), ["index.ts", "scripts/operation.ts"]);
     assert.equal(runGate(root), 0);
     const summary = JSON.parse(readFileSync(join(root, "coverage", "coverage-summary.json"), "utf8")) as {
       total: Record<string, { pct: number }>;
     };
     for (const metric of ["lines", "statements", "branches", "functions"]) assert.equal(summary.total[metric].pct, 100);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 });
 
 test("an unimported operational source fails the gate and invalidates stale LCOV", () => {
-  const root = fixture();
-  try {
+  fixture((root) => {
     mkdirSync(join(root, "coverage"));
     writeFileSync(join(root, "coverage", "lcov.info"), "stale-success");
     writeFileSync(join(root, "scripts", "unloaded.ts"), "export function missing() { return 'uncovered'; }\n");
     assert.equal(runGate(root), 1);
     assert.throws(() => readFileSync(join(root, "coverage", "lcov.info")));
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 });
 
 test("source enumeration excludes generated trees and verifies that type-only files erase", () => {
-  const root = fixture();
-  try {
+  fixture((root) => {
     mkdirSync(join(root, "dist"));
     writeFileSync(join(root, "dist", "generated.ts"), "export const generated = true;");
     writeFileSync(join(root, "types.d.ts"), "export declare const declared: string;");
@@ -55,12 +53,11 @@ test("source enumeration excludes generated trees and verifies that type-only fi
     writeFileSync(join(root, "notes.txt"), "fixture notes");
     assert.deepEqual(collectSources(root), ["index.ts", "scripts/operation.ts"]);
     assert.equal(runGate(root), 0);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 });
 
 test("invalid configuration and empty source inventories fail closed", () => {
-  const root = fixture();
-  try {
+  fixture((root) => {
     const manifestPath = join(root, "package.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
       coverageGate: { sources: string[]; ignore: string[]; thresholds: Record<string, number>; tests: string[] };
@@ -82,35 +79,31 @@ test("invalid configuration and empty source inventories fail closed", () => {
     rmSync(join(root, "index.ts"));
     rmSync(join(root, "scripts", "operation.ts"));
     assert.equal(runGate(root), 1);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 });
 
 test("a failing behavioral assertion cannot leave a successful coverage receipt", () => {
-  const root = fixture();
-  try {
+  fixture((root) => {
     writeFileSync(join(root, "test", "failing.test.ts"), "import test from 'node:test'; import assert from 'node:assert/strict'; test('failure', () => assert.equal('actual', 'expected'));\n");
     assert.equal(runGate(root), 1);
     assert.throws(() => readFileSync(join(root, "coverage", "lcov.info")));
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 });
 
 test("a source disappearing during the suite cannot silently shrink the report", () => {
-  const root = fixture();
-  try {
-    writeFileSync(join(root, "test", "remove.test.ts"), "import { unlinkSync } from 'node:fs'; import { message } from '../index.ts'; unlinkSync(new URL('../index.ts', import.meta.url));\n");
+  fixture((root) => {
+    writeFileSync(join(root, "test", "fixture.test.ts"), "import { unlinkSync } from 'node:fs'; import assert from 'node:assert/strict'; import test from 'node:test'; import { message } from '../index.ts'; import { operation } from '../scripts/operation.ts'; test('loaded before removal', () => { assert.equal(message, 'ready'); assert.equal(operation, 'complete'); unlinkSync(new URL('../index.ts', import.meta.url)); });\n");
     assert.equal(runGate(root), 1);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 });
 
 test("direct invocation sets success status while imports leave status untouched", () => {
-  const root = fixture();
-  const previousStatus = process.exitCode;
-  try {
-    assert.equal(runIfMain([], import.meta.url, root), false);
-    assert.equal(runIfMain([process.execPath, import.meta.filename], import.meta.url, root), true);
-    assert.equal(process.exitCode, 0);
-  } finally {
-    process.exitCode = previousStatus;
-    rmSync(root, { recursive: true, force: true });
-  }
+  fixture((root) => {
+    const previousStatus = process.exitCode;
+    try {
+      assert.equal(runIfMain([], import.meta.url, root), false);
+      assert.equal(runIfMain([process.execPath, import.meta.filename], import.meta.url, root), true);
+      assert.equal(process.exitCode, 0);
+    } finally { process.exitCode = previousStatus; }
+  });
 });
