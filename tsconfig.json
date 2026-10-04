@@ -17,7 +17,8 @@
     "allowImportingTsExtensions": true,
     "types": [
       "node"
-    ]
+    ],
+    "erasableSyntaxOnly": true
   },
   "include": [
     "*.ts"

@@ -477,12 +477,6 @@ const CRON_BOUNDS = [
 /** Parse one cron field token into a sorted unique list of valid values. */
 function parseCronField(token, fieldIndex) {
     const [min, max] = CRON_BOUNDS[fieldIndex];
-    const all = () => {
-        const out = [];
-        for (let v = min; v <= max; v++)
-            out.push(v);
-        return out;
-    };
     const expandRange = (lo, hi, step) => {
         const out = [];
         for (let v = lo; v <= hi; v += step)
@@ -569,7 +563,9 @@ export function parseSchedule(spec) {
             return { kind: "cron", fields: parsed, raw: s };
         }
         catch (err) {
-            throw new CommandError(`Invalid --schedule cron expression '${s}': ${err instanceof Error ? err.message : String(err)}.`, EXIT_CODE.USAGE);
+            // Only parseCronField and native operations run in this try block;
+            // each throws Error instances (see runtime coverage evidence).
+            throw new CommandError(`Invalid --schedule cron expression '${s}': ${err.message}.`, EXIT_CODE.USAGE);
         }
     }
     throw new CommandError(`Invalid --schedule '${s}'. Use HH:MM (daily, local time) or a 5-field cron expression (min hour dom mon dow).`, EXIT_CODE.USAGE);
@@ -744,278 +740,88 @@ export function describePmReadFailure(error, limitBytes) {
     return `pm read failed: ${error.message}`;
 }
 /**
- * Quote one argv element for a Windows command-line tail.
- *
- * The element is left bare when nothing in it needs quoting, and otherwise
- * wrapped in double quotes with the documented CommandLineToArgvW escaping:
- * every `"` in the element becomes `\"`, and a run of backslashes directly
- * before a quote (including the closing quote this function appends) doubles,
- * because the parser consuming the line collapses `2n` backslashes before a
- * quote back to `n`. An empty element becomes `""`, which is the only way an
- * empty argument survives a command line at all.
- *
- * Quoting is triggered by space and tab (which end an unquoted argument), by
- * `"` (which must be escaped anyway, and only reads as one token once quoted),
- * and by each of `& | < > ^ ( )`: cmd.exe treats those as operators when they
- * stand outside quotes and as literals inside them — which is also why quoting
- * is used instead of `^`-escaping, since a quoted `^` is a literal `^`. On the
- * cmd.exe launch path, the caller first refuses literal quotes because cmd does
- * not recognize the backslash escaping intended for CommandLineToArgvW; it also
- * refuses line breaks and `%NAME%` pairs because outer quoting cannot contain
- * them. `!` is not refused because the launch disables delayed expansion with
- * `/v:off`, making `!` literal. See {@link assertNoCmdVariableExpansion}.
- *
- * @param arg - One argv element to render.
- * @returns The element as it must appear inside a command-line tail.
+ * Retain the Windows argument refusal policy for quotes, line breaks and
+ * percent-delimited names even though the launch no longer uses cmd.exe.
+ * Validate the captured argv once so changing accessors cannot bypass it.
+ * @param argv - Binary path followed by every PM argument.
+ * @throws {CommandError} When an argument violates the compatibility policy.
  */
-function quoteWindowsArg(arg) {
-    if (arg === "")
-        return '""';
-    if (!/[\t "&|<>()^]/.test(arg))
-        return arg;
-    // Built by a single left-to-right pass rather than by two `replace` calls.
-    // The previous expressions were `/(\\*)"/g` and `/(\\*)$/`, and both are
-    // quadratic on a run of backslashes: the engine retries the pattern at every
-    // position in the run, and the greedy `\\*` rescans the rest of the run on
-    // each attempt. CodeQL flagged this as js/polynomial-redos, and the input is
-    // reachable — a Windows workspace path arrives here through `--pm-path`.
-    //
-    // The escaping rules are unchanged, only how they are applied. A run of `n`
-    // backslashes immediately before a `"` becomes `2n + 1` backslashes and a
-    // literal quote, because CommandLineToArgvW collapses `2n` backslashes before
-    // a quote back to `n` and the extra one escapes the quote itself. A run at the
-    // very end doubles for the same reason, since the closing quote this function
-    // appends is also a quote the parser will see. Backslashes anywhere else are
-    // literal and pass through untouched.
-    let quoted = '"';
-    let pendingBackslashes = 0;
-    for (const character of arg) {
-        if (character === "\\") {
-            pendingBackslashes += 1;
-            continue;
-        }
-        if (character === '"') {
-            quoted += "\\".repeat(pendingBackslashes * 2 + 1) + '"';
-            pendingBackslashes = 0;
-            continue;
-        }
-        quoted += "\\".repeat(pendingBackslashes) + character;
-        pendingBackslashes = 0;
-    }
-    return `${quoted}${"\\".repeat(pendingBackslashes * 2)}"`;
-}
-/**
- * Refuse a cmd.exe launch whose arguments can escape its outer quoting.
- *
- * No argument may contain a literal `"`, a carriage return or line feed, or a
- * `%NAME%` pair. Everything else cmd treats as syntax — including `&`, `|`,
- * `<`, `>`, `(`, `)`, and `^` — remains literal inside the outer quote state.
- * A literal quote cannot be supported by `quoteWindowsArg`: its backslash escape
- * is for CommandLineToArgvW, which parses only after cmd.exe, while cmd itself
- * treats that quote as closing its quote state and then executes exposed syntax.
- *
- * `!` (delayed expansion) is NOT among the refusals because the launch disables
- * it: {@link pmLaunchPlan} passes `/v:off` before `/c`, so `!` is literal for
- * this launch regardless of the machine's `DelayedExpansion` registry setting
- * or a parent `cmd /v:on`. When delayed expansion is on, `!NAME!` expands
- * inside the quote state exactly like `%NAME%` does, so `--pm-path
- * "C:\work\!BUILD!\pm"` would silently become a different path — the same
- * wrong-workspace-read failure the `%NAME%` refusal exists to prevent. Unlike
- * `"`, `!` is a legal character in a Windows filename, so refusing it would
- * reject real paths; `/v:off` makes it literal at no cost to legitimate input.
- * This guard therefore refuses only the characters the launch switch cannot
- * neutralize.
- *
- * `quoteWindowsArg` neutralizes every metacharacter cmd honours inside quotes
- * except `%`: cmd expands `%NAME%` even within a quoted string, and there is no
- * escape for it on a `cmd /c` command tail. That limit was documented and
- * accepted on the assumption that no path this package launches would contain
- * one — but a Windows workspace path is user-chosen, and `--pm-path` carries it
- * straight into this tail. A path like `C:\work\%BUILD%\pm` would silently
- * become whatever `%BUILD%` expands to (or empty), so pm would read a DIFFERENT
- * workspace and the standup would be built from it while reporting success.
- *
- * Since the expansion cannot be prevented, the failure is made loud instead:
- * a wrong-workspace read that reports success is far worse than a refusal that
- * names the offending argument. Only a `%NAME%` pair with at least one character
- * between the delimiters is refused, so both an ordinary literal percent
- * (`C:\reports\100% done`) and a literal doubled pair (`100%% done`) still
- * launch -- `%%` is a batch-file escape, not a command-line one.
- *
- * A line break is refused for a different reason, and quoting cannot help with
- * it either. `quoteWindowsArg` only quotes an argument containing one of
- * `[\t "&|<>()^]`, so an argument whose only special character is `\r` or `\n`
- * reaches the tail unquoted -- and even quoted it would not be contained, because
- * cmd ends the command at the line break and reads what follows as a fresh
- * command on the same `/c` tail. That is a command boundary rather than a
- * metacharacter, so there is nothing to escape and the argument is refused.
- *
- * @param argv - The binary path followed by every pm argument.
- * @throws {CommandError} When an argument contains a literal double quote, a
- *         carriage return or line feed, or a `%`-delimited name.
- */
-function assertNoCmdVariableExpansion(argv) {
+function assertWindowsArguments(argv) {
     const withQuote = argv.find((arg) => arg.includes('"'));
     if (withQuote !== undefined) {
-        throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(withQuote)} contains a `
-            + "double quote, and cmd.exe treats it as ending the quoted argument because backslash "
-            + "escaping only applies to the later CommandLineToArgvW parse, so outer quoting cannot "
-            + "contain it. Remove the double quote from the argument or use a Windows path without one.");
+        throw new CommandError(`Refusing Windows pm argument ${JSON.stringify(withQuote)}: it contains a double quote. `
+            + "The cmd.exe compatibility policy still applies. Remove the double quote from the argument.");
     }
     const withLineBreak = argv.find((arg) => /[\r\n]/.test(arg));
     if (withLineBreak !== undefined) {
-        throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(withLineBreak)} contains a `
-            + "line break, and cmd.exe ends the command there and reads the remainder as a separate "
-            + "command, which quoting cannot prevent. Remove the carriage return or line feed from the "
-            + "argument.");
+        throw new CommandError(`Refusing Windows pm argument ${JSON.stringify(withLineBreak)}: it contains a line break. `
+            + "Remove the carriage return or line feed from the argument.");
     }
-    // At least one character between the delimiters: `%%` is a literal doubled
-    // percent, not a variable reference. The doubling rule is a BATCH FILE
-    // convention; on a `cmd /c` command line `%%` is passed through unchanged. A
-    // zero-width match would refuse a valid path such as `C:\reports\100%% done`.
     const offending = argv.find((arg) => /%[^%\r\n]+%/.test(arg));
     if (offending === undefined)
         return;
-    throw new CommandError(`Refusing to launch pm through cmd.exe: the argument ${JSON.stringify(offending)} contains a `
-        + "%-delimited name, and cmd.exe expands %VAR% even inside quotes with no way to escape it. "
-        + "pm would read a different workspace than the one requested and the standup would be built "
-        + "from it while reporting success. Rename the path so it contains no %NAME% pair, or run "
-        + "from a workspace path without one.");
+    throw new CommandError(`Refusing Windows pm argument ${JSON.stringify(offending)}: it contains a %-delimited name. `
+        + "The compatibility policy prevents reading a different workspace through variable expansion. "
+        + "Rename the path so it contains no %NAME% pair.");
 }
 /**
- * Decide how `bin` is launched on `platform`: the single place that pairs a
- * resolved `pm` binary with the spawn that can actually execute it.
- *
- * On win32 every form this package can resolve — the `.cmd` batch shim, the
- * extensionless POSIX shim, and the bare `pm` PATH fallback — needs the Windows
- * command processor, for three different reasons: Node 18.20+/20.12+ refuse to
- * spawn `.cmd`/`.bat` directly at all (the CVE-2024-27980 mitigation fails the
- * spawn with EINVAL), CreateProcess rejects the extensionless shim for having
- * no recognized executable extension, and a bare `pm` is not resolved through
- * PATHEXT the way a shell would. So the launch is always the processor with
- * `/d /s /v:off /c` and the binary as the first word of the command.
- *
- * How the command tail after `/c` is built is the subtle part, and it is why
- * `PmLaunch` composes the whole argv rather than leaving a caller to append
- * arguments. cmd's documented `/c`/`/k` quote handling ("old behavior", which
- * `/s` forces unconditionally) is: if the first character after `/c` is a
- * quote, strip that leading quote and remove the LAST quote character on the
- * tail, preserving any text after it. Passing the binary and the pm arguments
- * as discrete argv elements — letting Node quote each one — assembles a tail
- * like `"C:\spaced path\pm.cmd" --path "C:\tracker root" list --all --json`:
- * the tail starts with the binary's opening quote, and when
- * the FINAL argument needs quoting (any tracker root containing a space), the
- * last quote on the tail is an inner one. cmd strips the leading quote and
- * that inner quote, and the executable's path splits at its first space. The
- * launch then only works when the last argument happens to be unquoted —
- * which is why the original form passed its tests and still broke on
- * `C:\Users\Some User\project`.
- *
- * The fix is the mechanism Node itself uses for `shell: true` on win32: the
- * ENTIRE tail — binary plus every pm argument, each quote-escaped per the
- * CommandLineToArgvW rules by {@link quoteWindowsArg} — is passed as ONE argv
- * element wrapped in an outer pair of quotes added here, with
- * `windowsVerbatimArguments: true` so Node adds nothing of its own. cmd's `/s`
- * strip removes exactly the outer pair (the first character and the last
- * quote character are now both ours), and the inner per-element quoting
- * survives verbatim for the parser on the other side. Unlike `shell: true`,`
- * no raw string is ever handed to a shell. Before composition, every argument
- * is checked against the boundary outer quoting cannot contain: no argument may
- * include a literal `"`, `\r`, `\n`, or a `%NAME%` pair. With those refused,
- * every other metacharacter remains inside cmd's quote state and is data to
- * `pm`, never cmd syntax — `shell: true` is what joins caller strings verbatim
- * and must not be reintroduced.
- *
- * `/v:off` disables delayed expansion for this launch, so `!` is literal
- * regardless of the machine's `DelayedExpansion` registry setting or a parent
- * `cmd /v:on`. Delayed expansion is off by default, but it can be switched on
- * machine-wide via `HKLM\Software\Microsoft\Command\Processor\DelayedExpansion`
- * or inherited from a parent `cmd /v:on`, and when it is on `!NAME!` expands
- * inside the quote state exactly like `%NAME%` does — so `--pm-path
- * "C:\work\!BUILD!\pm"` would silently become a different path, and pm would
- * read a DIFFERENT workspace while reporting success, the precise failure the
- * `%NAME%` refusal already exists to prevent. `/v:off` is preferred over a
- * `!NAME!` refusal: `!` is a legal character in a Windows filename (unlike `"`),
- * so refusing it would reject real paths, while the switch makes `!` literal for
- * this launch at no cost to legitimate input.
- *
- * `/d` additionally skips the AutoRun registry hook, so machine-level cmd
- * configuration cannot alter the launch.
- *
- * On every other platform the binary is spawned directly with the pm arguments
- * as discrete argv elements, byte-for-byte the invocation this package has
- * always used: the shebang shim is executable as-is and no processor is
- * involved.
- *
- * `platform` defaults to `process.platform` and is a parameter so tests can
- * assert the exact launch shape for win32 without a Windows box.
- *
- * @param bin - Binary path (or PATH fallback name) to launch.
- * @param platform - Platform the launch will run on; defaults to the current one.
- * @returns The launch to hand to `spawnSync`: `command` plus `args(pmArgs)`
- *          building the full argv, and the `windowsVerbatimArguments` value
- *          the spawn must pass.
+ * Locate the PM JavaScript entry behind a local or global npm shim.
+ * Explicit JS entries are accepted directly. Local .bin shims resolve to the
+ * adjacent scoped package; global shims resolve below their npm prefix. A bare
+ * pm searches Windows PATH in order. An unresolved wrapper fails closed rather
+ * than sending library input to a command processor.
+ * @param bin - Explicit entry, npm shim path, or the bare PM fallback.
+ * @returns JavaScript entry to pass to the running Node executable.
+ * @throws {CommandError} When no supported installed entry is present.
+ */
+function resolveWindowsPmEntry(bin) {
+    if (/\.[cm]?js$/i.test(bin))
+        return bin;
+    const directories = bin === "pm"
+        ? (process.env["PATH"] ?? "").split(";").filter((directory) => directory.length > 0)
+        : [dirname(bin)];
+    for (const directory of directories) {
+        for (const entry of [
+            join(directory, "..", "@unbrained", "pm-cli", "dist", "cli.js"),
+            join(directory, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js"),
+        ]) {
+            if (existsSync(entry))
+                return entry;
+        }
+    }
+    throw new CommandError("Cannot resolve the pm JavaScript entry on Windows. Install @unbrained/pm-cli beside a local .bin shim or in the global npm prefix's node_modules directory, or pass its JavaScript entry or a native executable as pmBin to fetchAllItems.");
+}
+/**
+ * Build a shell-free PM launch. Windows npm shims are bypassed by running their
+ * JavaScript entry with process.execPath and an argv array. Native executables
+ * launch directly. Windows refusals remain compatible with earlier releases.
+ * @param bin - Binary path, JavaScript entry, or PATH fallback.
+ * @param platform - Target platform; defaults to the running platform.
+ * @returns Executable and argv builder with Node's default argument quoting.
  */
 export function pmLaunchPlan(bin, platform = process.platform) {
     if (platform !== "win32") {
-        return {
-            command: bin,
-            args: (pmArgs) => [...pmArgs],
-            windowsVerbatimArguments: false,
-        };
+        return { command: bin, args: (pmArgs) => [...pmArgs], windowsVerbatimArguments: false };
     }
+    const native = /\.exe$/i.test(bin);
     return {
-        command: process.env["ComSpec"] || "cmd.exe",
-        // One argv element: outer-quoted by us, inner-quoted per element, so the
-        // /s strip removes exactly the outer pair. See the doc comment above for
-        // why this must not go back to appending the pm arguments as separate
-        // elements after `/c`.
+        command: native ? bin : process.execPath,
         args: (pmArgs) => {
-            assertNoCmdVariableExpansion([bin, ...pmArgs]);
-            return [
-                "/d",
-                "/s",
-                "/v:off",
-                "/c",
-                `"${[bin, ...pmArgs].map(quoteWindowsArg).join(" ")}"`,
-            ];
+            const argv = [bin, ...pmArgs];
+            assertWindowsArguments(argv);
+            return native ? argv.slice(1) : [resolveWindowsPmEntry(argv[0]), ...argv.slice(1)];
         },
-        windowsVerbatimArguments: true,
+        windowsVerbatimArguments: false,
     };
 }
 /**
- * Resolve the `pm` executable this package's own `@unbrained/pm-cli` declared,
- * walking up from `moduleUrl` to the nearest `node_modules/.bin/pm` shim, and
- * falling back to `pm` on `PATH` only when no local install is found — then
- * return it as a {@link PmLaunch} describing the spawn that can execute it.
- *
- * `spawnSync("pm", ...)` runs whichever `pm` comes first on `PATH`, which need
- * not be the `@unbrained/pm-cli` this package declared — that is what produced
- * the version skew this fix addresses. Resolving from the package's own
- * `node_modules` keeps the read against the same CLI the package pins, and the
- * walk handles both the source layout (`index.ts` at the package root) and the
- * built layout (`dist/index.js`), as well as a consumer install where the
- * nearest `.bin/pm` shim is the host CLI that loaded this extension.
- *
- * The result carries the launch decision, not just the path, because the two
- * cannot be separated on Windows: npm writes three shims into
- * `node_modules/.bin` (an extensionless shell script, a `.cmd` batch file, and
- * a `.ps1` script), and on win32 only the `.cmd` is executable at all — but
- * only through a command processor (see {@link pmLaunchPlan}). Returning the
- * bare `.cmd` path previously left the caller to invent a launch, and it
- * spawned the batch file directly, which Node refuses with EINVAL. Routing the
- * resolved binary through `pmLaunchPlan` here keeps "which file" and "how to
- * spawn it" in one place, so no caller can pair them wrongly.
- *
- * `moduleUrl` defaults to this module's URL and is a parameter only so the
- * resolution can be exercised against synthetic locations without touching the
- * real tree; `platform` likewise defaults to `process.platform` so the win32
- * launch shape can be asserted without a Windows box.
+ * Resolve the nearest local npm shim from up to four module ancestors, falling
+ * back to PM on PATH. Windows launches bypass the shim and use its JS entry.
+ * @param moduleUrl - Module location anchoring the bounded installation lookup.
+ * @param platform - Target platform; defaults to the running platform.
+ * @returns Shell-free launch plan for the resolved installation.
  */
 export function resolvePmBin(moduleUrl = import.meta.url, platform = process.platform) {
-    // Prefer the .cmd shim on win32 (Windows cannot execute the extensionless
-    // one) and the shebang script everywhere else; pmLaunchPlan then decides how
-    // the chosen file is spawned on that platform.
     const shims = platform === "win32" ? ["pm.cmd", "pm"] : ["pm"];
     let dir = dirname(fileURLToPath(moduleUrl));
     for (let i = 0; i < 4; i += 1) {
@@ -1071,15 +877,7 @@ export function pmReadTimeoutMs() {
 export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
     const launch = typeof pmBin === "string" ? pmLaunchPlan(pmBin) : pmBin;
     const maxBuffer = pmJsonMaxBuffer();
-    // `windowsVerbatimArguments` comes from the launch: on win32 the whole
-    // command tail is ONE argv element this package quote-escaped itself (see
-    // pmLaunchPlan), so Node must pass it through untouched — letting Node
-    // re-quote it would bury the outer pair cmd's `/s` strip is meant to
-    // remove. On POSIX the value is false, Node's default per-element quoting,
-    // and the argv is byte-for-byte the discrete-element invocation this
-    // package has always used. Nothing here may ever pass `shell: true`, which
-    // would join a raw command string for a shell to interpret — the injection
-    // surface the composed tail exists to avoid.
+    // Every launch uses discrete argv and Node's default native quoting.
     const result = spawnSync(launch.command, launch.args(["--path", pmRoot, ...COMPLETE_LIST_COMMAND_ARGUMENTS]), { encoding: "utf-8", maxBuffer, timeout: pmReadTimeoutMs(), windowsVerbatimArguments: launch.windowsVerbatimArguments });
     if (result.error) {
         throw new CommandError(describePmReadFailure(result.error, maxBuffer));
@@ -1661,12 +1459,14 @@ export function renderStandup(data, opts) {
 // ---------------------------------------------------------------------------
 // Slack transport
 // ---------------------------------------------------------------------------
+/** Post the actual JSON payload to the webhook's host, port, and request path. */
 function postToSlack(webhookUrl, payload) {
     return new Promise((resolvePromise, reject) => {
         const body = JSON.stringify(payload);
         const url = new URL(webhookUrl);
         const options = {
             hostname: url.hostname,
+            port: url.port,
             path: url.pathname + url.search,
             method: "POST",
             headers: {
@@ -1682,7 +1482,8 @@ function postToSlack(webhookUrl, payload) {
                     resolvePromise();
                 }
                 else {
-                    reject(new Error(`Slack webhook returned HTTP ${res.statusCode ?? "unknown"}: ${respBody}`));
+                    // Node assigns the parsed numeric status before this client callback.
+                    reject(new Error(`Slack webhook returned HTTP ${res.statusCode}: ${respBody}`));
                 }
             });
         });
@@ -1910,7 +1711,8 @@ export function readPriorCounts(path, warn = (m) => console.error(m)) {
         raw = readFileSync(resolve(path), "utf-8");
     }
     catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
+        // Native resolve/readFileSync failures are always Error instances.
+        const detail = err.message;
         warn(`warning: --compare '${path}' could not be read (${detail}); rendering standup without trend deltas.`);
         return undefined;
     }
@@ -1979,7 +1781,8 @@ export function readSnapshotHistory(dir, warn = (m) => console.error(m)) {
             parsed = JSON.parse(readFileSync(file, "utf-8"));
         }
         catch (err) {
-            const detail = err instanceof Error ? err.message : String(err);
+            // Native readFileSync and JSON.parse failures are Error instances.
+            const detail = err.message;
             warn(`warning: skipping snapshot '${file}' (${detail}).`);
             continue;
         }
@@ -2042,10 +1845,6 @@ export function renderTrendLine(deltas) {
 // ---------------------------------------------------------------------------
 // Extension
 // ---------------------------------------------------------------------------
-// True once the scoped `output_format` service override is registered. When
-// the host runtime lacks `registerService`, the exporter falls back to writing
-// stdout directly (legacy behavior, envelope included).
-let exportStdoutViaService = false;
 /**
  * Flags the `standup` command and the `standup` exporter both accept, in the
  * order both registrations already published them.
@@ -2092,6 +1891,9 @@ export default defineExtension({
     name: "pm-slack-standup",
     version: "2026.10.4",
     activate(api) {
+        // Each host activation owns its capability decision, including old hosts
+        // activated after a modern host in the same process.
+        let exportStdoutViaService = false;
         const standupFlags = [
             { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
             { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
@@ -2222,7 +2024,7 @@ export default defineExtension({
                 // Print the rendered standup so the work isn't lost on a transport
                 // failure. We exit 0 here: stdout delivery is the requested fallback.
                 for (const f of failures) {
-                    console.error(`Slack post to ${f.channel ?? "(default channel)"} failed: ${f.error ?? "unknown error"} — falling back to stdout.`);
+                    console.error(`Slack post to ${f.channel ?? "(default channel)"} failed: ${f.error} — falling back to stdout.`);
                 }
                 const rendered = renderStandup(data, opts);
                 process.stdout.write(rendered + "\n");
@@ -2239,7 +2041,7 @@ export default defineExtension({
             }
             if (failures.length > 0) {
                 throw new CommandError(`Slack post failed for ${failures.length} of ${targets.length} target(s): ` +
-                    failures.map((f) => `${f.channel ?? "(default)"}: ${f.error ?? "unknown"}`).join("; "), EXIT_CODE.GENERIC_FAILURE);
+                    failures.map((f) => `${f.channel ?? "(default)"}: ${f.error}`).join("; "), EXIT_CODE.GENERIC_FAILURE);
             }
             return {
                 posted: true,

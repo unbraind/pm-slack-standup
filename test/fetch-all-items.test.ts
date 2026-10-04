@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import extension, {
@@ -43,7 +44,7 @@ const EXPECTED_DEFAULT_MAX_BUFFER = 64 * 1024 * 1024;
  * spawn fails for reasons that have nothing to do with the behaviour under test
  * and the failure names the wrong cause. This repository runs a
  * `windows-acceptance-launcher` job, so those runs must report a skip. The
- * win32 launch path itself is not left uncovered: the `resolvePmBin` cmd.exe
+ * win32 launch path itself is not left uncovered: the shell-free `resolvePmBin`
  * tests below exercise it directly and run on every platform.
  */
 const posixOnly = {
@@ -73,6 +74,20 @@ function fakePmBin(dir: string, mode: "nonzero" | "overrun" | "good" | "truncate
   chmodSync(bin, 0o755);
   return bin;
 }
+
+test("Windows PM entry receives hostile input as one literal argument through a real child", () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-literal-argv-"));
+  try {
+    const entry = join(directory, "pm entry.cjs");
+    const envelope = completeListEnvelope({ items: [], count: 0, total: 0 });
+    writeFileSync(entry, `const args = process.argv.slice(2); const envelope = ${JSON.stringify(envelope)}; envelope.items = args.map((title, index) => ({ id: String(index), title, status: "open" })); envelope.count = args.length; envelope.total = args.length; process.stdout.write(JSON.stringify(envelope));`);
+    const hostile = "tracker with space & calc | whoami";
+    const plan = pmLaunchPlan(entry, "win32");
+    assert.deepEqual(fetchAllItems(hostile, plan).map((item) => item.title), ["--path", hostile, ...COMPLETE_LIST_COMMAND_ARGUMENTS]);
+    assert.equal(plan.command, process.execPath);
+    assert.equal(plan.windowsVerbatimArguments, false);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 // --- describePmReadFailure: message wording for each failure shape -----------
 test("describePmReadFailure names the buffer ceiling for an ENOBUFS overrun", () => {
@@ -124,13 +139,6 @@ test("pmJsonMaxBuffer falls back to the default for invalid or non-positive valu
 });
 
 // --- resolvePmBin: project-local pm vs PATH fallback -------------------------
-// The command the resolver hands back depends on ComSpec only on win32, and the
-// assertion has to hold on any machine running the suite, so the expected
-// processor is computed the same way the implementation computes it.
-function expectedComSpec(): string {
-  return process.env["ComSpec"] || "cmd.exe";
-}
-
 /**
  * Create a temporary directory with both `pm` (POSIX shebang) and `pm.cmd`
  * (Windows batch) shims in `node_modules/.bin`, and return the module URL the
@@ -140,16 +148,19 @@ function expectedComSpec(): string {
  *
  * @param prefix - Prefix for the temporary directory name.
  * @returns The temp `dir`, the `binDir` containing the shims, and the
- *          `moduleUrl` to pass to `resolvePmBin`.
+ *          `moduleUrl` to pass to `resolvePmBin`, plus the installed JS `entry`.
  */
-function setupBothShims(prefix: string): { dir: string; binDir: string; moduleUrl: string } {
+function setupBothShims(prefix: string): { dir: string; binDir: string; entry: string; moduleUrl: string } {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   const binDir = join(dir, "node_modules", ".bin");
   mkdirSync(binDir, { recursive: true });
   writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
   writeFileSync(join(binDir, "pm.cmd"), "@echo off\r\n", { encoding: "utf-8", mode: 0o755 });
   const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
-  return { dir, binDir, moduleUrl };
+  const entry = join(dir, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+  mkdirSync(join(entry, ".."), { recursive: true });
+  writeFileSync(entry, "process.stdout.write(JSON.stringify(process.argv.slice(2)));", "utf8");
+  return { dir, binDir, entry, moduleUrl };
 }
 
 test("resolvePmBin resolves the project-local node_modules/.bin/pm shim from this module", () => {
@@ -415,393 +426,105 @@ test("fetchAllItems names the exit status when pm exits non-zero with empty stde
   }
 });
 
-// --- resolvePmBin / pmLaunchPlan: the exact launch shape per platform ----------
-//
-// These are the regression tests for the unlaunchable-.cmd defect: the resolver
-// used to hand back the bare `pm.cmd` path, and the caller spawned it directly,
-// which Node (18.20+/20.12+, the CVE-2024-27980 mitigation) refuses with EINVAL.
-// Now the resolver returns the launch — command processor plus the `/d /s /v:off /c`
-// prefix on win32, the bare shim with no prefix on POSIX — and these assertions
-// pin the exact argv for each platform without needing a Windows box. Revert the
-// launch wrapping and the win32 assertions fail: the expected `cmd.exe /d /s /v:off /c`
-// shape collapses back to the bare (unlaunchable) shim path.
-
-test("resolvePmBin produces the cmd.exe launch for the .cmd shim on win32 (npm's both-shims layout)", () => {
-  const { dir, binDir, moduleUrl } = setupBothShims("standup-shim-cmd-");
+// Windows launch contracts execute Node entries and preserve discrete argv.
+test("resolvePmBin bypasses both npm shims on Windows and keeps POSIX shebang launch", () => {
+  const { dir, binDir, entry, moduleUrl } = setupBothShims("standup-shim-layout-");
   try {
-    // Both shims present, as npm installs them, so the .cmd choice is the assertion.
-    const launch = resolvePmBin(moduleUrl, "win32");
-    // The exact spawn for a read: cmd.exe is the executable, and the /d /s /v:off /c
-    // switches precede the ENTIRE command tail as one outer-quoted argv
-    // element. `/d` skips AutoRun, `/s` strips exactly the outer pair, `/c`
-    // runs and exits — the same switch set Node's own `shell: true` uses,
-    // with per-element quoting done here instead of a raw string join.
-    assert.deepEqual(
-      [launch.command, ...launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"])],
-      [expectedComSpec(), "/d", "/s", "/v:off", "/c", `"${join(binDir, "pm.cmd")} --path /tracker list --all --json --include-body"`]
-    );
-    assert.equal(launch.windowsVerbatimArguments, true);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+    const args = ["--path", "tracker with space", "list", "--all", "--json"];
+    const windows = resolvePmBin(moduleUrl, "win32");
+    assert.equal(windows.command, process.execPath);
+    assert.deepEqual(windows.args(args), [entry, ...args]);
+    assert.equal(windows.windowsVerbatimArguments, false);
+    rmSync(join(binDir, "pm.cmd"));
+    assert.deepEqual(resolvePmBin(moduleUrl, "win32").args(args), [entry, ...args]);
+    const posix = resolvePmBin(moduleUrl, "linux");
+    assert.equal(posix.command, join(binDir, "pm"));
+    assert.deepEqual(posix.args(args), args);
+    assert.equal(posix.windowsVerbatimArguments, false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("resolvePmBin wraps the extensionless shim in cmd.exe on win32 when only it exists", () => {
-  const dir = mkdtempSync(join(tmpdir(), "standup-shim-ext-"));
+test("Windows PATH fallback resolves a global npm entry without consulting ComSpec", () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-path-entry-"));
+  const savedPath = process.env.PATH;
+  const savedComSpec = process.env.ComSpec;
   try {
-    const binDir = join(dir, "node_modules", ".bin");
-    mkdirSync(binDir, { recursive: true });
-    // POSIX-style layout with no .cmd: resolution falls to the extensionless
-    // shim, and on win32 even that needs the command processor (CreateProcess
-    // rejects an extensionless file), so the launch is the wrapped form — the
-    // whole tail as ONE outer-quoted element — not a direct spawn that would
-    // fail, and not a multi-element tail that /s could strip mid-command.
-    writeFileSync(join(binDir, "pm"), "#!/bin/sh\n", { encoding: "utf-8", mode: 0o755 });
-    const moduleUrl = pathToFileURL(join(dir, "index.ts")).href;
-    const launch = resolvePmBin(moduleUrl, "win32");
-    const argv = launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"]);
-    assert.deepEqual(
-      [launch.command, ...argv],
-      [expectedComSpec(), "/d", "/s", "/v:off", "/c", `"${join(binDir, "pm")} --path /tracker list --all --json --include-body"`]
-    );
-    // Extensionless shim: still wrapped, so /s still strips exactly one pair.
-    assert.equal(launch.windowsVerbatimArguments, true);
-    assert.ok(argv[4].startsWith('"') && argv[4].endsWith('"'), "the tail must be one outer-quoted element");
+    const entry = join(directory, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+    mkdirSync(join(entry, ".."), { recursive: true });
+    writeFileSync(entry, "process.stdout.write(JSON.stringify(process.argv.slice(2)));", "utf8");
+    process.env.PATH = `;${join(directory, "absent")};${directory};`;
+    process.env.ComSpec = "unlaunchable-command-processor";
+    const plan = pmLaunchPlan("pm", "win32");
+    assert.equal(plan.command, process.execPath);
+    assert.deepEqual(plan.args(["--version"]), [entry, "--version"]);
+    delete process.env.PATH;
+    assert.throws(() => plan.args([]), /Cannot resolve.*JavaScript entry/);
+    assert.throws(() => pmLaunchPlan(join(directory, "absent", "pm.cmd"), "win32").args([]), /JavaScript entry/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    if (savedPath === undefined) delete process.env.PATH; else process.env.PATH = savedPath;
+    if (savedComSpec === undefined) delete process.env.ComSpec; else process.env.ComSpec = savedComSpec;
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
-test("resolvePmBin keeps the direct shebang-shim launch on POSIX with the argv verbatim", () => {
-  const { dir, binDir, moduleUrl } = setupBothShims("standup-shim-posix-");
+test("Windows native executables launch directly and JavaScript entries use Node", () => {
+  for (const bin of ["pm.exe", "PM.EXE", "pm.js", "pm.cjs", "pm.mjs"]) {
+    const plan = pmLaunchPlan(bin, "win32");
+    const native = bin.toLowerCase().endsWith(".exe");
+    assert.equal(plan.command, native ? bin : process.execPath);
+    assert.deepEqual(plan.args(["--path", "tracker"]), native ? ["--path", "tracker"] : [bin, "--path", "tracker"]);
+    assert.equal(plan.windowsVerbatimArguments, false);
+  }
+});
+
+test("Windows bare pm PATH supports local and standard global npm layouts with an actionable refusal", () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-pm-path-layouts-"));
+  const savedPath = process.env.PATH;
   try {
-    // Both shims present; on POSIX the extensionless one is chosen AND launched
-    // directly — byte-for-byte the invocation this package has always used:
-    // command plus the pm arguments as discrete argv elements, and the spawn
-    // option values unchanged (windowsVerbatimArguments false is Node's
-    // default per-element quoting).
-    const launch = resolvePmBin(moduleUrl, "linux");
-    assert.deepEqual(
-      [launch.command, ...launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"])],
-      [join(binDir, "pm"), "--path", "/tracker", "list", "--all", "--json", "--include-body"]
-    );
-    assert.equal(launch.windowsVerbatimArguments, false);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("the win32 launch resolves the command processor through ComSpec and falls back to cmd.exe", () => {
-  const saved = process.env["ComSpec"];
-  const pmArgs = ["--path", "/tracker", "list", "--all", "--json", "--include-body"];
-  try {
-    // ComSpec honored when set: the launch must use the machine's configured
-    // processor rather than assuming cmd.exe lives at a bare name.
-    process.env["ComSpec"] = "C:\\Windows\\system32\\cmd.exe";
-    const viaComSpec = pmLaunchPlan(join("x", "pm.cmd"), "win32");
-    assert.equal(viaComSpec.command, "C:\\Windows\\system32\\cmd.exe");
-    assert.deepEqual(
-      viaComSpec.args(pmArgs),
-      ["/d", "/s", "/v:off", "/c", `"${join("x", "pm.cmd")} --path /tracker list --all --json --include-body"`]
-    );
-    // Fallback when unset: the documented default.
-    delete process.env["ComSpec"];
-    const viaDefault = pmLaunchPlan(join("x", "pm.cmd"), "win32");
-    assert.equal(viaDefault.command, "cmd.exe");
-    assert.deepEqual(
-      viaDefault.args(pmArgs),
-      ["/d", "/s", "/v:off", "/c", `"${join("x", "pm.cmd")} --path /tracker list --all --json --include-body"`]
-    );
-  } finally {
-    if (saved === undefined) delete process.env["ComSpec"];
-    else process.env["ComSpec"] = saved;
-  }
-});
-
-test("a 200k-backslash win32 path is quoted correctly within the bounded launch time", () => {
-  // CodeQL js/polynomial-redos witness for the quoting the win32 tail applies.
-  // The escaping used to be two `replace` calls whose `(\\*)` groups are
-  // quadratic on a run of backslashes: the engine retries at every position in
-  // the run and the greedy quantifier rescans the remainder each time.
-  //
-  // The input is reachable rather than theoretical. A Windows workspace path
-  // arrives in this tail through `--pm-path`, and a path is exactly the kind of
-  // string that carries long backslash runs. The leading " x" is what makes the
-  // argument need quoting at all, so the escaping path is genuinely entered.
-  //
-  // The original quadratic expressions took 16202ms for this 200k witness on
-  // an idle machine. The 2000ms bound rejects that implementation by a wide
-  // margin; batched medians also check growth without dividing two tiny times.
-  const adversarial = " x" + "\\".repeat(200_000);
-  const launch = pmLaunchPlan("pm", "win32");
-  for (let index = 0; index < 10; index++) launch.args([" x" + "\\".repeat(1_000)]);
-  const start = performance.now();
-  const args = launch.args([adversarial]);
-  const elapsed = performance.now() - start;
-  assert.ok(elapsed < 2000, `building the win32 tail must stay below 2000ms; took ${elapsed.toFixed(2)}ms`);
-  const shorter = " x" + "\\".repeat(20_000);
-  const shortTimes: number[] = [];
-  const longTimes: number[] = [];
-  for (let trial = 0; trial < 3; trial++) {
-    const shortStart = performance.now();
-    for (let iteration = 0; iteration < 25; iteration++) launch.args([shorter]);
-    shortTimes.push(performance.now() - shortStart);
-    const longStart = performance.now();
-    for (let iteration = 0; iteration < 25; iteration++) launch.args([adversarial]);
-    longTimes.push(performance.now() - longStart);
-  }
-  shortTimes.sort((left, right) => left - right);
-  longTimes.sort((left, right) => left - right);
-  assert.ok(
-    longTimes[1] / shortTimes[1] < 30,
-    `tenfold input growth must stay below thirtyfold runtime growth; medians ${shortTimes[1].toFixed(2)}ms and ${longTimes[1].toFixed(2)}ms`,
-  );
-  // The escaping must still be correct, not merely fast: a run of n backslashes
-  // at the end of the element doubles to 2n before the closing quote. A
-  // speed-only assertion would accept a rewrite that silently changed the
-  // quoting.
-  assert.ok(
-    args[4].includes(" x" + "\\".repeat(400_000) + '"'),
-    "a run of n backslashes at the end of the element must double to 2n before the closing quote",
-  );
-});
-
-test("pmLaunchPlan wraps even the bare PATH fallback 'pm' on win32 so PATHEXT resolution happens", () => {
-  // On win32 a bare 'pm' cannot be spawned directly either: Node does not do
-  // PATHEXT lookup, so the direct spawn would ENOENT. The command processor
-  // does that lookup, so the fallback goes through the same one-element tail
-  // as every other form.
-  const launch = pmLaunchPlan("pm", "win32");
-  assert.equal(launch.command, expectedComSpec());
-  assert.deepEqual(
-    launch.args(["--path", "/tracker", "list", "--all", "--json", "--include-body"]),
-    ["/d", "/s", "/v:off", "/c", '"pm --path /tracker list --all --json --include-body"']
-  );
-});
-
-test("pmLaunchPlan returns a direct launch with no wrapping on POSIX", () => {
-  const launch = pmLaunchPlan(join("x", "pm"), "linux");
-  assert.equal(launch.command, join("x", "pm"));
-  assert.deepEqual(launch.args(["--path", "/tracker"]), ["--path", "/tracker"]);
-  assert.equal(launch.windowsVerbatimArguments, false);
-});
-
-// --- pmLaunchPlan win32 quoting: the cmd.exe /s tail contract --------------------
-//
-// Regression tests for the /s quote-stripping defect found in review (PR #35,
-// Greptile P1): passing the shim and the pm arguments as DISCRETE argv elements
-// after `/d /s /v:off /c` lets Node assemble the tail, and cmd's documented "old
-// behavior" quote handling (forced unconditionally by /s) strips the tail's
-// leading quote and its LAST quote character whenever the first character after
-// /c is a quote. When the final argument itself needs quoting — any tracker
-// root containing a space — that last quote is an inner one, so the strip also
-// destroys the quote protecting the executable path and the command splits at
-// its first space. The launch now passes the whole tail as ONE argv element
-// wrapped in an outer pair of quotes added by us (with
-// windowsVerbatimArguments so Node adds nothing), so /s removes exactly the
-// outer pair. These tests pin that contract without a Windows box.
-
-/**
- * Parse a Windows command line back into argv per the documented
- * CommandLineToArgvW rules, the inverse of the quoting pmLaunchPlan applies:
- * space and tab separate arguments unless inside double quotes; 2n
- * backslashes immediately before a quote collapse to n, and an odd run makes
- * the quote literal; a doubled quote inside quotes is one literal quote.
- *
- * Written here rather than imported so the round-trip assertions are a real
- * re-parse under the documented rules, not a mirror of the quoter that could
- * share a bug with it and pass vacuously.
- *
- * @param line - One command line (no argv0) to parse.
- * @returns The argv elements the child process would observe.
- */
-function parseWindowsCommandLine(line: string): string[] {
-  const out: string[] = [];
-  let i = 0;
-  while (i < line.length) {
-    // Skip the whitespace that separates one argument from the next.
-    while (i < line.length && (line[i] === " " || line[i] === "\t")) i += 1;
-    if (i >= line.length) break;
-    let arg = "";
-    let backslashes = 0;
-    let quoted = false;
-    while (i < line.length) {
-      const c = line[i];
-      if (c === "\\") {
-        backslashes += 1;
-        i += 1;
-        continue;
-      }
-      if (c === '"') {
-        arg += "\\".repeat(Math.floor(backslashes / 2));
-        if (backslashes % 2 === 1) {
-          // 2n+1 backslashes then a quote: n backslashes plus a literal quote.
-          arg += '"';
-        } else {
-          // A bare quote toggles quoting, except "" inside quotes is literal.
-          if (quoted && i + 1 < line.length && line[i + 1] === '"') {
-            arg += '"';
-            i += 1;
-          } else {
-            quoted = !quoted;
-          }
-        }
-        backslashes = 0;
-        i += 1;
-        continue;
-      }
-      // Any other character flushes pending backslashes literally.
-      arg += "\\".repeat(backslashes);
-      backslashes = 0;
-      if (!quoted && (c === " " || c === "\t")) break; // ends this argument
-      arg += c;
-      i += 1;
+    for (const layout of ["local", "global"]) {
+      const prefix = join(directory, layout);
+      const shimDirectory = layout === "local" ? join(prefix, "node_modules", ".bin") : prefix;
+      const entry = join(prefix, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+      mkdirSync(shimDirectory, { recursive: true });
+      mkdirSync(join(entry, ".."), { recursive: true });
+      writeFileSync(join(shimDirectory, "pm.cmd"), "unsupported shim");
+      writeFileSync(entry, "process.stdout.write(JSON.stringify(process.argv.slice(2)));", "utf8");
+      process.env.PATH = `;${join(directory, "absent")};${shimDirectory};`;
+      const plan = pmLaunchPlan("pm", "win32");
+      const args = ["--path", "tracker with space & pipe |", "--version"];
+      assert.deepEqual(plan.args(args), [entry, ...args]);
+      const child = spawnSync(plan.command, plan.args(args), { encoding: "utf8" });
+      assert.equal(child.status, 0, child.stderr);
+      assert.deepEqual(JSON.parse(child.stdout), args);
     }
-    arg += "\\".repeat(backslashes);
-    out.push(arg);
-  }
-  return out;
-}
-
-test("win32 outer-wraps the tail so /s cannot strip the quotes protecting a spaced .cmd path (quoted final arg)", () => {
-  // The exact broken case: a spaced shim path AND a final argument that itself
-  // needs quoting. With the old discrete-element tail, cmd's /s rule removed
-  // the shim's opening quote and the tracker root's closing quote, splitting
-  // the executable path at its first space.
-  const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd";
-  const root = "C:\\Users\\Some User\\tracker";
-  const launch = pmLaunchPlan(bin, "win32");
-  const argv = launch.args(["--path", root, "list", "--all", "--json", "--include-body"]);
-  assert.equal(launch.windowsVerbatimArguments, true, "the tail is pre-quoted; Node must not re-quote it");
-  // The exact spawn argv: the entire command tail is ONE element. Note the
-  // doubled opening quote: the outer pair we add, then the bin's own quotes —
-  // /s strips exactly the outer pair and leaves the inner one intact.
-  assert.deepEqual(argv, [
-    "/d", "/s", "/v:off", "/c",
-    '""C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd" --path "C:\\Users\\Some User\\tracker" list --all --json --include-body"',
-  ]);
-  const tail = argv[4];
-  // The outer pair exists: the FIRST character after /c and the LAST quote on
-  // the tail are both ours, so the /s strip removes exactly that pair.
-  assert.ok(tail.startsWith('"'), "tail must open with the outer quote");
-  assert.ok(tail.endsWith('"'), "tail must close with the outer quote — this is what the unwrapped form lacks");
-  // Inner quoting survives: the spaced shim path stays one quoted token, and
-  // the final argument keeps ITS quotes even though it is last.
-  assert.ok(
-    tail.slice(1, -1).startsWith('"C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd"'),
-    "the shim's own quotes must survive inside the outer pair"
-  );
-  assert.ok(
-    tail.includes('--path "C:\\Users\\Some User\\tracker"'),
-    "the quoted final argument must keep its quotes"
-  );
-  // And cmd hands the child exactly the command line we intended: strip the
-  // outer pair the way /s does, parse per CommandLineToArgvW, compare.
-  assert.deepEqual(parseWindowsCommandLine(tail.slice(1, -1)), [
-    bin, "--path", root, "list", "--all", "--json", "--include-body",
-  ]);
-});
-
-test("win32 wraps the spaced extensionless shim in the same outer-quoted tail", () => {
-  // Spec case 3: the extensionless shim also goes through the processor, so a
-  // spaced one needs the same outer pair or /s splits it identically.
-  const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm";
-  const root = "C:\\Users\\Some User\\tracker";
-  const launch = pmLaunchPlan(bin, "win32");
-  const argv = launch.args(["--path", root, "list", "--all", "--json", "--include-body"]);
-  assert.equal(launch.windowsVerbatimArguments, true);
-  assert.equal(argv.length, 5, "the whole tail must be one argv element after /d /s /v:off /c");
-  assert.ok(argv[4].startsWith('"') && argv[4].endsWith('"'), "outer pair present");
-  assert.deepEqual(parseWindowsCommandLine(argv[4].slice(1, -1)), [
-    bin, "--path", root, "list", "--all", "--json", "--include-body",
-  ]);
-});
-
-test("every permitted cmd metacharacter round-trips through the win32 tail per the CommandLineToArgvW rules", () => {
-  const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd";
-  // Spec case 2: each permitted metacharacter, embedded in a realistic tracker
-  // root. A metacharacter outside quotes would be cmd syntax; the quoter must
-  // wrap every one of these, and the re-parse must recover the original argv.
-  // A literal double quote is deliberately absent because cmd.exe parses before
-  // CommandLineToArgvW and cannot contain that character with backslash escaping.
-  for (const ch of [" ", "\t", "&", "|", "<", ">", "^", "(", ")"]) {
-    const root = `C:\\Users\\Some User ${ch} part\\tracker`;
-    const pmArgs = ["--path", root, "list", "--all", "--json", "--include-body"];
-    const argv = pmLaunchPlan(bin, "win32").args(pmArgs);
-    assert.equal(argv.length, 5, `one tail element for '${ch}'`);
-    const tail = argv[4];
-    assert.ok(tail.startsWith('"') && tail.endsWith('"'), `outer pair for '${ch}'`);
-    assert.deepEqual(
-      parseWindowsCommandLine(tail.slice(1, -1)),
-      [bin, ...pmArgs],
-      `the tail after /s strips the outer pair must re-parse to the original argv for '${ch}'`
-    );
+    process.env.PATH = directory;
+    assert.throws(() => pmLaunchPlan("pm", "win32").args([]), /local.*\.bin.*global npm prefix.*JavaScript entry.*pmBin.*fetchAllItems/);
+  } finally {
+    if (savedPath === undefined) delete process.env.PATH; else process.env.PATH = savedPath;
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
-test("backslash interactions with generated quotes in the win32 tail follow the documented doubling rules", () => {
-  const bin = "C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd";
-  // Backslash runs directly before the closing quote we append must double, or
-  // a root ending in a backslash would eat that quote and swallow the NEXT
-  // argument into the path. Literal input quotes are refused at the cmd layer.
-  const cases = [
-    "C:\\Users\\Some User\\tracker\\",          // trailing backslash before the closing quote
-    "",                                        // empty argument must survive as ""
-    "plain",                                   // no quoting needed at all
-  ];
-  for (const root of cases) {
-    const pmArgs = ["--path", root, "list", "--all", "--json", "--include-body"];
-    const { args } = pmLaunchPlan(bin, "win32");
-    const tail = args(pmArgs)[4];
-    assert.ok(tail.startsWith('"') && tail.endsWith('"'), `outer pair for ${JSON.stringify(root)}`);
-    assert.deepEqual(
-      parseWindowsCommandLine(tail.slice(1, -1)),
-      [bin, ...pmArgs],
-      `round trip for ${JSON.stringify(root)}`
-    );
-  }
-});
-
-test("cmd metacharacters never escape quote state in an accepted win32 /c tail", () => {
-  const plan = pmLaunchPlan("C:\\Program Files\\pm\\node_modules\\.bin\\pm.cmd", "win32");
-  const metacharacterArguments = [
-    "C:\\work\\amp&ersand",
-    "C:\\work\\pipe|name",
-    "C:\\work\\input<name",
-    "C:\\work\\output>name",
-    "C:\\work\\care^t",
-    "C:\\work\\paren(name)",
-    "C:\\work\\all&|<>^chars",
-    'C:\\work\\a"&calc&"b',
-  ];
-
-  for (const argument of metacharacterArguments) {
-    let tail: string;
-    try {
-      tail = plan.args(["--pm-path", argument, "list", "--all", "--json"])[4];
-    } catch (err: unknown) {
-      assert.ok(err instanceof CommandError, "only the explicit cmd boundary guard may refuse a case");
-      assert.ok(argument.includes('"'), "a metacharacter-only argument must produce a tail to inspect");
-      continue;
-    }
-    assert.ok(tail.startsWith('"') && tail.endsWith('"'), "the /s outer quote pair must be present");
-    const afterCmdStripsOuterPair = tail.slice(1, -1);
-    let quoted = false;
-    for (const character of afterCmdStripsOuterPair) {
-      // This deliberately models cmd.exe, not CommandLineToArgvW: backslash has
-      // no escape meaning here, and every literal double quote toggles state.
-      if (character === '"') {
-        quoted = !quoted;
-      } else if (/[&|<>^]/.test(character)) {
-        assert.equal(
-          quoted,
-          true,
-          `${JSON.stringify(character)} escaped cmd quote state in ${JSON.stringify(afterCmdStripsOuterPair)}`,
-        );
-      }
-    }
-    assert.equal(quoted, false, "generated element quotes must be balanced after the outer pair is stripped");
-  }
+test("Windows argv preserves empty values, metacharacters and backslashes without composition", () => {
+  const plan = pmLaunchPlan("pm.js", "win32");
+  const values = ["", "a & calc | whoami", "()<>^!", " spaced\\path\\", "\\".repeat(200_000)];
+  assert.deepEqual(plan.args(values), ["pm.js", ...values]);
+  // Guard copying and validating a large argv value against excessive runtime.
+  // Warm up before measuring; native quoting happens later in spawnSync and
+  // is not measured here. Keep a generous absolute ceiling for slow runners.
+  /** Return the warmed-up median time for copying and validating one argument. */
+  const medianMs = (length: number): number => {
+    const argv = ["\\".repeat(length)];
+    for (let i = 0; i < 5; i++) plan.args(argv);
+    const samples = Array.from({ length: 7 }, () => {
+      const start = performance.now();
+      plan.args(argv);
+      return performance.now() - start;
+    }).sort((a, b) => a - b);
+    return samples[3];
+  };
+  const large = medianMs(200_000);
+  assert.ok(large < 5000, `200k run took ${large}ms, above the generous 5,000 ms ceiling`);
 });
 
 test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", posixOnly, () => {
@@ -987,10 +710,10 @@ test("the win32 launch refuses an argument carrying a line break cmd.exe would s
  * against a case cmd.exe does not actually expand.
  */
 test("the win32 launch still accepts a literal percent that names no variable", () => {
-  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
+  const plan = pmLaunchPlan("pm.js", "win32");
   const argv = plan.args(["--pm-path", "C:\\reports\\100% done\\.agents\\pm"]);
-  assert.strictEqual(argv[0], "/d");
-  assert.ok(argv[4]?.includes("100% done"), "the literal percent must survive into the tail");
+  assert.strictEqual(argv[0], "pm.js");
+  assert.ok(argv[2]?.includes("100% done"), "the literal percent must survive into the tail");
 });
 
 /**
@@ -1001,38 +724,14 @@ test("the win32 launch still accepts a literal percent that names no variable", 
  * percent signs".
  */
 test("the win32 launch accepts a literal doubled percent, which names no variable", () => {
-  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
+  const plan = pmLaunchPlan("pm.js", "win32");
   const argv = plan.args(["--pm-path", "C:\\reports\\100%% done\\.agents\\pm"]);
-  assert.ok(argv[4]?.includes("100%% done"), "the doubled percent must survive into the tail");
+  assert.ok(argv[2]?.includes("100%% done"), "the doubled percent must survive into the tail");
 });
 
-/**
- * `/v:off` must appear in the composed argv BEFORE `/c`. cmd.exe processes
- * switches only before the `/c` command tail; a switch placed after `/c` is
- * part of the command, not a switch, so the ordering is load-bearing. This test
- * pins both the presence and the position: without `/v:off` a machine with
- * `DelayedExpansion` enabled (or a parent `cmd /v:on`) would expand `!NAME!`
- * inside the quote state and silently redirect pm to a different workspace.
- */
-test("the win32 launch disables delayed expansion with /v:off before /c", () => {
-  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
-  const argv = plan.args(["--pm-path", "C:\\work\\pm", "list", "--all", "--json"]);
-  const voffIndex = argv.indexOf("/v:off");
-  const cIndex = argv.indexOf("/c");
-  assert.notEqual(voffIndex, -1, "/v:off must be present in the launch argv");
-  assert.notEqual(cIndex, -1, "/c must be present in the launch argv");
-  assert.ok(voffIndex < cIndex, "/v:off must appear before /c — cmd ignores a switch after /c");
-});
-
-/**
- * An argument containing `!NAME!` must still launch, not be refused. The launch
- * disables delayed expansion with `/v:off`, so `!` is literal regardless of the
- * machine's registry setting — refusing `!` would reject valid Windows paths
- * (unlike `"`, `!` is a legal filename character). The `!` must survive verbatim
- * into the tail so pm receives exactly the path the caller passed.
- */
-test("the win32 launch accepts an argument containing !NAME! because /v:off makes it literal", () => {
-  const plan = pmLaunchPlan("C:\\proj\\node_modules\\.bin\\pm.cmd", "win32");
+/** Delayed-expansion names remain literal because the launch uses no command processor. */
+test("the win32 launch accepts an argument containing !NAME! because no command processor runs", () => {
+  const plan = pmLaunchPlan("pm.js", "win32");
   const argv = plan.args(["--pm-path", "C:\\work\\!BUILD!\\.agents\\pm"]);
-  assert.ok(argv[4]?.includes("!BUILD!"), "the !NAME! pair must survive verbatim into the tail");
+  assert.ok(argv[2]?.includes("!BUILD!"), "the !NAME! pair must survive as a literal argument");
 });

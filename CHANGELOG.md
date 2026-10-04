@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Require exact all-source 100/100/100/100 coverage and strict quality gates ([pm-slack-standup-7t31](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-7t31.toon))
+
+### Security
+
+- Removing the cmd.exe launch would close the shell-command alert, but the obvious version of that change breaks Windows ([pm-slack-standup-z1up](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-z1up.toon))
+
 ### Other
 
 - Auto-merge green Dependabot updates and group the pm toolchain into one daily PR ([pm-slack-standup-gquv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-gquv.toon))

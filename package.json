@@ -51,6 +51,7 @@
     "@babel/plugin-syntax-typescript": "8.0.3",
     "@types/node": "26.6.4",
     "@unbrained/pm-cli": "2026.10.4",
+    "c8": "12.0.0",
     "eslint": "10.12.0",
     "fast-glob": "3.3.3",
     "jscpd": "5.4.0",
@@ -116,9 +117,10 @@
       "test/*.test.ts"
     ],
     "thresholds": {
-      "lines": 83,
-      "branches": 87,
-      "functions": 87
+      "lines": 100,
+      "statements": 100,
+      "branches": 100,
+      "functions": 100
     },
     "ignore": []
   },

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "id": "bcde9266-179d-4048-b2ad-989ae14a86a9",
+  "item_path": ".agents/pm/issues/pm-slack-standup-7t31.toon",
+  "item_id": "pm-slack-standup-7t31",
+  "requested_preference": "ours",
+  "requested_preference_applied": false,
+  "conflict_resolution": "latest_document_update",
+  "fields_from_theirs": [],
+  "union_fields": [
+    "comments",
+    "docs",
+    "files",
+    "tests"
+  ],
+  "merged_field_hashes": {
+    "comments": "63b909f802d85b7a375846f798942979fa71cc81ec22d2d491a021eec992fa4c",
+    "docs": "569dee65210bc9cea2818b5ede5ac0e4a199424163c6a49ca563f15fdcf05bb4",
+    "files": "ec8cddff6ba4a3bdc5ac95d2700f973b21ad022b79e66184c7af0df76ccd64ee",
+    "tests": "4a00693c73b8baa8d0e5d563cd189b8142b22b1b11dc40470b47b0b695007ce9"
+  },
+  "decisions": [],
+  "state": "pending",
+  "created_at": "2026-10-04T18:09:50.639Z",
+  "value_availability": "hash_only",
+  "value_policy": "bounded_non_sensitive_scalars_v1"
+}
