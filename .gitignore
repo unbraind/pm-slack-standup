@@ -19,3 +19,6 @@ coverage/
 # one turns the health gate red; the journal has no value once the transaction
 # has landed. Deliberately outside any `pm-cli:` fence, which the CLI rewrites.
 .agents/pm/transactions/
+
+# Managed extension distributions are installed locally; version and preview receipts live in docs.
+.agents/pm/extensions/

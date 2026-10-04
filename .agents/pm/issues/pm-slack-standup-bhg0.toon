@@ -1,0 +1,11 @@
+id: pm-slack-standup-bhg0
+title: Track published pm-github apply-path limitations exposed by certification review
+description: "PR #105 Greptile statically identified cancellation status omission, repeated export duplicates and duplicate project drafts after partially failed status/tag updates in installed pm-github 2026.10.4. Generated runtime payload is excluded from consumer Git scope. Canonical upstream fixes and synthetic write acceptance remain separate; this task authorizes only read-only sync preview, which was zero-case."
+type: Issue
+status: open
+priority: 1
+tags: []
+created_at: "2026-10-04T12:10:50.275Z"
+updated_at: "2026-10-04T12:10:50.275Z"
+author: codex-sol
+body: ""
