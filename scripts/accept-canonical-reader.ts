@@ -1,49 +1,43 @@
+/** Exercise the complete reader against a disposable workspace initialized by the real PM CLI. */
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { COMPLETE_LIST_COMMAND_ARGUMENTS, fetchAllItems, type PmLaunch } from "../index.ts";
-import { completeListEnvelope } from "../test/complete-list-fixture.ts";
 
-test("canonical reader acceptance issues exactly one complete-list read", () => {
+test("canonical reader acceptance issues exactly one complete-list read against a real PM workspace", () => {
   const root = mkdtempSync(join(tmpdir(), "pm-slack-standup-canonical-reader-"));
-  const fakePm = join(root, "fake-pm.mjs");
-  const argsFile = join(root, "args.json");
-  const previousResponse = process.env.PM_STANDUP_FAKE_RESPONSE;
-  const previousArgsFile = process.env.PM_STANDUP_ARGS_FILE;
-  writeFileSync(fakePm, `import { appendFileSync } from "node:fs";
-appendFileSync(process.env.PM_STANDUP_ARGS_FILE, JSON.stringify(process.argv.slice(2)) + "\\n");
-process.stdout.write(process.env.PM_STANDUP_FAKE_RESPONSE);
-`, "utf8");
-  process.env.PM_STANDUP_FAKE_RESPONSE = JSON.stringify(
-    completeListEnvelope({
-      items: [{ id: "fixture-1", title: "Tracked standup work", status: "in_progress" }],
-    }),
-  );
-  process.env.PM_STANDUP_ARGS_FILE = argsFile;
+  const pmRoot = join(root, ".agents", "pm");
+  const hostCli = resolve(import.meta.dirname, "..", "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+  const env: NodeJS.ProcessEnv = { ...process.env, PM_PATH: pmRoot, PM_GLOBAL_PATH: join(root, "global-pm"), PM_TELEMETRY_DISABLED: "1" };
+  const invocations: string[][] = [];
   const launch: PmLaunch = {
     command: process.execPath,
-    args: (pmArgs) => [fakePm, ...pmArgs],
+    args: (pmArgs) => {
+      invocations.push([...pmArgs]);
+      return [hostCli, ...pmArgs];
+    },
     windowsVerbatimArguments: false,
   };
   try {
-    assert.deepEqual(fetchAllItems("/tracker", launch), [
-      { id: "fixture-1", title: "Tracked standup work", status: "in_progress" },
-    ]);
-    const invocations = readFileSync(argsFile, "utf8")
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line) as string[]);
-    assert.deepEqual(invocations, [[
-      "--path", "/tracker", ...COMPLETE_LIST_COMMAND_ARGUMENTS,
-    ]], "the acceptance must observe exactly one canonical host invocation");
+    for (const args of [
+      ["init", "--defaults", "--agent-guidance", "skip", "--prefix", "reader"],
+      ["create", "task", "Tracked standup work", "--status", "in_progress", "--create-mode", "progressive"],
+    ]) {
+      const result = spawnSync(process.execPath, [hostCli, ...args], { cwd: root, env, encoding: "utf8" });
+      assert.equal(result.status, 0, result.stderr);
+    }
+    const items = fetchAllItems(pmRoot, launch);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].title, "Tracked standup work");
+    assert.equal(items[0].status, "in_progress");
+    assert.match(items[0].id, /^reader-/u);
+    assert.deepEqual(invocations, [["--path", pmRoot, ...COMPLETE_LIST_COMMAND_ARGUMENTS]],
+      "the real host must receive exactly one canonical complete-list invocation");
   } finally {
-    if (previousResponse === undefined) delete process.env.PM_STANDUP_FAKE_RESPONSE;
-    else process.env.PM_STANDUP_FAKE_RESPONSE = previousResponse;
-    if (previousArgsFile === undefined) delete process.env.PM_STANDUP_ARGS_FILE;
-    else process.env.PM_STANDUP_ARGS_FILE = previousArgsFile;
     rmSync(root, { recursive: true, force: true });
   }
 });

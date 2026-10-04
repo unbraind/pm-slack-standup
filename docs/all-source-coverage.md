@@ -71,3 +71,77 @@ Its stderr receipt is `standup export: rendered 4 item(s) as md.` The preview
 returns four section counts and the rendered text/Block Kit fallback. These
 synthetic checks establish local package behavior; they do not establish hosted
 Slack delivery, deployment, Windows execution or privacy remediation.
+
+## Integrated release gate
+
+`npm run release:check` passed with exit 0 on Node 24.19.0 and the installed
+CLI/SDK 2026.10.4. The compiler enforces `erasableSyntaxOnly` for source and test
+compilation. The complete coverage suite reports 241 passing tests and no skips.
+
+| Dimension | Covered / total | Percent |
+| --- | --- | --- |
+| Lines | 4002 / 4002 | 100 |
+| Statements | 4002 / 4002 | 100 |
+| Branches | 1066 / 1066 | 100 |
+| Functions | 130 / 130 | 100 |
+
+The eleven measured files are:
+
+- `index.ts`: all four metrics 100%.
+- `scripts/accept-canonical-reader.ts`: all four metrics 100%.
+- `scripts/accept-packed.ts`: all four metrics 100%.
+- `scripts/coverage-gate.ts`: all four metrics 100%.
+- `scripts/docstring-gate.ts`: all four metrics 100%.
+- `scripts/duplication-gate.ts`: all four metrics 100%.
+- `scripts/lint.ts`: all four metrics 100%.
+- `scripts/main-invocation.ts`: all four metrics 100%.
+- `scripts/prepare-merge-driver.ts`: all four metrics 100%.
+- `scripts/verify-release-changelog-date.ts`: all four metrics 100%.
+- `scripts/verify-release-publish-attestation.ts`: all four metrics 100%.
+
+Exact pass lines from the integrated run:
+
+```text
+ℹ tests 241
+ℹ pass 241
+ℹ fail 0
+ℹ skipped 0
+duplication-gate: 0% duplicated lines (0/9440), 36 source(s), 0 clone pair(s), threshold 0%
+docstring-gate: 11 file(s), 90 declaration(s) documented.
+coverage-gate: 11 source file(s) reported; lines/statements/branches/functions thresholds met.
+found 0 vulnerabilities
+verify-release-publish-attestation: every publish invocation is attested.
+```
+
+Typecheck, lint, build, test compilation, dry-run packing and canonical-reader
+acceptance also exited 0. No changelog regeneration was needed: its check passed.
+The exact packed npm/Bun receipt is:
+
+```json
+{"ok":true,"receipts":[{"scenario":"npm-current","host_version":"2026.10.4","tracker_items":2,"rendered_items":2,"stderr_bytes":44,"fixtures_present":true},{"scenario":"bun-current","host_version":"2026.10.4","tracker_items":2,"rendered_items":2,"stderr_bytes":44,"fixtures_present":true},{"scenario":"npm-minimum","host_version":"2026.8.20","tracker_items":2,"rendered_items":2,"stderr_bytes":44,"fixtures_present":true},{"scenario":"bun-minimum","host_version":"2026.8.20","tracker_items":2,"rendered_items":2,"stderr_bytes":44,"fixtures_present":true},{"scenario":"npm-global-current","host_version":"2026.10.4","tracker_items":1,"rendered_items":1,"stderr_bytes":44,"fixtures_present":true}]}
+```
+
+## Tracker integration
+
+The original coverage item was reused and remains open. Independent histories
+from the runtime and tooling worktrees are preserved verbatim in
+[evidence/runtime-coverage-history.jsonl](evidence/runtime-coverage-history.jsonl)
+and [evidence/tooling-coverage-history.jsonl](evidence/tooling-coverage-history.jsonl).
+The field-aware history driver refused one redundant remove after concurrent
+collection edits. Receipt reconciliation could not prove the candidate, so that
+tracker union was abandoned. The exact original tracker item/history was restored
+and verified, and the integrated files, documents, tests and results were recorded
+through normal audited PM mutations. No history repair was forced. The failed
+hash-only receipt is preserved separately in
+[evidence/runtime-abandoned-merge-receipt.json](evidence/runtime-abandoned-merge-receipt.json);
+it describes an abandoned candidate, not an applied merge.
+
+Both original source commits used SteveBot identity:
+`09fa83763956c6fdaee3694cbb542b751f4988a5` and
+`45e68dbfce46575ce3d245affa358b4adea991be`. The integrated code was reviewed before
+the combined gate. A caller-context fixture additionally verifies that inherited
+tracker overrides cannot redirect its disposable project's initialization.
+
+The existing development-dependency audit and reachable-history privacy items
+remain separate from this coverage result. The PR remains open; no publishing,
+merging, hosted-data access or deployment is part of this change.

@@ -668,11 +668,6 @@ const CRON_BOUNDS: Array<[number, number]> = [
 /** Parse one cron field token into a sorted unique list of valid values. */
 function parseCronField(token: string, fieldIndex: number): number[] {
   const [min, max] = CRON_BOUNDS[fieldIndex];
-  const all = (): number[] => {
-    const out: number[] = [];
-    for (let v = min; v <= max; v++) out.push(v);
-    return out;
-  };
   const expandRange = (lo: number, hi: number, step: number): number[] => {
     const out: number[] = [];
     for (let v = lo; v <= hi; v += step) out.push(v);
@@ -749,8 +744,10 @@ export function parseSchedule(spec: string | undefined): ScheduleSpec | undefine
       const parsed = fields.map((f, i) => parseCronField(f, i));
       return { kind: "cron", fields: parsed, raw: s };
     } catch (err: unknown) {
+      // Only parseCronField and native operations run in this try block;
+      // each throws Error instances (see runtime coverage evidence).
       throw new CommandError(
-        `Invalid --schedule cron expression '${s}': ${err instanceof Error ? err.message : String(err)}.`,
+        `Invalid --schedule cron expression '${s}': ${(err as Error).message}.`,
         EXIT_CODE.USAGE
       );
     }
@@ -987,23 +984,15 @@ function quoteWindowsArg(arg: string): string {
   // each attempt. CodeQL flagged this as js/polynomial-redos, and the input is
   // reachable — a Windows workspace path arrives here through `--pm-path`.
   //
-  // The escaping rules are unchanged, only how they are applied. A run of `n`
-  // backslashes immediately before a `"` becomes `2n + 1` backslashes and a
-  // literal quote, because CommandLineToArgvW collapses `2n` backslashes before
-  // a quote back to `n` and the extra one escapes the quote itself. A run at the
-  // very end doubles for the same reason, since the closing quote this function
-  // appends is also a quote the parser will see. Backslashes anywhere else are
-  // literal and pass through untouched.
+  // The sole caller validates the same captured argv before quoting, so a
+  // literal double quote is already refused and cannot reach this function.
+  // Trailing backslashes still double before our closing quote; backslashes
+  // anywhere else are literal and pass through untouched.
   let quoted = '"';
   let pendingBackslashes = 0;
   for (const character of arg) {
     if (character === "\\") {
       pendingBackslashes += 1;
-      continue;
-    }
-    if (character === '"') {
-      quoted += "\\".repeat(pendingBackslashes * 2 + 1) + '"';
-      pendingBackslashes = 0;
       continue;
     }
     quoted += "\\".repeat(pendingBackslashes) + character;
@@ -1225,13 +1214,16 @@ export function pmLaunchPlan(bin: string, platform: NodeJS.Platform = process.pl
     // why this must not go back to appending the pm arguments as separate
     // elements after `/c`.
     args: (pmArgs) => {
-      assertNoCmdVariableExpansion([bin, ...pmArgs]);
+      // Capture once: accessors or custom iterators must not swap in an
+      // unchecked argument between validation and command composition.
+      const argv = [bin, ...pmArgs];
+      assertNoCmdVariableExpansion(argv);
       return [
         "/d",
         "/s",
         "/v:off",
         "/c",
-        `"${[bin, ...pmArgs].map(quoteWindowsArg).join(" ")}"`,
+        `"${argv.map(quoteWindowsArg).join(" ")}"`,
       ];
     },
     windowsVerbatimArguments: true,
@@ -2030,6 +2022,7 @@ export function renderStandup(data: StandupData, opts: StandupOptions): string {
 // Slack transport
 // ---------------------------------------------------------------------------
 
+/** Post the actual JSON payload to the webhook's host, port, and request path. */
 function postToSlack(webhookUrl: string, payload: Record<string, unknown>): Promise<void> {
   return new Promise((resolvePromise, reject) => {
     const body = JSON.stringify(payload);
@@ -2037,6 +2030,7 @@ function postToSlack(webhookUrl: string, payload: Record<string, unknown>): Prom
 
     const options = {
       hostname: url.hostname,
+      port: url.port,
       path: url.pathname + url.search,
       method: "POST",
       headers: {
@@ -2052,7 +2046,8 @@ function postToSlack(webhookUrl: string, payload: Record<string, unknown>): Prom
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
           resolvePromise();
         } else {
-          reject(new Error(`Slack webhook returned HTTP ${res.statusCode ?? "unknown"}: ${respBody}`));
+          // Node assigns the parsed numeric status before this client callback.
+          reject(new Error(`Slack webhook returned HTTP ${res.statusCode}: ${respBody}`));
         }
       });
     });
@@ -2332,7 +2327,8 @@ export function readPriorCounts(
   try {
     raw = readFileSync(resolve(path), "utf-8");
   } catch (err: unknown) {
-    const detail = err instanceof Error ? err.message : String(err);
+    // Native resolve/readFileSync failures are always Error instances.
+    const detail = (err as Error).message;
     warn(`warning: --compare '${path}' could not be read (${detail}); rendering standup without trend deltas.`);
     return undefined;
   }
@@ -2405,7 +2401,8 @@ export function readSnapshotHistory(
     try {
       parsed = JSON.parse(readFileSync(file, "utf-8"));
     } catch (err: unknown) {
-      const detail = err instanceof Error ? err.message : String(err);
+      // Native readFileSync and JSON.parse failures are Error instances.
+      const detail = (err as Error).message;
       warn(`warning: skipping snapshot '${file}' (${detail}).`);
       continue;
     }
@@ -2474,11 +2471,6 @@ export function renderTrendLine(deltas: SectionDelta[]): string {
 // Extension
 // ---------------------------------------------------------------------------
 
-// True once the scoped `output_format` service override is registered. When
-// the host runtime lacks `registerService`, the exporter falls back to writing
-// stdout directly (legacy behavior, envelope included).
-let exportStdoutViaService = false;
-
 /**
  * Flags the `standup` command and the `standup` exporter both accept, in the
  * order both registrations already published them.
@@ -2529,6 +2521,9 @@ export default defineExtension({
   version: "2026.10.4",
 
   activate(api) {
+    // Each host activation owns its capability decision, including old hosts
+    // activated after a modern host in the same process.
+    let exportStdoutViaService = false;
     const standupFlags: FlagDefinition[] = [
       { long: "--webhook", value_name: "url", description: "Slack incoming webhook URL (overrides PM_SLACK_WEBHOOK env var)" },
       { long: "--channel", value_name: "name", description: "Channel name shown in the message (e.g. #team-eng)" },
@@ -2676,7 +2671,7 @@ export default defineExtension({
         // failure. We exit 0 here: stdout delivery is the requested fallback.
         for (const f of failures) {
           console.error(
-            `Slack post to ${f.channel ?? "(default channel)"} failed: ${f.error ?? "unknown error"} — falling back to stdout.`
+            `Slack post to ${f.channel ?? "(default channel)"} failed: ${f.error} — falling back to stdout.`
           );
         }
         const rendered = renderStandup(data, opts);
@@ -2696,7 +2691,7 @@ export default defineExtension({
       if (failures.length > 0) {
         throw new CommandError(
           `Slack post failed for ${failures.length} of ${targets.length} target(s): ` +
-            failures.map((f) => `${f.channel ?? "(default)"}: ${f.error ?? "unknown"}`).join("; "),
+            failures.map((f) => `${f.channel ?? "(default)"}: ${f.error}`).join("; "),
           EXIT_CODE.GENERIC_FAILURE
         );
       }
