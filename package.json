@@ -1,6 +1,6 @@
 {
   "name": "pm-slack-standup",
-  "version": "2026.9.26",
+  "version": "2026.10.4",
   "description": "Post pm context as a Slack standup message",
   "repository": {
     "type": "git",
