@@ -2,11 +2,13 @@ id: pm-slack-standup-7t31
 title: Require exact all-source 100/100/100/100 coverage and strict quality gates
 description: "The current V8 coverage gate measures only index.ts at 90.44% lines, 88.23% branches, and 91.79% functions, with no separately reported statements result. release:check now enforces canonical pm-ops ESLint lint and zero-duplication checks plus the docstring gate, but executable scripts remain outside coverage and the mutation and broader static/security gate criteria remain incomplete. This blocks an all-source 100/100/100/100 or production-ready claim."
 type: Issue
-status: in_progress
+status: closed
 priority: 1
 tags[4]: coverage,quality-gate,release-blocker,tdd
 created_at: "2026-08-21T10:11:53.131Z"
-updated_at: "2026-10-04T22:56:57.186Z"
+updated_at: "2026-10-04T23:01:41.188Z"
+closed_at: "2026-10-04T23:01:35.781Z"
+completed_at: "2026-10-04T23:01:35.781Z"
 author: codex
 estimated_minutes: 720
 acceptance_criteria: "Inventory every executable TypeScript and JavaScript source; replace or explicitly justify JavaScript; measure statements, branches, functions, and lines across every executable source at exact 100 percent; make the gate fail when a source is added or removed from measurement; add strict lint, duplication and security/static gates with no blanket suppression; mutation-check the gate; keep tests behavior-driven and non-duplicative"
@@ -20,6 +22,7 @@ reporter: codex
 severity: high
 environment: "main 2d0077a, Node V8 coverage"
 repro_steps: Run npm run coverage and inspect coverage-gate DEFAULT_SKIP_DIRS plus package thresholds.
+resolution: completed
 expected_result: All executable repository source is measured at exact 100/100/100/100 and every strict quality gate is mandatory.
 actual_result: "All-source coverage gate: 238 tests pass; 11 authored sources (operational scripts included, no ignores) at 100/100/100/100; thresholds must be exactly 100; docstring 89 declarations; duplication 0%; release:check passes on the PR #107 head."
 affected_version: pm-slack-standup 2026.8.17
@@ -140,4 +143,5 @@ docs[7]{path,scope}:
   docs/review-107.md,project
   docs/runtime-coverage-2026-10-04.md,project
   docs/tooling-behavior-coverage.md,project
+close_reason: "PR #107: all-source coverage gate at exactly 100/100/100/100 (scripts included, no ignores, thresholds below 100 refused); 238 tests; three runtime bugs fixed; Greptile 5/5; CodeRabbit findings fixed and verified in-thread; CodeQL 0 open."
 body: ""

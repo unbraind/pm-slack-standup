@@ -2,14 +2,17 @@ id: pm-slack-standup-z1up
 title: "Removing the cmd.exe launch would close the shell-command alert, but the obvious version of that change breaks Windows"
 description: "CodeQL alert 2 reports js/shell-command-constructed-from-input at index.ts line 1120, where the win32 branch of pmLaunchPlan builds a single command tail for cmd.exe by joining the binary path and every pm argument. The message is accurate: a string concatenation that depends on library input is later used in a shell command.\n\nThe existing code is not careless about it. quoteWindowsArg applies the documented CommandLineToArgvW escaping so every metacharacter cmd honours inside quotes is neutralised, the tail is outer-quoted so cmd's /s handling strips exactly the pair we added, and assertNoCmdVariableExpansion refuses the launch outright when an argument contains a %NAME% pair, because cmd expands those even inside quotes with no escape available. That last defence exists specifically so a workspace path containing %BUILD% cannot make pm silently read a different workspace and report success.\n\nThe clean way to close the alert is to stop using a command processor at all: resolve the shim to the JS entry it wraps and spawn node with that entry and discrete argv elements, which removes the string concatenation rather than escaping it. An attempt at this was drafted and rejected, and the reason is worth recording so the next attempt does not repeat it. The draft made the direct spawn unconditional, which breaks the case the cmd.exe path exists for: npm writes three shims into node_modules/.bin, on Windows only the .cmd is executable, and Node refuses to spawn a .cmd directly with EINVAL. A launch plan that cannot resolve a JS entry must therefore still have a command processor to fall back to, so the alert does not disappear — it only stops being on the path that normally runs.\n\nDeliberately not dismissed. Dismissing would require arguing the quoting is complete, and the honest position is that the mitigations are careful but unverified, which is exactly the claim a scanner is better placed to doubt than a reviewer."
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags[1]: security
 created_at: "2026-09-03T17:57:21.842Z"
-updated_at: "2026-10-04T21:57:23.990Z"
+updated_at: "2026-10-04T23:01:41.643Z"
+closed_at: "2026-10-04T23:01:36.504Z"
+completed_at: "2026-10-04T23:01:36.504Z"
 author: pi-agent
 acceptance_criteria: "Windows PM reads use a JavaScript entry with process.execPath or an explicit native executable and separate argv elements; no shell or command-tail fallback remains; Real child tests preserve hostile ampersand and pipe arguments as one literal argv element while quote, CR/LF and percent-name refusals still pass; Local and global npm shim resolution, PATH fallback and unresolved-entry refusal are tested; full release:check passes at all-source 100/100/100/100; CodeQL is not dismissed or suppressed"
 risk: medium
+resolution: completed
 comments[8]{created_at,author,text}:
   "2026-10-04T18:44:30.680Z",codex-sol,"Coverage PR https://github.com/unbraind/pm-slack-standup/pull/107 retains the required Windows cmd.exe launch and its strict argument guard. CodeQL annotation https://github.com/unbraind/pm-slack-standup/security/code-scanning/5 again flags the library-input command composition. The coverage change fixes a real double-read accessor bug by validating and quoting one snapshot, and tests assert quoting/refusal outputs without dropping Windows behavior. This existing portability/security follow-up remains open; full Linux release gates and pure Windows launch-plan coverage do not establish security disposition or Windows execution."
   "2026-10-04T18:58:36.997Z",codex-sol,"PR #107 review round: read CodeQL alert #5 and both CodeQL review comments in full. Main merged cleanly. Plan: reproduce shell-free Windows launch requirements and literal hostile argv handling before replacing cmd.exe composition; retain quote, CR/LF and percent-variable refusals."
@@ -30,4 +33,5 @@ tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   "node --test --test-name-pattern=\"Windows bare pm PATH|Windows argv preserves|packed launch configuration|incomplete installations|Windows npm PATH lookup launches\" test/fetch-all-items.test.ts test/accept-packed.test.ts",project,codex-sol,"2026-10-04T21:51:20.820Z",local_mutation,test/cover-every-standup-path
 docs[1]{path,scope}:
   docs/review-107.md,project
+close_reason: "PR #107: Windows launches are shell-free (Node entry + discrete argv; local and global npm layouts resolved; unresolvable wrappers fail closed); CodeQL shell-construction alert resolved at the source; windows-acceptance-launcher CI passes."
 body: ""
