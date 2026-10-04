@@ -125,6 +125,21 @@ test("a damaged pm-ops entry without package.json fails instead of masquerading 
   }
 });
 
+test("an invalid global lookup path preserves the installer failure", () => {
+  const directory = checkout("invalid-global-path", "absent");
+  const lookupFile = join(scratch, "lookup-file");
+  writeFileSync(lookupFile, "This is a file, not a module search directory.");
+  const result = spawnSync(process.execPath, [launcher], {
+    cwd: directory,
+    encoding: "utf8",
+    env: { ...process.env, PATH: hostPath, NODE_PATH: lookupFile },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /MODULE_NOT_FOUND/);
+  assert.doesNotMatch(result.stderr, /skipping merge-driver install/);
+  assert.deepEqual(registeredDrivers(directory), []);
+});
+
 test("a failing pm merge install fails the install with the same status", posixOnly, () => {
   const result = prepare(checkout("failing-pm", "pinned"), stubPm("failing-pm", 7));
   assert.equal(result.status, 7, result.stderr);

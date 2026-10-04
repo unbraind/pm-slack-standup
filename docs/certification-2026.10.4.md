@@ -8,11 +8,11 @@ Exact development pins: CLI/SDK, pm-ops, pm-changelog 2026.10.4; Babel ESLint pa
 
 ## Gate results
 
-`flock /tmp/claude-1000/heavy-gate.lock npm run release:check` passed: 207/207 tests, zero skipped, plus canonical-reader acceptance; lint passed, duplication 0/8775 lines across 26 sources with 0 clone pairs; 81 documented declarations. Coverage remains 90.44% lines/88.23% branches/91.79% functions over index.ts only (1 reported source). Scripts and independent statements remain unmeasured in the existing coverage item. No threshold, ignore or skip was added or reduced.
+`flock /tmp/claude-1000/heavy-gate.lock npm run release:check` passed: 208/208 tests, zero skipped, plus canonical-reader acceptance; lint passed, duplication 0/8790 lines across 26 sources with 0 clone pairs; 81 documented declarations. Coverage remains 90.44% lines/88.23% branches/91.79% functions over index.ts only (1 reported source). Scripts and independent statements remain unmeasured in the existing coverage item. No threshold, ignore or skip was added or reduced.
 
 All 5 packed scenarios passed: npm-current and bun-current on 2026.10.4, npm-minimum and bun-minimum on 2026.8.20 (each 2 tracker/2 rendered items), and npm-global-current (1/1). Production audit, pack contents, changelog, release-date and publish-attestation checks passed. The same heavy lock covered CI's `bun install --no-save` and the following dogfood script.
 
-`npx pm health --strict-exit --require-merge-drivers --json` passed with existing advisory warnings stale_in_progress_items:1 and legacy role-domain count 13. The linked launcher suite via `pm test --run --progress` passed 7/7.
+`npx pm health --strict-exit --require-merge-drivers --json` passed with existing advisory warnings stale_in_progress_items:1 and legacy role-domain count 13. The linked launcher suite via `pm test --run --progress` passed 8/8.
 
 ## Security blocker
 
@@ -43,3 +43,9 @@ file: "/tmp/claude-1000/cert-wt/pm-slack-standup-dogfood/bun-standup.json"
 ## Managed GitHub preview
 
 Installed managed `npm:pm-github@2026.10.4`. `pm github sync --repo unbraind/pm-slack-standup --dry-run` reports no provenance-linked items and synced=0/skipped=0/planned=0. This is zero-case preview evidence. No GitHub issue writes or scheduled sync. Final-head CI and substantive reviews remain separate; the orchestrator merges and closes PM items after verification.
+
+## Review follow-up
+
+Managed extension payloads are clone-local installed distributions and are excluded from Git. Reproduce the read-only preview with `npx -y @unbrained/pm-cli@2026.10.4 package install npm:pm-github@2026.10.4 --project`, then `npx -y @unbrained/pm-cli@2026.10.4 github sync --repo unbraind/pm-slack-standup --dry-run`. The installed version and zero-case receipt above remain the evidence; no write-path acceptance is claimed.
+
+Greptile missing-catch-path finding is covered by a real `NODE_PATH` file fixture: nonzero `MODULE_NOT_FOUND`, no omit-dev skip and no installed drivers. Scoped and linked launcher suites pass 8/8; final locked full gate passes 208/208. Upstream generated pm-github apply concerns remain in open [pm-slack-standup-bhg0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bhg0.toon), not fixed by removing their distribution from the consumer PR.
