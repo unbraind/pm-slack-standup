@@ -477,10 +477,26 @@ test("Windows native executables launch directly and JavaScript entries use Node
 });
 
 test("Windows argv preserves empty values, metacharacters and backslashes without composition", () => {
+  const plan = pmLaunchPlan("pm.js", "win32");
   const values = ["", "a & calc | whoami", "()<>^!", " spaced\\path\\", "\\".repeat(200_000)];
-  const start = performance.now();
-  assert.deepEqual(pmLaunchPlan("pm.js", "win32").args(values), ["pm.js", ...values]);
-  assert.ok(performance.now() - start < 2000);
+  assert.deepEqual(plan.args(values), ["pm.js", ...values]);
+  // Backslash runs once triggered quadratic quoting (js/polynomial-redos), so
+  // assert growth rather than one cold wall-clock reading: after warm-up, the
+  // median cost of a 10x longer run must stay far below the 100x a quadratic
+  // pass would take.
+  const medianMs = (length: number): number => {
+    const argv = ["\\".repeat(length)];
+    for (let i = 0; i < 5; i++) plan.args(argv);
+    const samples = Array.from({ length: 7 }, () => {
+      const start = performance.now();
+      plan.args(argv);
+      return performance.now() - start;
+    }).sort((a, b) => a - b);
+    return samples[3];
+  };
+  const small = medianMs(20_000);
+  const large = medianMs(200_000);
+  assert.ok(large < Math.max(small, 0.05) * 30, `200k run took ${large}ms vs ${small}ms for 20k`);
 });
 
 test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", posixOnly, () => {
