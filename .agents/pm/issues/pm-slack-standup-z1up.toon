@@ -6,8 +6,10 @@ status: open
 priority: 2
 tags[1]: security
 created_at: "2026-09-03T17:57:21.842Z"
-updated_at: "2026-09-03T17:57:21.842Z"
+updated_at: "2026-10-04T18:44:30.680Z"
 author: pi-agent
 acceptance_criteria: "The normal launch path resolves the shim to its JS entry and spawns node with discrete argv elements, with no command string built anywhere on it; the cmd.exe fallback is retained only for the case where no JS entry can be resolved, and a test asserts that a .cmd shim with no resolvable entry still launches rather than failing EINVAL; and CodeQL either closes alert 2 or the remaining fallback is dismissed with the reachability argument written on the alert"
 risk: medium
+comments[1]{created_at,author,text}:
+  "2026-10-04T18:44:30.680Z",codex-sol,"Coverage PR https://github.com/unbraind/pm-slack-standup/pull/107 retains the required Windows cmd.exe launch and its strict argument guard. CodeQL annotation https://github.com/unbraind/pm-slack-standup/security/code-scanning/5 again flags the library-input command composition. The coverage change fixes a real double-read accessor bug by validating and quoting one snapshot, and tests assert quoting/refusal outputs without dropping Windows behavior. This existing portability/security follow-up remains open; full Linux release gates and pure Windows launch-plan coverage do not establish security disposition or Windows execution."
 body: ""

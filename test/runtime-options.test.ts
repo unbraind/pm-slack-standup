@@ -71,7 +71,7 @@ test("real tracker records exercise dependency context, grouping, windows, and r
     for (const [index, groupBy] of groups.entries()) {
       const groupingOpts = { ...opts, groupBy, channel: "#preview", since: "2026-01-01" };
       const groupingData = { ...data, wip: [missingType] };
-      assert.match(buildTextMessage(groupingData, groupingOpts), new RegExp(labels[index].replace(/[()]/g, "\\$&")));
+      assert.ok(buildTextMessage(groupingData, groupingOpts).includes(labels[index]));
       const markdown = buildTextMessage(groupingData, { ...groupingOpts, format: "markdown" });
       assert.match(markdown, /- \*\*.*\*\*\n  - /);
       assert.match(buildBlockKit(groupingData, groupingOpts).fallback, /#preview/);
