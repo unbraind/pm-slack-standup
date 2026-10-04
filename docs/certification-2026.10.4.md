@@ -8,7 +8,7 @@ Exact development pins: CLI/SDK, pm-ops, pm-changelog 2026.10.4; Babel ESLint pa
 
 ## Gate results
 
-`flock /tmp/claude-1000/heavy-gate.lock npm run release:check` passed: 208/208 tests, zero skipped, plus canonical-reader acceptance; lint passed, duplication 0/8790 lines across 26 sources with 0 clone pairs; 81 documented declarations. Coverage remains 90.44% lines/88.23% branches/91.79% functions over index.ts only (1 reported source). Scripts and independent statements remain unmeasured in the existing coverage item. No threshold, ignore or skip was added or reduced.
+`flock /tmp/claude-1000/heavy-gate.lock npm run release:check` passed: 208/208 tests, zero skipped, plus canonical-reader acceptance; lint passed, duplication 0/8796 lines across 26 sources with 0 clone pairs; 81 documented declarations. Coverage remains 90.44% lines/88.23% branches/91.79% functions over index.ts only (1 reported source). Scripts and independent statements remain unmeasured in the existing coverage item. No threshold, ignore or skip was added or reduced.
 
 All 5 packed scenarios passed: npm-current and bun-current on 2026.10.4, npm-minimum and bun-minimum on 2026.8.20 (each 2 tracker/2 rendered items), and npm-global-current (1/1). Production audit, pack contents, changelog, release-date and publish-attestation checks passed. The same heavy lock covered CI's `bun install --no-save` and the following dogfood script.
 
@@ -51,3 +51,5 @@ Managed extension payloads are clone-local installed distributions and are exclu
 Greptile missing-catch-path finding is covered by a real `NODE_PATH` file fixture: nonzero `MODULE_NOT_FOUND`, no omit-dev skip and no installed drivers. Scoped and linked launcher suites pass 8/8; final locked full gate passes 208/208. Upstream generated pm-github apply concerns remain in open [pm-slack-standup-bhg0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bhg0.toon), not fixed by removing their distribution from the consumer PR.
 
 The executable PM-linked full gate now runs `mkdir -p /tmp/claude-1000 && flock /tmp/claude-1000/heavy-gate.lock npm run release:check` in explicit tracker/source context. A real disposable missing-parent preflight reproduced failure before directory creation and success afterward. The shared lock path and full npm gate are unchanged; this fixes CodeRabbit portability finding #4177585174.
+
+The corrected full PM-linked gate passes 208/208 tests, zero skips, all five packed scenarios and all release checks, using explicit tracker/source context (90 copied real items, no mismatch). Its first run exposed inherited PM_PATH in packed fixtures; source packing now clears external tracker overrides and each scenario owns its explicit project/global tracker roots. Coverage remains 90.44/88.23/91.79, duplication 0/8796 lines across 26 sources. No gate was weakened.

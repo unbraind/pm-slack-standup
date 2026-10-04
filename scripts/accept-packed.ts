@@ -56,7 +56,11 @@ const cleanEnvironment: NodeJS.ProcessEnv = {
   PM_TELEMETRY_DISABLED: "1",
 };
 for (const key of Object.keys(cleanEnvironment)) {
-  if (key.toLowerCase() === "npm_config_allow_scripts") delete cleanEnvironment[key];
+  // The source pack runs in the checkout; inherited tracker overrides belong
+  // to a parent PM test runner and must not redirect this acceptance matrix.
+  if (["npm_config_allow_scripts", "pm_path", "pm_global_path"].includes(key.toLowerCase())) {
+    delete cleanEnvironment[key];
+  }
 }
 /** Maximum time allowed for one install, pack, or pm subprocess. */
 const commandTimeoutMs = 5 * 60 * 1000;
@@ -121,6 +125,7 @@ try {
     mkdirSync(scenarioRoot);
     const scenarioEnvironment: NodeJS.ProcessEnv = {
       ...cleanEnvironment,
+      PM_PATH: join(scenarioRoot, ".agents", "pm"),
       PM_GLOBAL_PATH: join(scenarioRoot, "global-pm"),
       XDG_CONFIG_HOME: isolatedConfig,
       XDG_DATA_HOME: isolatedData,
@@ -192,6 +197,7 @@ try {
   mkdirSync(globalDataRoot);
   const globalEnvironment: NodeJS.ProcessEnv = {
     ...cleanEnvironment,
+    PM_PATH: join(globalProjectRoot, ".agents", "pm"),
     PM_GLOBAL_PATH: join(globalScenarioRoot, "global-pm"),
     XDG_CONFIG_HOME: globalConfigRoot,
     XDG_DATA_HOME: globalDataRoot,
