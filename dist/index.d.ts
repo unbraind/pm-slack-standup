@@ -299,148 +299,30 @@ export declare function pmJsonMaxBuffer(): number;
  * wording can be regression-tested directly with synthetic errors, mirroring the
  * `describePmNullStatus` convention the sibling pm-csv package uses. */
 export declare function describePmReadFailure(error: Error, limitBytes: number): string;
-/**
- * How to launch the resolved `pm` binary: the file to pass to `spawnSync`, how
- * to build that spawn's argv for any pm arguments, and the
- * `windowsVerbatimArguments` value the spawn must pass.
- *
- * This triple — not a bare path — is what a resolution returns, because the
- * path alone is not enough to launch `pm` correctly: on Windows the npm `.cmd`
- * shim can only be executed by a command processor, so "which file" and "how
- * to spawn it" are one decision that must not be split across functions. A
- * caller that goes through {@link args} gets a correct spawn by construction;
- * a caller that invents its own argv reintroduces one of the two defects this
- * shape exists to make impossible (see {@link pmLaunchPlan}).
- */
+/** Shell-free executable and discrete arguments for one PM invocation. */
 export interface PmLaunch {
-    /**
-     * The file `spawnSync` must execute: the resolved binary on POSIX, or the
-     * Windows command processor when the binary is a batch shim that Windows
-     * cannot execute directly.
-     */
+    /** Executable passed to spawnSync: Node for Windows JS entries, otherwise the binary. */
     readonly command: string;
-    /**
-     * The complete `spawnSync` argv for one pm invocation carrying these
-     * arguments: the pm arguments themselves on POSIX, and on win32
-     * `["/d", "/s", "/v:off", "/c", tail]` where `tail` is ONE argv element holding the
-     * binary and every pm argument — each quote-escaped per the
-     * CommandLineToArgvW rules — wrapped in the single outer pair of quotes
-     * that cmd's `/s` handling is arranged to strip (see {@link pmLaunchPlan}).
-     * The tail is composed here, not by the caller, so the executable path and
-     * the arguments behind it can never disagree about quoting.
-     */
+    /** Capture and validate one argument snapshot, adding the Node entry when needed. */
     readonly args: (pmArgs: readonly string[]) => string[];
-    /**
-     * The value the spawn must pass as `windowsVerbatimArguments`: `true` on
-     * win32, because the composed tail is already quoted and Node re-quoting it
-     * would destroy the outer pair; `false` on POSIX, Node's per-element
-     * quoting, which the direct spawn has always relied on.
-     */
+    /** False so Node handles native argv quoting without a command processor. */
     readonly windowsVerbatimArguments: boolean;
 }
 /**
- * Decide how `bin` is launched on `platform`: the single place that pairs a
- * resolved `pm` binary with the spawn that can actually execute it.
- *
- * On win32 every form this package can resolve — the `.cmd` batch shim, the
- * extensionless POSIX shim, and the bare `pm` PATH fallback — needs the Windows
- * command processor, for three different reasons: Node 18.20+/20.12+ refuse to
- * spawn `.cmd`/`.bat` directly at all (the CVE-2024-27980 mitigation fails the
- * spawn with EINVAL), CreateProcess rejects the extensionless shim for having
- * no recognized executable extension, and a bare `pm` is not resolved through
- * PATHEXT the way a shell would. So the launch is always the processor with
- * `/d /s /v:off /c` and the binary as the first word of the command.
- *
- * How the command tail after `/c` is built is the subtle part, and it is why
- * `PmLaunch` composes the whole argv rather than leaving a caller to append
- * arguments. cmd's documented `/c`/`/k` quote handling ("old behavior", which
- * `/s` forces unconditionally) is: if the first character after `/c` is a
- * quote, strip that leading quote and remove the LAST quote character on the
- * tail, preserving any text after it. Passing the binary and the pm arguments
- * as discrete argv elements — letting Node quote each one — assembles a tail
- * like `"C:\spaced path\pm.cmd" --path "C:\tracker root" list --all --json`:
- * the tail starts with the binary's opening quote, and when
- * the FINAL argument needs quoting (any tracker root containing a space), the
- * last quote on the tail is an inner one. cmd strips the leading quote and
- * that inner quote, and the executable's path splits at its first space. The
- * launch then only works when the last argument happens to be unquoted —
- * which is why the original form passed its tests and still broke on
- * `C:\Users\Some User\project`.
- *
- * The fix is the mechanism Node itself uses for `shell: true` on win32: the
- * ENTIRE tail — binary plus every pm argument, each quote-escaped per the
- * CommandLineToArgvW rules by {@link quoteWindowsArg} — is passed as ONE argv
- * element wrapped in an outer pair of quotes added here, with
- * `windowsVerbatimArguments: true` so Node adds nothing of its own. cmd's `/s`
- * strip removes exactly the outer pair (the first character and the last
- * quote character are now both ours), and the inner per-element quoting
- * survives verbatim for the parser on the other side. Unlike `shell: true`,`
- * no raw string is ever handed to a shell. Before composition, every argument
- * is checked against the boundary outer quoting cannot contain: no argument may
- * include a literal `"`, `\r`, `\n`, or a `%NAME%` pair. With those refused,
- * every other metacharacter remains inside cmd's quote state and is data to
- * `pm`, never cmd syntax — `shell: true` is what joins caller strings verbatim
- * and must not be reintroduced.
- *
- * `/v:off` disables delayed expansion for this launch, so `!` is literal
- * regardless of the machine's `DelayedExpansion` registry setting or a parent
- * `cmd /v:on`. Delayed expansion is off by default, but it can be switched on
- * machine-wide via `HKLM\Software\Microsoft\Command\Processor\DelayedExpansion`
- * or inherited from a parent `cmd /v:on`, and when it is on `!NAME!` expands
- * inside the quote state exactly like `%NAME%` does — so `--pm-path
- * "C:\work\!BUILD!\pm"` would silently become a different path, and pm would
- * read a DIFFERENT workspace while reporting success, the precise failure the
- * `%NAME%` refusal already exists to prevent. `/v:off` is preferred over a
- * `!NAME!` refusal: `!` is a legal character in a Windows filename (unlike `"`),
- * so refusing it would reject real paths, while the switch makes `!` literal for
- * this launch at no cost to legitimate input.
- *
- * `/d` additionally skips the AutoRun registry hook, so machine-level cmd
- * configuration cannot alter the launch.
- *
- * On every other platform the binary is spawned directly with the pm arguments
- * as discrete argv elements, byte-for-byte the invocation this package has
- * always used: the shebang shim is executable as-is and no processor is
- * involved.
- *
- * `platform` defaults to `process.platform` and is a parameter so tests can
- * assert the exact launch shape for win32 without a Windows box.
- *
- * @param bin - Binary path (or PATH fallback name) to launch.
- * @param platform - Platform the launch will run on; defaults to the current one.
- * @returns The launch to hand to `spawnSync`: `command` plus `args(pmArgs)`
- *          building the full argv, and the `windowsVerbatimArguments` value
- *          the spawn must pass.
+ * Build a shell-free PM launch. Windows npm shims are bypassed by running their
+ * JavaScript entry with process.execPath and an argv array. Native executables
+ * launch directly. Windows refusals remain compatible with earlier releases.
+ * @param bin - Binary path, JavaScript entry, or PATH fallback.
+ * @param platform - Target platform; defaults to the running platform.
+ * @returns Executable and argv builder with Node's default argument quoting.
  */
 export declare function pmLaunchPlan(bin: string, platform?: NodeJS.Platform): PmLaunch;
 /**
- * Resolve the `pm` executable this package's own `@unbrained/pm-cli` declared,
- * walking up from `moduleUrl` to the nearest `node_modules/.bin/pm` shim, and
- * falling back to `pm` on `PATH` only when no local install is found — then
- * return it as a {@link PmLaunch} describing the spawn that can execute it.
- *
- * `spawnSync("pm", ...)` runs whichever `pm` comes first on `PATH`, which need
- * not be the `@unbrained/pm-cli` this package declared — that is what produced
- * the version skew this fix addresses. Resolving from the package's own
- * `node_modules` keeps the read against the same CLI the package pins, and the
- * walk handles both the source layout (`index.ts` at the package root) and the
- * built layout (`dist/index.js`), as well as a consumer install where the
- * nearest `.bin/pm` shim is the host CLI that loaded this extension.
- *
- * The result carries the launch decision, not just the path, because the two
- * cannot be separated on Windows: npm writes three shims into
- * `node_modules/.bin` (an extensionless shell script, a `.cmd` batch file, and
- * a `.ps1` script), and on win32 only the `.cmd` is executable at all — but
- * only through a command processor (see {@link pmLaunchPlan}). Returning the
- * bare `.cmd` path previously left the caller to invent a launch, and it
- * spawned the batch file directly, which Node refuses with EINVAL. Routing the
- * resolved binary through `pmLaunchPlan` here keeps "which file" and "how to
- * spawn it" in one place, so no caller can pair them wrongly.
- *
- * `moduleUrl` defaults to this module's URL and is a parameter only so the
- * resolution can be exercised against synthetic locations without touching the
- * real tree; `platform` likewise defaults to `process.platform` so the win32
- * launch shape can be asserted without a Windows box.
+ * Resolve the nearest local npm shim from up to four module ancestors, falling
+ * back to PM on PATH. Windows launches bypass the shim and use its JS entry.
+ * @param moduleUrl - Module location anchoring the bounded installation lookup.
+ * @param platform - Target platform; defaults to the running platform.
+ * @returns Shell-free launch plan for the resolved installation.
  */
 export declare function resolvePmBin(moduleUrl?: string, platform?: NodeJS.Platform): PmLaunch;
 /**

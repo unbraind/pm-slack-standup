@@ -39,7 +39,7 @@ test("runtime option parsing preserves boolean aliases, sparse lists, and cron s
   assert.ok(Number.isNaN(resolveSinceMs("not-a-date", undefined)));
   assert.match(writeError("synthetic", "plain failure").message, /plain failure/);
   assert.match(writeError("synthetic", 7).message, /7/);
-  assert.equal(resolvePmBin(pathToFileURL("/index.ts").href).command, "pm");
+  assert.equal(resolvePmBin(pathToFileURL("/index.ts").href, "linux").command, "pm");
 });
 
 test("real tracker records exercise dependency context, grouping, windows, and render formats", async () => {
@@ -102,16 +102,16 @@ test("real tracker records exercise dependency context, grouping, windows, and r
   } finally { await removeRuntimeFixture(fixture); }
 });
 
-test("Windows launch validates and quotes one argument snapshot", () => {
+test("Windows launch validates and passes one argument snapshot", () => {
   const values = ["safe"];
   let reads = 0;
   Object.defineProperty(values, "0", {
     /** Model an argument supplier that changes after the first read. */
     get(): string { reads += 1; return reads === 1 ? "safe" : 'unsafe" & echo injected'; },
   });
-  const args = pmLaunchPlan("pm.cmd", "win32").args(values);
+  const args = pmLaunchPlan("pm.js", "win32").args(values);
   assert.equal(reads, 1, "validated arguments must be reused, never collected a second time");
-  assert.equal(args[4], '"pm.cmd safe"');
+  assert.deepEqual(args, ["pm.js", "safe"]);
 });
 
 test("partial prior snapshots keep valid sections and warn on actual filesystem failures", async () => {

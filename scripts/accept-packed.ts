@@ -1,5 +1,5 @@
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { join, resolve, posix, win32 } from "node:path";
 
@@ -57,18 +57,38 @@ interface AcceptanceLaunchers {
   readonly bunx: string;
 }
 
-/** Select native launcher names or npm's JavaScript entries without consulting host globals. */
-export function acceptanceLaunchers(platform: NodeJS.Platform, npmExecPath: string | undefined, node: string): AcceptanceLaunchers {
+/**
+ * Select npm's pinned JavaScript entry or resolve its Windows installation from PATH.
+ * @param platform - Target platform for executable naming and path parsing.
+ * @param npmExecPath - Inherited npm entry, preserved as unset when absent.
+ * @param node - Node executable used for JavaScript launchers.
+ * @param searchPath - Explicit PATH used to find npm's Windows installation.
+ * @returns Executables and discrete entry prefixes for npm, npx and Bun.
+ */
+export function acceptanceLaunchers(platform: NodeJS.Platform, npmExecPath: string | undefined, node: string, searchPath = ""): AcceptanceLaunchers {
   const windows = platform === "win32";
   const paths = windows ? win32 : posix;
-  const npmCli = npmExecPath?.endsWith(".js") ? npmExecPath : undefined;
+  let npmCli = npmExecPath?.endsWith(".js") ? npmExecPath : undefined;
+  let npxCli = npmCli === undefined ? undefined : paths.resolve(paths.dirname(npmCli), "npx-cli.js");
+  if (windows && npmCli === undefined) {
+    for (const directory of searchPath.split(";")) {
+      if (directory === "") continue;
+      const bin = join(directory, "node_modules", "npm", "bin");
+      const candidate = join(bin, "npm-cli.js");
+      if (existsSync(candidate)) {
+        npmCli = candidate;
+        npxCli = join(bin, "npx-cli.js");
+        break;
+      }
+    }
+  }
   return {
     npm: npmCli === undefined
       ? { command: windows ? "npm.cmd" : "npm", prefix: [] }
       : { command: node, prefix: [npmCli] },
-    npx: npmCli === undefined
+    npx: npxCli === undefined
       ? { command: windows ? "npx.cmd" : "npx", prefix: [] }
-      : { command: node, prefix: [paths.resolve(paths.dirname(npmCli), "npx-cli.js")] },
+      : { command: node, prefix: [npxCli] },
     bun: windows ? "bun.exe" : "bun",
     bunx: windows ? "bunx.exe" : "bunx",
   };
@@ -180,7 +200,7 @@ export function globalReceipt(actualVersion: string, expectedVersion: string, ex
 export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
   const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as PackageContract;
   const { developmentVersion, minimumVersion } = acceptanceVersions(packageJson);
-  const launchers = acceptanceLaunchers(process.platform, process.env.npm_execpath, process.execPath);
+  const launchers = acceptanceLaunchers(process.platform, process.env.npm_execpath, process.execPath, process.env.PATH);
   const npmLauncher = launchers.npm;
   const temporaryRoot = mkdtempSync(join(temporaryParent, "pm-slack-standup-packed-acceptance-"));
   try {

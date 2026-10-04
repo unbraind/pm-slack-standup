@@ -6,7 +6,7 @@ status: in_progress
 priority: 1
 tags[4]: coverage,quality-gate,release-blocker,tdd
 created_at: "2026-08-21T10:11:53.131Z"
-updated_at: "2026-10-04T18:44:35.961Z"
+updated_at: "2026-10-04T19:16:33.850Z"
 author: codex
 estimated_minutes: 720
 acceptance_criteria: "Inventory every executable TypeScript and JavaScript source; replace or explicitly justify JavaScript; measure statements, branches, functions, and lines across every executable source at exact 100 percent; make the gate fail when a source is added or removed from measurement; add strict lint, duplication and security/static gates with no blanket suppression; mutation-check the gate; keep tests behavior-driven and non-duplicative"
@@ -25,7 +25,7 @@ actual_result: "CLI/SDK 2026.10.4 full coverage run: 207/207 tests pass, zero sk
 affected_version: pm-slack-standup 2026.8.17
 component: quality and release gates
 customer_impact: "A green release gate can coexist with untested source and below-mandate coverage, so it cannot support a production-ready claim."
-comments[15]{created_at,author,text}:
+comments[19]{created_at,author,text}:
   "2026-09-22T05:10:25.678Z",pi-agent,"Not closed by the 2026.9.21 certify task pm-slack-standup-add0. That task delivers the canonical pm-ops lint and duplication gates only. This item still requires exact 100/100/100/100 all-source coverage, mutation checking, and the broader security/static analyzers named in its acceptance criteria."
   "2026-10-02T21:14:35.906Z",pi-grok,"Current-state actual_result now reports the later 21:38 certification run of 207/207. The 206-test result remains in the append-only history event from 2026-09-28T21:23:29.863Z. Later commits after that run do not add tests."
   "2026-10-03T00:00:48.172Z",codex-sol,"npm ci and npm run release:check PASS: 207/207 tests, zero skipped; measured index.ts coverage 90.44/88.23/91.79 lines/branches/functions with unchanged 83/87/87 floors; 81 documented declarations. Independent statements, whole-source 100 percent, mutation and broader static/security acceptance remain unmeasured/unaccepted in pm-slack-standup-7t31. Canonical-reader acceptance and all five packed npm/Bun current/minimum/global scenarios pass. Audit all/production zero; strict CI health, pm validate, Bun install and CI fresh-dist comparison pass. Linked packaging tests pass 2/2 and focused PATH fallback test 1/1 passes after failing red on a populated temporary ancestor. The fixture now owns all four searched directories and a shim just outside the bound, preserving real fallback assertions without touching other workspaces. Retained 207 count correction and original 206 history event preserved; all JSONL prefixes unchanged. Note projections support edit/delete in pinned CLI; immutable history is retained. Final-head CI and substantive reviews remain separate; both items released in_progress, never closed."
@@ -41,6 +41,10 @@ comments[15]{created_at,author,text}:
   "2026-10-04T18:24:14.640Z",codex-sol,"Orchestrator combined verification passed npm run release:check exit 0 against pinned installed CLI/SDK 2026.10.4 on Node 24.19.0: 241 tests, zero failures/skips; all 11 authored runtime TypeScript files 100/100/100/100, 4002/4002 lines/statements, 1066/1066 branches, 130/130 functions. Typecheck/lint/build/test compilation, docstrings 11 files/90 declarations, duplication 0% across 36 sources, production audit 0 vulnerabilities, canonical reader, dry-run packing, five packed npm/Bun host scenarios, unchanged changelog, calendar date and provenance gates passed. Erasable syntax compile passed and is now enforced in tsconfig. Fresh final packed manual README preview/export shows four real initialized PM fixtures in all four sections. Worker history streams preserved intact; active item history verifies with no mismatches. Coverage evidence docs/all-source-coverage.md. Final committed-head linked gate to follow."
   "2026-10-04T18:33:08.710Z",codex-sol,"Final committed-head verification retained exact 100% across all 11 source files; 240 tests passed and the per-commit identity/privacy test rejected an absolute host path in a pasted changelog receipt. Removed that path from the unpublished commit without weakening the audit. Changelog success remains recorded as a result, while published pass lines contain no host-home paths. Rerunning the final committed-head full gate using supported tracker/source context; no test or threshold weakened."
   "2026-10-04T18:44:29.749Z",codex-sol,"Opened PR https://github.com/unbraind/pm-slack-standup/pull/107 after final committed-head linked release:check passed 241 tests, zero skips and all 11 sources 100/100/100/100. Remote matched tested commit 1cdaefb71418ac587639eb441cf30148cc39dbb2; tracker history verified 40 entries with no mismatch. Initial CodeQL annotation flagged incomplete escaping in a test regex constructed solely from four constant labels. Replace it with an equivalent literal includes assertion, preserving the exact observable labels and avoiding unnecessary regex construction. Existing Windows shell-launch annotation remains tracked by pm-slack-standup-z1up; no portable behavior removed. CI and substantive reviews remain pending; skipped/quota-limited reviews are not approvals."
+  "2026-10-04T18:58:37.469Z",codex-sol,"PR #107 review round: reproduce fixture escaping and npm_execpath fallback findings with failing tests first, then repair and rerun release:check at unchanged 100/100/100/100 coverage thresholds."
+  "2026-10-04T19:03:03.481Z",codex-sol,"Red test observed: packed acceptance with npm_execpath unset under a copied Node executable failed before packing because the test invented a nonexistent npm entry. Preserve the inherited environment and exercise inherited and unset cases. Finding 4178833812 was already fixed by commit 8217431: literal includes replaces incomplete regex escaping."
+  "2026-10-04T19:10:34.810Z",codex-sol,"Additional red test: unset npm_execpath on Windows selected npm.cmd, which cannot be launched through the shell-free runner. acceptanceLaunchers now resolves the real npm and npx JavaScript entries from an explicit PATH in npm prefix layouts. A portable fixture test runs both entries as real child processes and verifies literal arguments. The pinned npm_execpath retains precedence."
+  "2026-10-04T19:16:32.902Z",codex-sol,"Final tracker-linked npm run release:check passed with exit code 0: 235 tests, zero failed/skipped; all 11 executable source files at 100/100/100/100 with no ignores; duplication 0 percent (0/8918), 36 sources and no clone pairs; 89 documented declarations; zero production vulnerabilities. Both inherited/unset npm_execpath packed matrices and the separate five-scenario packed gate passed. Typecheck, lint, build, canonical reader, changelog consistency, release-date and publish-attestation gates passed. Erasable syntax, tracker health/validation and diff checks passed. Changelog regeneration was unnecessary. See docs/review-107.md. Remote Windows execution and new CodeQL scan remain pending after push."
 notes[2]{created_at,author,text}:
   "2026-08-21T11:48:16.531Z",codex,CodeRabbit exact-head review verified that the description still carried the older 89.66/87.74/90.76 baseline. This append-only update aligns the blocker description with the final measured 89.97/88.32/91.27 result without changing its open status.
   "2026-09-28T21:07:57.383Z",codex,"2026-09-28 certification candidate (pm-slack-standup-74w8): release gate now runs canonical pm-ops lint, duplication and docstring checks, but V8 coverage still reports only index.ts at 90.44% lines, 88.38% branches, 91.79% functions; no independently reported statements dimension or whole-source coverage. This open item remains the readiness blocker. The package upgrade PR does not claim 100/100/100/100."
@@ -87,7 +91,7 @@ files[20]:
     scope: project
   - path: tsconfig.json
     scope: project
-tests[3]:
+tests[5]:
   - command: npm run coverage
     path: package.json
     scope: project
@@ -107,11 +111,26 @@ tests[3]:
       created_at: "2026-10-04T18:17:01.072Z"
       source_kind: local_mutation
       source_ref: test/cover-every-standup-path
-docs[6]{path,scope}:
+  - command: node --test test/runtime-options.test.ts
+    scope: project
+    provenance:
+      author: codex-sol
+      created_at: "2026-10-04T19:07:07.880Z"
+      source_kind: local_mutation
+      source_ref: test/cover-every-standup-path
+  - command: "node --test --test-name-pattern=\"Windows npm PATH lookup|packed launch configuration\" test/accept-packed.test.ts"
+    scope: project
+    provenance:
+      author: codex-sol
+      created_at: "2026-10-04T19:10:35.794Z"
+      source_kind: local_mutation
+      source_ref: test/cover-every-standup-path
+docs[7]{path,scope}:
   docs/all-source-coverage.md,project
   docs/evidence/runtime-abandoned-merge-receipt.json,project
   docs/evidence/runtime-coverage-history.jsonl,project
   docs/evidence/tooling-coverage-history.jsonl,project
+  docs/review-107.md,project
   docs/runtime-coverage-2026-10-04.md,project
   docs/tooling-behavior-coverage.md,project
 body: ""

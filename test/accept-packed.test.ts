@@ -1,7 +1,7 @@
 /** Behavior contracts for packed acceptance configuration, subprocesses and receipts. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -46,6 +46,25 @@ test("packed launch configuration selects Windows and POSIX tools with and witho
       assert.equal(launchers.bunx, windows ? "bunx.exe" : "bunx");
     }
   }
+});
+
+test("Windows npm PATH lookup launches real JavaScript entries when npm_execpath is unset", () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-npm-path-"));
+  try {
+    const bin = join(directory, "node_modules", "npm", "bin");
+    mkdirSync(bin, { recursive: true });
+    const body = "process.stdout.write(JSON.stringify(process.argv.slice(2)));";
+    writeFileSync(join(bin, "npm-cli.js"), body);
+    writeFileSync(join(bin, "npx-cli.js"), body);
+    const launchers = acceptanceLaunchers("win32", undefined, process.execPath, `;${join(directory, "absent")};${directory};`);
+    for (const launcher of [launchers.npm, launchers.npx]) {
+      assert.equal(launcher.command, process.execPath);
+      const args = ["literal & calc | whoami"];
+      assert.deepEqual(JSON.parse(run(launcher.command, [...launcher.prefix, ...args], directory).stdout), args);
+    }
+    const pinned = acceptanceLaunchers("win32", join(bin, "npm-cli.js"), process.execPath, join(directory, "absent"));
+    assert.deepEqual(pinned.npm, launchers.npm);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("packed environment strips case-insensitive tracker and script overrides without mutation", () => {
@@ -134,19 +153,26 @@ test("a real pack failure leaves no acceptance workspace behind", () => {
   }
 });
 
-test("packed acceptance completes npm/Bun current, minimum and external host matrices", { timeout: 300_000 }, () => {
-  const result = spawnSync(process.execPath, [join(root, "scripts", "accept-packed.ts")], {
-    cwd: root, encoding: "utf8", env: { ...process.env, npm_execpath: process.env.npm_execpath ?? resolve(process.execPath, "..", "..", "lib", "node_modules", "npm", "bin", "npm-cli.js") }, timeout: 290_000, maxBuffer: 16 * 1024 * 1024,
-  });
-  assert.equal(result.status, 0, result.stderr || result.error?.message || "packed acceptance did not exit successfully");
-  const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string }[] };
-  assert.equal(receipt.ok, true);
-  assert.deepEqual(receipt.receipts.map((entry) => entry.scenario), ["npm-current", "bun-current", "npm-minimum", "bun-minimum", "npm-global-current"]);
-  const versions = acceptanceVersions(JSON.parse(readFileSync(join(root, "package.json"), "utf8")));
-  for (const entry of receipt.receipts) {
-    assert.equal(entry.fixtures_present, true);
-    assert.equal(entry.rendered_items, entry.tracker_items);
-    assert.equal(entry.tracker_items, entry.scenario === "npm-global-current" ? 1 : 2);
-    assert.equal(entry.host_version, entry.scenario.endsWith("minimum") ? versions.minimumVersion : versions.developmentVersion);
-  }
+for (const direct of [false, true]) test(`packed acceptance completes npm/Bun matrices with npm_execpath ${direct ? "unset" : "inherited"}`, { timeout: 300_000 }, () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-direct-node-"));
+  const node = join(directory, process.platform === "win32" ? "node.exe" : "node");
+  copyFileSync(process.execPath, node);
+  const environment = { ...process.env };
+  if (direct) delete environment.npm_execpath;
+  try {
+    const result = spawnSync(direct ? node : process.execPath, [join(root, "scripts", "accept-packed.ts")], {
+      cwd: root, encoding: "utf8", env: environment, timeout: 290_000, maxBuffer: 16 * 1024 * 1024,
+    });
+    assert.equal(result.status, 0, result.stderr || result.error?.message || "packed acceptance did not exit successfully");
+    const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string }[] };
+    assert.equal(receipt.ok, true);
+    assert.deepEqual(receipt.receipts.map((entry) => entry.scenario), ["npm-current", "bun-current", "npm-minimum", "bun-minimum", "npm-global-current"]);
+    const versions = acceptanceVersions(JSON.parse(readFileSync(join(root, "package.json"), "utf8")));
+    for (const entry of receipt.receipts) {
+      assert.equal(entry.fixtures_present, true);
+      assert.equal(entry.rendered_items, entry.tracker_items);
+      assert.equal(entry.tracker_items, entry.scenario === "npm-global-current" ? 1 : 2);
+      assert.equal(entry.host_version, entry.scenario.endsWith("minimum") ? versions.minimumVersion : versions.developmentVersion);
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
