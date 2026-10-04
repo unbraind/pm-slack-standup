@@ -6,7 +6,7 @@ status: in_progress
 priority: 1
 tags[4]: coverage,quality-gate,release-blocker,tdd
 created_at: "2026-08-21T10:11:53.131Z"
-updated_at: "2026-10-04T17:57:08.366Z"
+updated_at: "2026-10-04T17:59:34.003Z"
 assignee: codex-sol
 claim_principal: codex-sol
 author: codex
@@ -27,7 +27,7 @@ actual_result: "CLI/SDK 2026.10.4 full coverage run: 207/207 tests pass, zero sk
 affected_version: pm-slack-standup 2026.8.17
 component: quality and release gates
 customer_impact: "A green release gate can coexist with untested source and below-mandate coverage, so it cannot support a production-ready claim."
-comments[10]{created_at,author,text}:
+comments[11]{created_at,author,text}:
   "2026-09-22T05:10:25.678Z",pi-agent,"Not closed by the 2026.9.21 certify task pm-slack-standup-add0. That task delivers the canonical pm-ops lint and duplication gates only. This item still requires exact 100/100/100/100 all-source coverage, mutation checking, and the broader security/static analyzers named in its acceptance criteria."
   "2026-10-02T21:14:35.906Z",pi-grok,"Current-state actual_result now reports the later 21:38 certification run of 207/207. The 206-test result remains in the append-only history event from 2026-09-28T21:23:29.863Z. Later commits after that run do not add tests."
   "2026-10-03T00:00:48.172Z",codex-sol,"npm ci and npm run release:check PASS: 207/207 tests, zero skipped; measured index.ts coverage 90.44/88.23/91.79 lines/branches/functions with unchanged 83/87/87 floors; 81 documented declarations. Independent statements, whole-source 100 percent, mutation and broader static/security acceptance remain unmeasured/unaccepted in pm-slack-standup-7t31. Canonical-reader acceptance and all five packed npm/Bun current/minimum/global scenarios pass. Audit all/production zero; strict CI health, pm validate, Bun install and CI fresh-dist comparison pass. Linked packaging tests pass 2/2 and focused PATH fallback test 1/1 passes after failing red on a populated temporary ancestor. The fixture now owns all four searched directories and a shim just outside the bound, preserving real fallback assertions without touching other workspaces. Retained 207 count correction and original 206 history event preserved; all JSONL prefixes unchanged. Note projections support edit/delete in pinned CLI; immutable history is retained. Final-head CI and substantive reviews remain separate; both items released in_progress, never closed."
@@ -38,6 +38,7 @@ comments[10]{created_at,author,text}:
   "2026-10-04T17:45:22.135Z",codex-sol,"Coverage work on test/cover-every-standup-path: measure every authored runtime TypeScript source including scripts; add separately measured statements and retain source presence checks. Behavioral tests and real disposable PM projects; no coverage ignores or mocked module under test. Runtime coverage delegated to isolated Codex CLI agent under current quota policy."
   "2026-10-04T17:52:27.353Z",codex-sol,"Gate regression first failed against the old implementation (missing runGate/collectSources exports). New gate measures statements independently with c8 12.0.0, inventories operational scripts, verifies type-only erasure with native Node stripping, isolates config/counters, removes stale LCOV before and after failure, and reconciles report filenames. Seven real child-suite fixtures pass; focused coverage-gate.ts coverage is exactly 100 statements/branches/functions/lines. Reproduced and fixed inherited NODE_TEST_CONTEXT causing recursive child suite suppression. No source behavior removed."
   "2026-10-04T17:57:08.366Z",codex-sol,"Orchestrator verification: full baseline release gate reaches 215 passing tests with zero skips; all-source measurement is 85.19 statements/lines, 89.61 branches, 90.24 functions, correctly fails 100 thresholds. Fixed a race in the source-disappearance regression by deleting the loaded source inside one test rather than two concurrent files. Manual packed README preview and Markdown export render four real disposable PM items with all four sections. Production audit clean, changelog remains up to date."
+  "2026-10-04T17:59:34.003Z",codex-sol,"Hardened both report receipts: failures invalidate coverage-summary.json as well as LCOV. Hostile .c8rc configuration cannot narrow the package-owned inventory. Focused gate remains measured 100/100/100/100; lint, duplication 0%, and test compilation pass."
 notes[2]{created_at,author,text}:
   "2026-08-21T11:48:16.531Z",codex,CodeRabbit exact-head review verified that the description still carried the older 89.66/87.74/90.76 baseline. This append-only update aligns the blocker description with the final measured 89.97/88.32/91.27 result without changing its open status.
   "2026-09-28T21:07:57.383Z",codex,"2026-09-28 certification candidate (pm-slack-standup-74w8): release gate now runs canonical pm-ops lint, duplication and docstring checks, but V8 coverage still reports only index.ts at 90.44% lines, 88.38% branches, 91.79% functions; no independently reported statements dimension or whole-source coverage. This open item remains the readiness blocker. The package upgrade PR does not claim 100/100/100/100."
@@ -49,7 +50,7 @@ files[4]:
     note: Coverage thresholds and release gate
   - path: scripts/coverage-gate.ts
     scope: project
-    note: Current index-only V8 gate
+    note: All authored runtime TypeScript with four metric thresholds and stale receipt protection
   - path: test/coverage-gate.test.ts
     scope: project
 tests[2]:

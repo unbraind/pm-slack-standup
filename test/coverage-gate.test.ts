@@ -38,9 +38,11 @@ test("an unimported operational source fails the gate and invalidates stale LCOV
   fixture((root) => {
     mkdirSync(join(root, "coverage"));
     writeFileSync(join(root, "coverage", "lcov.info"), "stale-success");
+    writeFileSync(join(root, "coverage", "coverage-summary.json"), "stale-success");
     writeFileSync(join(root, "scripts", "unloaded.ts"), "export function missing() { return 'uncovered'; }\n");
     assert.equal(runGate(root), 1);
     assert.throws(() => readFileSync(join(root, "coverage", "lcov.info")));
+    assert.throws(() => readFileSync(join(root, "coverage", "coverage-summary.json")));
   });
 });
 

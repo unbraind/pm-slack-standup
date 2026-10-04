@@ -28,6 +28,11 @@ const nonSourceDirectories = new Set([
 const metrics = ["lines", "statements", "branches", "functions"] as const;
 const c8 = createRequire(import.meta.url).resolve("c8/bin/c8.js");
 
+/** Remove public report receipts together so a failed gate leaves no reusable pass. */
+function clearReceipts(reportDir: string): void {
+  for (const name of ["lcov.info", "coverage-summary.json"]) rmSync(join(reportDir, name), { force: true });
+}
+
 /**
  * Inventory executable TypeScript recursively without excluding operational scripts.
  * Type-only declarations erase completely and carry no runtime counters.
@@ -59,9 +64,8 @@ export function collectSources(root: string, base = root): string[] {
  */
 export function runGate(root: string): number {
   const reportDir = join(root, "coverage");
-  const lcov = join(reportDir, "lcov.info");
   mkdirSync(reportDir, { recursive: true });
-  rmSync(lcov, { force: true });
+  clearReceipts(reportDir);
   const counters = join(reportDir, "gate-counters");
   rmSync(counters, { recursive: true, force: true });
   try {
@@ -101,7 +105,7 @@ export function runGate(root: string): number {
     console.log(`coverage-gate: ${sources.length} source file(s) reported; lines/statements/branches/functions thresholds met.`);
     return 0;
   } catch (error: unknown) {
-    rmSync(lcov, { force: true });
+    clearReceipts(reportDir);
     console.error(`coverage-gate: ${String(error)}`);
     return 1;
   }
