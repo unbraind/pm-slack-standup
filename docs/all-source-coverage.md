@@ -26,8 +26,10 @@ supported hosts, plus an external host without project `node_modules`.
 Three runtime bugs were reproduced before fixes: explicit webhook ports were
 dropped; stdout ownership leaked between extension activations; Windows launch
 validation and composition collected caller arguments separately. The fixes
-preserve the port, keep stdout ownership within an activation, and validate and
-compose one argument snapshot. Gate fixtures also reproduced inherited
+preserve the port, keep stdout ownership within an activation, and validate one
+argument snapshot. The subsequent shell-free launch superseded command-tail
+composition and `quoteWindowsArg`; [PR 107 review evidence](review-107.md)
+describes the current discrete argv launch. Gate fixtures also reproduced inherited
 `NODE_TEST_CONTEXT` suppressing a nested test run; the gate clears that marker
 for its child runner.
 
@@ -36,6 +38,8 @@ message and [runtime evidence](runtime-coverage-2026-10-04.md). They cover an
 unused local cron helper, quote handling after validation of the same snapshot,
 native-only Error catch paths, and transport failure diagnostics whose values
 are always populated. Reachable credential and grouping fallbacks remain tested.
+The quote-helper proof describes the earlier implementation; the shell-free
+launch removed that helper entirely.
 
 ## Manual README acceptance
 
@@ -76,13 +80,15 @@ Slack delivery, deployment, Windows execution or privacy remediation.
 
 `npm run release:check` passed with exit 0 on Node 24.19.0 and the installed
 CLI/SDK 2026.10.4. The compiler enforces `erasableSyntaxOnly` for source and test
-compilation. The complete coverage suite reports 241 passing tests and no skips.
+compilation. The final PR 107 review-fix tree's complete coverage suite reports
+238 passing tests and no skips. These counts supersede the earlier integrated
+and shell-free-launch receipts.
 
 | Dimension | Covered / total | Percent |
 | --- | --- | --- |
-| Lines | 4002 / 4002 | 100 |
-| Statements | 4002 / 4002 | 100 |
-| Branches | 1066 / 1066 | 100 |
+| Lines | 3805 / 3805 | 100 |
+| Statements | 3805 / 3805 | 100 |
+| Branches | 1081 / 1081 | 100 |
 | Functions | 130 / 130 | 100 |
 
 The eleven measured files are:
@@ -102,12 +108,12 @@ The eleven measured files are:
 Exact pass lines from the integrated run:
 
 ```text
-ℹ tests 241
-ℹ pass 241
+ℹ tests 238
+ℹ pass 238
 ℹ fail 0
 ℹ skipped 0
-duplication-gate: 0% duplicated lines (0/9440), 36 source(s), 0 clone pair(s), threshold 0%
-docstring-gate: 11 file(s), 90 declaration(s) documented.
+duplication-gate: 0% duplicated lines (0/9005), 36 source(s), 0 clone pair(s), threshold 0%
+docstring-gate: 11 file(s), 89 declaration(s) documented.
 coverage-gate: 11 source file(s) reported; lines/statements/branches/functions thresholds met.
 found 0 vulnerabilities
 verify-release-publish-attestation: every publish invocation is attested.

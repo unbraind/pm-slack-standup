@@ -64,6 +64,7 @@ interface AcceptanceLaunchers {
  * @param node - Node executable used for JavaScript launchers.
  * @param searchPath - Explicit PATH used to find npm's Windows installation.
  * @returns Executables and discrete entry prefixes for npm, npx and Bun.
+ * @throws {Error} When Windows cannot resolve npm and npx JavaScript entries.
  */
 export function acceptanceLaunchers(platform: NodeJS.Platform, npmExecPath: string | undefined, node: string, searchPath = ""): AcceptanceLaunchers {
   const windows = platform === "win32";
@@ -75,19 +76,23 @@ export function acceptanceLaunchers(platform: NodeJS.Platform, npmExecPath: stri
       if (directory === "") continue;
       const bin = join(directory, "node_modules", "npm", "bin");
       const candidate = join(bin, "npm-cli.js");
-      if (existsSync(candidate)) {
+      const npxCandidate = join(bin, "npx-cli.js");
+      if (existsSync(candidate) && existsSync(npxCandidate)) {
         npmCli = candidate;
-        npxCli = join(bin, "npx-cli.js");
+        npxCli = npxCandidate;
         break;
       }
     }
   }
+  if (windows && npmCli === undefined) {
+    throw new Error("Cannot resolve npm-cli.js and npx-cli.js on Windows. Set npm_execpath to npm's JavaScript entry in a complete npm installation or set PATH to its prefix containing node_modules/npm/bin; .cmd shims cannot launch without a shell.");
+  }
   return {
     npm: npmCli === undefined
-      ? { command: windows ? "npm.cmd" : "npm", prefix: [] }
+      ? { command: "npm", prefix: [] }
       : { command: node, prefix: [npmCli] },
     npx: npxCli === undefined
-      ? { command: windows ? "npx.cmd" : "npx", prefix: [] }
+      ? { command: "npx", prefix: [] }
       : { command: node, prefix: [npxCli] },
     bun: windows ? "bun.exe" : "bun",
     bunx: windows ? "bunx.exe" : "bunx",

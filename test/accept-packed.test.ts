@@ -38,14 +38,39 @@ test("packed launch configuration selects Windows and POSIX tools with and witho
     const windows = platform === "win32";
     const node = windows ? "C:\\Node\\node.exe" : "/usr/bin/node";
     for (const npmPath of [undefined, "npm.cmd", windows ? "C:\\Node\\npm\\bin\\npm-cli.js" : "/usr/npm/bin/npm-cli.js"]) {
+      if (windows && !npmPath?.endsWith(".js")) {
+        assert.throws(() => acceptanceLaunchers(platform, npmPath, node), /npm-cli\.js.*npx-cli\.js.*npm_execpath.*PATH/);
+        continue;
+      }
       const launchers = acceptanceLaunchers(platform, npmPath, node);
       const script = npmPath?.endsWith(".js") === true;
-      assert.deepEqual(launchers.npm, { command: script ? node : windows ? "npm.cmd" : "npm", prefix: script ? [npmPath] : [] });
-      assert.deepEqual(launchers.npx, { command: script ? node : windows ? "npx.cmd" : "npx", prefix: script ? [windows ? "C:\\Node\\npm\\bin\\npx-cli.js" : "/usr/npm/bin/npx-cli.js"] : [] });
+      assert.deepEqual(launchers.npm, { command: script ? node : "npm", prefix: script ? [npmPath] : [] });
+      assert.deepEqual(launchers.npx, { command: script ? node : "npx", prefix: script ? [windows ? "C:\\Node\\npm\\bin\\npx-cli.js" : "/usr/npm/bin/npx-cli.js"] : [] });
       assert.equal(launchers.bun, windows ? "bun.exe" : "bun");
       assert.equal(launchers.bunx, windows ? "bunx.exe" : "bunx");
     }
   }
+});
+
+test("Windows npm PATH lookup refuses incomplete installations and skips them for a complete pair", () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-npm-incomplete-"));
+  try {
+    const incomplete = join(directory, "incomplete");
+    const bin = join(incomplete, "node_modules", "npm", "bin");
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(incomplete, "npm.cmd"), "unsupported shim");
+    assert.throws(() => acceptanceLaunchers("win32", undefined, process.execPath, incomplete), /npm-cli\.js.*npx-cli\.js.*npm_execpath.*PATH/);
+    writeFileSync(join(bin, "npm-cli.js"), "process.exit(0);");
+    assert.throws(() => acceptanceLaunchers("win32", "npm.cmd", process.execPath, incomplete), /npm-cli\.js.*npx-cli\.js.*npm_execpath.*PATH/);
+    const complete = join(directory, "complete");
+    const completeBin = join(complete, "node_modules", "npm", "bin");
+    mkdirSync(completeBin, { recursive: true });
+    for (const name of ["npm-cli.js", "npx-cli.js"]) writeFileSync(join(completeBin, name), "process.stdout.write('complete');");
+    const launchers = acceptanceLaunchers("win32", undefined, process.execPath, `${incomplete};${complete}`);
+    for (const launcher of [launchers.npm, launchers.npx]) {
+      assert.equal(run(launcher.command, launcher.prefix, directory).stdout, "complete");
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("Windows npm PATH lookup launches real JavaScript entries when npm_execpath is unset", () => {

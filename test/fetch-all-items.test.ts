@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import extension, {
@@ -476,14 +477,42 @@ test("Windows native executables launch directly and JavaScript entries use Node
   }
 });
 
+test("Windows bare pm PATH supports local and standard global npm layouts with an actionable refusal", () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-pm-path-layouts-"));
+  const savedPath = process.env.PATH;
+  try {
+    for (const layout of ["local", "global"]) {
+      const prefix = join(directory, layout);
+      const shimDirectory = layout === "local" ? join(prefix, "node_modules", ".bin") : prefix;
+      const entry = join(prefix, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+      mkdirSync(shimDirectory, { recursive: true });
+      mkdirSync(join(entry, ".."), { recursive: true });
+      writeFileSync(join(shimDirectory, "pm.cmd"), "unsupported shim");
+      writeFileSync(entry, "process.stdout.write(JSON.stringify(process.argv.slice(2)));", "utf8");
+      process.env.PATH = `;${join(directory, "absent")};${shimDirectory};`;
+      const plan = pmLaunchPlan("pm", "win32");
+      const args = ["--path", "tracker with space & pipe |", "--version"];
+      assert.deepEqual(plan.args(args), [entry, ...args]);
+      const child = spawnSync(plan.command, plan.args(args), { encoding: "utf8" });
+      assert.equal(child.status, 0, child.stderr);
+      assert.deepEqual(JSON.parse(child.stdout), args);
+    }
+    process.env.PATH = directory;
+    assert.throws(() => pmLaunchPlan("pm", "win32").args([]), /local.*\.bin.*global npm prefix.*JavaScript entry.*pmBin.*fetchAllItems/);
+  } finally {
+    if (savedPath === undefined) delete process.env.PATH; else process.env.PATH = savedPath;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("Windows argv preserves empty values, metacharacters and backslashes without composition", () => {
   const plan = pmLaunchPlan("pm.js", "win32");
   const values = ["", "a & calc | whoami", "()<>^!", " spaced\\path\\", "\\".repeat(200_000)];
   assert.deepEqual(plan.args(values), ["pm.js", ...values]);
-  // Backslash runs once triggered quadratic quoting (js/polynomial-redos), so
-  // assert growth rather than one cold wall-clock reading: after warm-up, the
-  // median cost of a 10x longer run must stay far below the 100x a quadratic
-  // pass would take.
+  // Guard copying and validating a large argv value against excessive runtime.
+  // Warm up before measuring; native quoting happens later in spawnSync and
+  // is not measured here. Keep a generous absolute ceiling for slow runners.
+  /** Return the warmed-up median time for copying and validating one argument. */
   const medianMs = (length: number): number => {
     const argv = ["\\".repeat(length)];
     for (let i = 0; i < 5; i++) plan.args(argv);
@@ -494,9 +523,7 @@ test("Windows argv preserves empty values, metacharacters and backslashes withou
     }).sort((a, b) => a - b);
     return samples[3];
   };
-  const small = medianMs(20_000);
   const large = medianMs(200_000);
-  assert.ok(large < Math.max(small, 0.05) * 30, `200k run took ${large}ms vs ${small}ms for 20k`);
   assert.ok(large < 5000, `200k run took ${large}ms, above the generous 5,000 ms ceiling`);
 });
 

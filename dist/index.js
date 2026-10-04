@@ -789,7 +789,7 @@ function resolveWindowsPmEntry(bin) {
                 return entry;
         }
     }
-    throw new CommandError("Cannot resolve the pm JavaScript entry on Windows. Install @unbrained/pm-cli or provide its JavaScript entry or a native executable.");
+    throw new CommandError("Cannot resolve the pm JavaScript entry on Windows. Install @unbrained/pm-cli beside a local .bin shim or in the global npm prefix's node_modules directory, or pass its JavaScript entry or a native executable as pmBin to fetchAllItems.");
 }
 /**
  * Build a shell-free PM launch. Windows npm shims are bypassed by running their

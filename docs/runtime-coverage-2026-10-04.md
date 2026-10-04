@@ -2,7 +2,7 @@
 
 Work item: `pm-slack-standup-7t31`; author: `codex-sol-runtime`.
 
-This focused receipt measures only `index.ts`. It does not certify all package
+The historical focused receipt below measures only `index.ts`. It does not certify all package
 scripts, deployment, Slack-hosted delivery, Windows execution, or release readiness.
 All PM data is synthetic, initialized through `pm init --defaults` in disposable
 temporary projects and mutated/read through the installed package SDK. The real
@@ -23,6 +23,9 @@ by the test process; normal TLS verification remains enabled.
    A changing accessor supplied a quote-containing argument only on the second
    traversal. The regression failed with two reads. One snapshot must be both
    validated and composed so no unchecked value reaches the command tail.
+   This command-tail implementation was subsequently superseded by the
+   shell-free launch. One snapshot is now validated and passed as discrete argv;
+   [PR 107 review evidence](review-107.md) describes the current launch.
 
 ## Unreachable-code proofs before removal
 
@@ -41,6 +44,8 @@ removal commit and do not rely on coverage ignores or replacing `index.ts`.
   literal-quote escaping branch can therefore never run. Quote refusals and
   allowed metacharacter/backslash quoting remain tested. The snapshot fix is
   necessary before this proof holds; the old second traversal defeated it.
+  This proof describes the earlier implementation. The shell-free launch later
+  removed `quoteWindowsArg` entirely; see [PR 107 review evidence](review-107.md).
 - `parseSchedule` catches only its own `fields.map(parseCronField)` call, on
   fields obtained by splitting a string. `parseCronField` throws only `Error`
   instances; native string/number/set/array operations also throw Error
@@ -73,6 +78,16 @@ or exported render functions on real disposable tracker data.
 
 ## Validation and boundaries
 
+The final PR 107 review-fix tree passed `npm run release:check` against the
+pinned SDK/CLI 2026.10.4: 238 tests passed, zero failed or skipped, and 89
+declarations documented across 11 executable source files. All four package
+coverage dimensions are 100%. In that same all-source run, `index.ts` reports
+2723/2723 lines and statements, 839/839 branches, and 100/100 functions.
+See the [all-source report](all-source-coverage.md) for the complete pass lines
+and [PR 107 review evidence](review-107.md) for current shell-free launch tests.
+The focused counts and declaration totals below are historical, before those
+review fixes; they are not counts for the final head.
+
 Baseline external c8: 90.44% statements/lines, 88.40% branches, 92.07% functions.
 The focused receipt below used the installed SDK/CLI 2026.9.28. The combined
 package gate subsequently passed against the pinned installed SDK/CLI 2026.10.4,
@@ -95,10 +110,11 @@ These are c8's V8-derived measurements, including its source-to-statement
 mapping, over the complete `index.ts` file. There are no coverage ignore
 directives and no mocked module-under-test exports.
 
-Exact linked command:
+Historical focused command, shown with repository-relative scratch tool and
+report locations:
 
 ```sh
-/tmp/standup-coverage-tools/node_modules/.bin/c8 --include=index.ts --check-coverage --lines=100 --statements=100 --branches=100 --functions=100 --reporter=json-summary --reporter=json --reporter=text --reports-dir=/tmp/standup-runtime-pm-verified node --test test/runtime-coverage.test.ts test/runtime-export.test.ts test/runtime-options.test.ts test/runtime-receipts.test.ts test/runtime-transport.test.ts test/units.test.ts test/complete-list.test.ts test/fetch-all-items.test.ts test/smoke.test.ts
+coverage/tools/node_modules/.bin/c8 --include=index.ts --check-coverage --lines=100 --statements=100 --branches=100 --functions=100 --reporter=json-summary --reporter=json --reporter=text --reports-dir=coverage/runtime-pm-verified node --test test/runtime-coverage.test.ts test/runtime-export.test.ts test/runtime-options.test.ts test/runtime-receipts.test.ts test/runtime-transport.test.ts test/units.test.ts test/complete-list.test.ts test/fetch-all-items.test.ts test/smoke.test.ts
 ```
 
 Required tracker invocation:
@@ -118,13 +134,11 @@ Additional validation: `npm run typecheck`, `npm run lint`,
 `node_modules/.bin/tsc --noEmit --erasableSyntaxOnly -p tsconfig.test.json`
 all passed. `git diff --check` passed.
 
-Local receipts: `/tmp/standup-runtime-pm-test.log`,
-`/tmp/standup-runtime-pm-verified/coverage-summary.json`, and
-`/tmp/standup-runtime-pm-verified/coverage-final.json`.
-Measured `index.ts` SHA-256:
+The historical local scratch receipts were not committed. Historical measured
+`index.ts` SHA-256:
 `2d11d8fec88e2ab24266dabfd023de158653e1d54b90ea571abd62fc6d04ee82`.
 
 The fixtures require OpenSSL to generate their disposable TLS certificate.
-Windows argument validation/quoting is tested on Linux; no Windows process is
+Windows argument validation and discrete argv launches are tested on Linux; no Windows process is
 executed. The integrated package gate reruns these tests against the combined checkout
 and pinned SDK/CLI 2026.10.4.

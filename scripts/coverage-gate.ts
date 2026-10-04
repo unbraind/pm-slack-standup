@@ -1,6 +1,6 @@
 /** Measure all authored TypeScript, including operational scripts, with fresh V8 counters. */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire, stripTypeScriptTypes } from "node:module";
 import { join, relative, resolve, sep } from "node:path";
 import { isMainInvocation } from "./main-invocation.ts";
@@ -69,7 +69,8 @@ export function runGate(root: string): number {
   const counters = join(reportDir, "gate-counters");
   rmSync(counters, { recursive: true, force: true });
   try {
-    const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { coverageGate?: CoverageConfig };
+    const canonicalRoot = realpathSync(root);
+    const manifest = JSON.parse(readFileSync(join(canonicalRoot, "package.json"), "utf8")) as { coverageGate?: CoverageConfig };
     const config = manifest.coverageGate;
     if (!config || config.sources.length !== 1 || config.sources[0] !== "." || config.ignore.length !== 0) {
       throw new Error('coverageGate must inventory sources ["."] with no ignored executable source');
@@ -80,11 +81,11 @@ export function runGate(root: string): number {
         throw new Error(`coverageGate.thresholds.${metric} must be a finite percentage`);
       }
     }
-    const sources = collectSources(root);
+    const sources = collectSources(canonicalRoot);
     if (sources.length === 0) throw new Error("source walk found no executable TypeScript files");
     const settings = join(reportDir, "gate-config.json");
     writeFileSync(settings, JSON.stringify({
-      all: true, src: [root], include: sources, exclude: [], extension: [".ts"],
+      all: true, src: [canonicalRoot], include: sources, exclude: [], extension: [".ts"],
       reporter: ["text", "lcovonly", "json-summary"],
       "reports-dir": reportDir, "temp-directory": counters,
       "exclude-after-remap": true, "check-coverage": true, ...config.thresholds,
@@ -93,12 +94,12 @@ export function runGate(root: string): number {
     delete environment.NODE_TEST_CONTEXT;
     execFileSync(process.execPath, [c8, "--config", settings, process.execPath,
       "--test", "--test-reporter=spec", ...config.tests], {
-      cwd: root, stdio: "inherit",
+      cwd: canonicalRoot, stdio: "inherit",
       env: environment,
     });
     const summary = JSON.parse(readFileSync(join(reportDir, "coverage-summary.json"), "utf8")) as Record<string, unknown>;
     const reported = Object.keys(summary).filter((file) => file !== "total")
-      .map((file) => relative(root, file).split(sep).join("/")).sort();
+      .map((file) => relative(canonicalRoot, file).split(sep).join("/")).sort();
     if (JSON.stringify(reported) !== JSON.stringify(sources)) {
       throw new Error(`report/source inventory mismatch: expected ${sources.join(", ")}; reported ${reported.join(", ")}`);
     }

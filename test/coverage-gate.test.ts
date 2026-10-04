@@ -1,6 +1,6 @@
 /** Exercise the coverage gate with real Node tests in disposable source trees. */
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -43,6 +43,18 @@ test("an unimported operational source fails the gate and invalidates stale LCOV
     assert.equal(runGate(root), 1);
     assert.throws(() => readFileSync(join(root, "coverage", "lcov.info")));
     assert.throws(() => readFileSync(join(root, "coverage", "coverage-summary.json")));
+  });
+});
+
+test("coverage through a directory alias reports the canonical source inventory", () => {
+  fixture((root) => {
+    const alias = `${root}-alias`;
+    symlinkSync(root, alias, "junction");
+    try {
+      assert.equal(runGate(alias), 0);
+      const summary = JSON.parse(readFileSync(join(alias, "coverage", "coverage-summary.json"), "utf8")) as Record<string, unknown>;
+      assert.equal(Object.keys(summary).length, 3);
+    } finally { rmSync(alias, { force: true }); }
   });
 });
 

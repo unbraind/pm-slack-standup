@@ -6,22 +6,28 @@ status: in_progress
 priority: 2
 tags[1]: security
 created_at: "2026-09-03T17:57:21.842Z"
-updated_at: "2026-10-04T19:26:42.945Z"
+updated_at: "2026-10-04T21:57:23.990Z"
 author: pi-agent
 acceptance_criteria: "Windows PM reads use a JavaScript entry with process.execPath or an explicit native executable and separate argv elements; no shell or command-tail fallback remains; Real child tests preserve hostile ampersand and pipe arguments as one literal argv element while quote, CR/LF and percent-name refusals still pass; Local and global npm shim resolution, PATH fallback and unresolved-entry refusal are tested; full release:check passes at all-source 100/100/100/100; CodeQL is not dismissed or suppressed"
 risk: medium
-comments[5]{created_at,author,text}:
+comments[8]{created_at,author,text}:
   "2026-10-04T18:44:30.680Z",codex-sol,"Coverage PR https://github.com/unbraind/pm-slack-standup/pull/107 retains the required Windows cmd.exe launch and its strict argument guard. CodeQL annotation https://github.com/unbraind/pm-slack-standup/security/code-scanning/5 again flags the library-input command composition. The coverage change fixes a real double-read accessor bug by validating and quoting one snapshot, and tests assert quoting/refusal outputs without dropping Windows behavior. This existing portability/security follow-up remains open; full Linux release gates and pure Windows launch-plan coverage do not establish security disposition or Windows execution."
   "2026-10-04T18:58:36.997Z",codex-sol,"PR #107 review round: read CodeQL alert #5 and both CodeQL review comments in full. Main merged cleanly. Plan: reproduce shell-free Windows launch requirements and literal hostile argv handling before replacing cmd.exe composition; retain quote, CR/LF and percent-variable refusals."
   "2026-10-04T19:03:02.822Z",codex-sol,"Red tests observed: real Windows-plan hostile argv child failed with cmd.exe ENOENT; Node-entry, npm shim and PATH launch contracts failed against command composition. Replacement uses process.execPath and discrete argv, resolves local/global npm entries, and refuses unresolved wrappers without a shell fallback. Existing quote, CR/LF and percent-name refusals remain. Prior item acceptance language allowing cmd.exe fallback is superseded by this review requirement."
   "2026-10-04T19:16:33.373Z",codex-sol,"Verified shell-free PM Node entry and native-executable launch plans, local/global npm entry resolution, PATH fallback, unresolved-wrapper refusal, single argument snapshot, and real hostile argv child execution. Existing double-quote, CR/LF and percent-variable refusals pass. Targeted launch/runtime suite passed 38 tests; final full release:check passed with 235 tests and all-source 100/100/100/100. No CodeQL dismissal or suppression. Unknown custom wrappers now fail closed and require an explicit JavaScript entry or native executable. Claims released for orchestrator verification; item stays in progress."
   "2026-10-04T19:26:42.945Z",claude-orchestrator,"Review (Greptile, PR #107): the Windows argv timing test now warms up and compares median cost at 20k vs 200k backslashes (linear growth bound) instead of one cold 2,000 ms ceiling."
-files[3]{path,scope}:
+  "2026-10-04T21:48:49.391Z",codex-sol,"PR #107 follow-up: standard global npm entry candidate already exists; add bare-PATH tests for local and global layouts and actionable PM_BIN refusal. Acceptance must reject missing npm/npx JavaScript entries without a shell or .cmd fallback."
+  "2026-10-04T21:53:35.225Z",codex-sol,"Targeted PM-linked launch suite passed five tests with zero failures/skips. Real temporary local .bin and standard global npm prefix entries preserve hostile discrete argv in Node children. The package has no PM_BIN environment override, so the refusal names supported layouts and the existing fetchAllItems pmBin parameter rather than inventing an environment setting. Missing npm or sibling npx entries fail clearly; a later complete PATH installation is selected."
+  "2026-10-04T21:57:23.014Z",codex-sol,"Full linked release:check passed with 238 tests, zero failures/skips and all-source 100/100/100/100. CodeRabbit 4179454075 adds real bare-PATH local/global npm layout execution and supported-layout refusal guidance; 4179454080 rejects missing Windows npm/npx entries and checks both PATH files; 4179454096 removes the noisy ratio while retaining warm-up and the 5000 ms validation ceiling. See docs/review-107.md. No shell fallback or CodeQL suppression; remote Windows execution remains unverified locally."
+files[5]{path,scope}:
   index.ts,project
+  scripts/accept-packed.ts,project
+  test/accept-packed.test.ts,project
   test/fetch-all-items.test.ts,project
   test/runtime-options.test.ts,project
-tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test test/fetch-all-items.test.ts test/runtime-options.test.ts,project,codex-sol,"2026-10-04T19:04:36.068Z",local_mutation,test/cover-every-standup-path
+  "node --test --test-name-pattern=\"Windows bare pm PATH|Windows argv preserves|packed launch configuration|incomplete installations|Windows npm PATH lookup launches\" test/fetch-all-items.test.ts test/accept-packed.test.ts",project,codex-sol,"2026-10-04T21:51:20.820Z",local_mutation,test/cover-every-standup-path
 docs[1]{path,scope}:
   docs/review-107.md,project
 body: ""

@@ -1013,7 +1013,7 @@ function resolveWindowsPmEntry(bin: string): string {
       if (existsSync(entry)) return entry;
     }
   }
-  throw new CommandError("Cannot resolve the pm JavaScript entry on Windows. Install @unbrained/pm-cli or provide its JavaScript entry or a native executable.");
+  throw new CommandError("Cannot resolve the pm JavaScript entry on Windows. Install @unbrained/pm-cli beside a local .bin shim or in the global npm prefix's node_modules directory, or pass its JavaScript entry or a native executable as pmBin to fetchAllItems.");
 }
 
 /**
