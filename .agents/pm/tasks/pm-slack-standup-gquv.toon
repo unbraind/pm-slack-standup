@@ -1,18 +1,21 @@
 id: pm-slack-standup-gquv
 title: Auto-merge green Dependabot updates and group the pm toolchain into one daily PR
-description: "Version bumps of the pm CLI, SDK-bearing packages and fleet gates are mechanical and must land without a hand-written certification PR. Dependabot checks npm daily, groups @unbrained/pm-cli and pm-* packages into one pm-toolchain PR and other minor/patch updates into one dependencies PR; a least-privilege workflow enables GitHub squash auto-merge for every non-major Dependabot PR so it merges as soon as the required checks pass. A failing bump is a real defect to fix. Fleet rule: companion pm-cli-website-6d05; pilot unbraind/pm-presets#118."
+description: "Version bumps of the pm CLI, SDK-bearing packages and fleet gates are mechanical and must land without a hand-written certification PR. Dependabot checks npm daily, groups @unbrained/pm-cli and pm-* packages into one pm-toolchain PR and every other dependency (minor/patch) into a disjoint dependencies PR; a least-privilege workflow enables GitHub squash auto-merge for the calendar-versioned pm-toolchain group and otherwise only for updates classified semver-minor or semver-patch, so a major or unclassified update waits for a person. Required checks gate every merge; a failing bump is a real defect to fix. Fleet rule: companion pm-cli-website-6d05; pilot unbraind/pm-presets#118."
 type: Task
 status: closed
 priority: 2
 tags[3]: automation,ci,dependencies
 created_at: "2026-10-04T16:55:55.633Z"
-updated_at: "2026-10-04T17:20:42.041Z"
+updated_at: "2026-10-04T18:38:53.895Z"
 deadline: "2026-10-06T00:00:00.000Z"
 closed_at: "2026-10-04T16:58:38.826Z"
 completed_at: "2026-10-04T16:58:38.826Z"
 author: claude-orchestrator
 estimated_minutes: 15
 acceptance_criteria: "dependabot.yml checks npm daily with disjoint pm-toolchain and dependencies groups; dependabot-auto-merge.yml enables squash auto-merge for the calendar-versioned pm-toolchain group (year rollovers read as semver-major) and otherwise only for updates classified minor or patch, with documented least-privilege permissions; repository allows auto-merge; required checks still gate every merge"
+resolution: completed
+expected_result: A green Dependabot pm-toolchain or minor/patch PR merges itself once required checks pass; majors and unclassified updates stay open for review.
+actual_result: Workflow and grouped config added; the same configuration enabled squash auto-merge on a real Dependabot PR in the pilot (pm-presets#119).
 comments[2]{created_at,author,text}:
   "2026-10-04T16:55:55.633Z",claude-orchestrator,Rolled out from the reviewed pilot unbraind/pm-presets#118.
   "2026-10-04T17:20:42.041Z",claude-orchestrator,"Review round 2 (Greptile/CodeRabbit across the fleet rollout): explicit minor/patch allow-list so an unclassified update never auto-merges; documented why the job needs write permissions; explicit patterns for the dependencies group; acceptance criteria now name the pm-toolchain calendar-version exception. Refused: switching to pull_request_target (GitHub keeps Dependabot-authored runs read-only there too; the pull_request + permissions pattern is proven by pm-presets#119) and removing the pm-toolchain exception (owner rule pm-cli-website-6d05: pm bumps land unattended; required checks gate them)."
