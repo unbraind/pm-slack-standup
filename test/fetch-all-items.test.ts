@@ -497,6 +497,7 @@ test("Windows argv preserves empty values, metacharacters and backslashes withou
   const small = medianMs(20_000);
   const large = medianMs(200_000);
   assert.ok(large < Math.max(small, 0.05) * 30, `200k run took ${large}ms vs ${small}ms for 20k`);
+  assert.ok(large < 5000, `200k run took ${large}ms, above the generous 5,000 ms ceiling`);
 });
 
 test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", posixOnly, () => {
