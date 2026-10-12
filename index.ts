@@ -1702,8 +1702,16 @@ export function buildBlockKit(data: StandupData, opts: StandupOptions): { blocks
   const blocks: SlackBlock[] = [];
   const dateStr = todayISO();
 
-  const truncate = (text: string, max: number): string =>
-    text.length <= max ? text : text.slice(0, max - 1) + "…";
+  /** Clip at a complete code point within the UTF-16 budget, reserving the ellipsis. */
+  const truncate = (text: string, max: number): string => {
+    if (text.length <= max) return text;
+    let end = 0;
+    for (const point of text) {
+      if (end + point.length > max - 1) break;
+      end += point.length;
+    }
+    return text.slice(0, end) + "…";
+  };
 
   blocks.push({
     type: "header",
