@@ -1372,7 +1372,18 @@ function mrkdwnList(items, opts, withPriority = false) {
 export function buildBlockKit(data, opts) {
     const blocks = [];
     const dateStr = todayISO();
-    const truncate = (text, max) => text.length <= max ? text : text.slice(0, max - 1) + "…";
+    /** Clip at a complete code point within the UTF-16 budget, reserving the ellipsis. */
+    const truncate = (text, max) => {
+        if (text.length <= max)
+            return text;
+        let end = 0;
+        for (const point of text) {
+            if (end + point.length > max - 1)
+                break;
+            end += point.length;
+        }
+        return text.slice(0, end) + "…";
+    };
     blocks.push({
         type: "header",
         text: { type: "plain_text", text: truncate(`📊 pm standup — ${dateStr}`, 150), emoji: true },
