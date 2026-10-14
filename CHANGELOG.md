@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Preserve Unicode code points when clipping Block Kit standup sections ([pm-slack-standup-github-efbbd7c92737-113](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-113.toon))
+
 ## 2026.10.5 - 2026-10-05
 
 ### Fixed
