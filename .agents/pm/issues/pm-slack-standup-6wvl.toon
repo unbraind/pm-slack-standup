@@ -6,11 +6,9 @@ status: in_progress
 priority: 1
 tags: []
 created_at: "2026-10-16T22:29:54.869Z"
-updated_at: "2026-10-17T12:38:50.153Z"
-assignee: codex-agent
-claim_principal: codex-agent
+updated_at: "2026-10-17T12:43:20.309Z"
 author: codex-agent
-comments[18]{created_at,author,text}:
+comments[19]{created_at,author,text}:
   "2026-10-16T22:30:26.055Z",codex-agent,"Root cause: test/workflow-security.test.ts freezes individual reviewed commits and covers only two workflows. Replace eligibility with owner, SHA and version properties across every workflow. Docker references will be rejected explicitly; local actions remain allowed. Known offline tag evidence will validate comments without rejecting future unknown commits. Full semantic-version comments replace existing major-only comments."
   "2026-10-16T22:33:09.729Z",codex-agent,"Behavioural revert proof: restoring only the prior commit-equality implementation under the new tests exits 1, rejecting future SHA pins and failing adversarial assertions. The fixed gate passes 4/4. Applied the original PR 126 diff locally, resolved only its legacy major-version comments to full v7.1.0 annotations, and reran all four tests successfully. Restored the original dependency revision afterward; no Dependabot branch was edited."
   "2026-10-17T09:26:17.963Z",codex-agent,Resumed partial work and fast-forwarded to current main. Verified existing action SHA annotations against upstream tag refs; retain only comment normalization in workflows. Reviewing parser bypass cases before acceptance and re-running the Dependabot patch proof and behavioural revert locally.
@@ -29,6 +27,7 @@ comments[18]{created_at,author,text}:
   "2026-10-17T12:15:00.764Z",codex-agent,"Round 2 behavioural revert proof: restored only the previous raw /uses:/ assertion in the shared inventory function while keeping all new tests. node --test test/workflow-security.test.ts exits 1 with 6/9 passing: spaced keys and action-free workflows are wrongly rejected, and quoted-key tags fail at the wrong assertion. Restoring the parsed-only inventory passes 9/9, including nested multiline input text and every real workflow."
   "2026-10-17T12:29:07.494Z",codex-agent,"Round 2 clean-identity npm run release:check passed locally on Node 26.12.0: 263/263 tests with zero failures, skips, cancellations or todos; canonical-reader 1/1; all five packed npm/Bun scenarios; 100 percent lines/statements/branches/functions across 11 production sources. Lint, zero duplication, docstrings, production audit, package dry run, changelog/date and publish-attestation checks passed at unchanged thresholds. The required Bun release gate is now running with isolated HOME and disabled global/system Git configuration."
   "2026-10-17T12:38:50.153Z",codex-agent,"Round 2 local Bun release gate was 262/263: only the inherited-npm_execpath packed matrix exceeded its existing 290-second deadline with ETIMEDOUT. All 9 workflow tests passed and all four coverage dimensions measured 100 percent. This matches the existing shared-host integration follow-up pm-slack-standup-maint1014; no timeout or assertion change is included. Reuse the prior temporary read-only release-validation workflow to obtain both exact clean-identity gates on isolated runners, then remove it and verify final-head checks."
+  "2026-10-17T12:43:19.249Z",codex-agent,"Round 2 exact clean-identity release gates passed on CI at 6157afc: npm run release:check and bun run release:check each pass 263/263, zero failures/skips/cancellations/todos, canonical-reader 1/1, all five packed npm/Bun scenarios, and 100 percent lines/statements/branches/functions across all 11 production sources. npm: https://github.com/unbraind/pm-slack-standup/actions/runs/39033371725/job/117398241990 ; Bun: https://github.com/unbraind/pm-slack-standup/actions/runs/39033371725/job/117398241842 . The review reply was posted after pushing 6157afc and names the commit and regressions without mentions. CodeRabbit acknowledged the fix and resolved its own thread; resolvedBy is coderabbitai[bot], with no resolution requested by this agent. Full automated reviews remain skipped. Remove the temporary validation workflow, preserve the tested source unchanged, release this claim without closing, and verify final-head CI."
 files[8]{path,scope}:
   .github/workflows/ci.yml,project
   .github/workflows/codeql.yml,project
