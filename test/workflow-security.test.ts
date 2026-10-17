@@ -33,7 +33,7 @@ function assertActionPins(workflow: string): void {
       assert.ok(TRUSTED_OWNERS.has(pin[1]!), `${reference}: untrusted owner`);
       const version = value.comment?.trim();
       assert.match(version ?? "", /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/, `${reference}: missing or malformed version comment`);
-      assert.match(workflow.slice(value.range![1], value.range![2]), /^[ \t]+#[ \t]*v\d+\.\d+\.\d+[ \t]*(?:\r?\n)?$/, "version comment must be on the uses line");
+      assert.match(workflow.slice(value.range![1], value.range![2]), /^[ \t]+# v\d+\.\d+\.\d+[ \t]*(?:\r?\n)?$/, "version comment must be on the uses line with exactly one space after #");
       const observed = OBSERVED_VERSIONS.get(`${pin[1]}/${pin[2]}@${version}`);
       if (observed !== undefined) assert.equal(pin[3], observed, `${reference}: comment disagrees with observed tag`);
     },
@@ -58,6 +58,12 @@ test("the pin gate accepts future commits without refreshing a commit allow-list
   assertActionPins('- uses: "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1" # v7.1.0');
   assertActionPins("uses: 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1' # v7.1.0");
   assertActionPins("- uses: ./actions/local");
+});
+
+test("the pin gate rejects malformed version-comment spacing and missing v prefixes", () => {
+  for (const comment of ["#v7.1.0", "#  v7.1.0", "#    v7.1.0", "#\tv7.1.0", "# \tv7.1.0", "# 7.1.0"]) {
+    assert.throws(() => assertActionPins(`- uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 ${comment}`), comment);
+  }
 });
 
 test("the pin gate rejects mutable, undocumented and untrusted external references", () => {
