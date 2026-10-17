@@ -14,7 +14,7 @@ const OBSERVED_VERSIONS = new Map<string, string>([
   ["oven-sh/setup-bun@v2.2.0", "0c5077e51419868618aeaa5fe8019c62421857d6"],
 ]);
 
-/** Check every uses line; local actions are allowed and Docker actions are refused. */
+/** Check every parsed uses pair; local actions are allowed and Docker actions are refused. */
 function assertActionPins(workflow: string): void {
   const document = parseDocument(workflow);
   assert.deepEqual(document.errors, [], "workflow must be valid YAML");
@@ -40,15 +40,52 @@ function assertActionPins(workflow: string): void {
   });
 }
 
+/** Validate a nonempty workflow inventory without requiring actions in each workflow. */
+function assertWorkflowInventory(workflows: readonly string[]): void {
+  assert.ok(workflows.length > 0, "workflow inventory must not be empty");
+  for (const workflow of workflows) assertActionPins(workflow);
+}
+
 test("every external workflow action has an immutable pin and version annotation from a trusted owner", () => {
   const directory = new URL("../.github/workflows/", import.meta.url);
   const workflows = readdirSync(directory).filter((file) => /\.ya?ml$/.test(file));
-  assert.ok(workflows.length > 0, "workflow inventory must not be empty");
-  for (const file of workflows) {
-    const workflow = readFileSync(new URL(file, directory), "utf8");
-    assert.match(workflow, /uses:/, `${file} must exercise the action-pin gate`);
-    assertActionPins(workflow);
-  }
+  assertWorkflowInventory(workflows.map((file) => readFileSync(new URL(file, directory), "utf8")));
+});
+
+test("workflow inventory accepts spaced uses keys with valid pins", () => {
+  assertWorkflowInventory([`jobs:
+  check:
+    steps:
+      - uses : actions/setup-node@${"a".repeat(40)} # v99.2.3
+`]);
+});
+
+test("workflow inventory rejects quoted uses keys with mutable tag pins", () => {
+  assert.throws(() => assertWorkflowInventory([`jobs:
+  check:
+    "uses": unbraind/example/.github/workflows/check.yml@v1.2.3 # v1.2.3
+`]), /external actions require a full 40-hex commit SHA/);
+});
+
+test("workflow inventory accepts action-free workflows", () => {
+  assertWorkflowInventory([`jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ready
+`]);
+});
+
+test("workflow inventory ignores uses text nested inside a with input", () => {
+  assertWorkflowInventory([`jobs:
+  check:
+    steps:
+      - uses : ./actions/local
+        with:
+          text: |
+            uses: actions/setup-node@v7.1.0
+            "uses": actions/setup-node@main
+`]);
 });
 
 test("the pin gate accepts future commits without refreshing a commit allow-list", () => {

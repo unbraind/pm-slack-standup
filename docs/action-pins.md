@@ -5,6 +5,9 @@ exact `# vX.Y.Z` annotation. A YAML syntax-tree walk prevents quoted keys, flow 
 from evading the gate. Aliases are refused pending an explicit policy review.
 The gate inventories every workflow, including
 CodeQL, Dependabot and reusable workflow callers.
+Inventory uses parsed YAML rather than raw key spelling: `uses :` and quoted
+`"uses":` keys receive the same pin checks. Workflows without actions are valid,
+and `uses:` text within a scalar input is data rather than an action reference.
 
 Offline observations of known action tags check their annotations. They are
 optional evidence: an unobserved version with a valid SHA annotation is
