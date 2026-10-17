@@ -6,16 +6,18 @@ status: in_progress
 priority: 1
 tags: []
 created_at: "2026-10-16T22:29:54.869Z"
-updated_at: "2026-10-17T09:38:20.514Z"
+updated_at: "2026-10-17T10:13:56.658Z"
 assignee: codex-agent
 claim_principal: codex-agent
 author: codex-agent
-comments[5]{created_at,author,text}:
+comments[7]{created_at,author,text}:
   "2026-10-16T22:30:26.055Z",codex-agent,"Root cause: test/workflow-security.test.ts freezes individual reviewed commits and covers only two workflows. Replace eligibility with owner, SHA and version properties across every workflow. Docker references will be rejected explicitly; local actions remain allowed. Known offline tag evidence will validate comments without rejecting future unknown commits. Full semantic-version comments replace existing major-only comments."
   "2026-10-16T22:33:09.729Z",codex-agent,"Behavioural revert proof: restoring only the prior commit-equality implementation under the new tests exits 1, rejecting future SHA pins and failing adversarial assertions. The fixed gate passes 4/4. Applied the original PR 126 diff locally, resolved only its legacy major-version comments to full v7.1.0 annotations, and reran all four tests successfully. Restored the original dependency revision afterward; no Dependabot branch was edited."
   "2026-10-17T09:26:17.963Z",codex-agent,Resumed partial work and fast-forwarded to current main. Verified existing action SHA annotations against upstream tag refs; retain only comment normalization in workflows. Reviewing parser bypass cases before acceptance and re-running the Dependabot patch proof and behavioural revert locally.
   "2026-10-17T09:29:26.324Z",codex-agent,"Behavioural revert independently repeated: replacing only assertActionPins with the previous commit-equality logic fails 3 of 4 tests; the fixed gate passes 4 of 4. YAML parsing additionally prevents quoted-key, flow-map, block-scalar, alias and duplicate-key bypasses. yaml is a direct development dependency at its existing resolved version, with no version bumps. Original PR 126 patch requires only comment-format conflict resolution to v7.1.0 after the full-version migration; the applied action revisions pass the gate in a disposable clone, and the package action SHAs remain unchanged."
   "2026-10-17T09:38:20.514Z",codex-agent,"Known offline tags are keyed by action and version, so future tags may reuse existing SHAs without a new allow-list edit. The full npm release gate is in progress; publish the reviewed source change to start independent CI while npm and Bun acceptance complete."
+  "2026-10-17T09:45:25.264Z",codex-agent,"PR 131 Node 22.18.0 and Node 26 CI each pass 258/258 with 100 percent lines/statements/branches/functions. Original PR 126 patch was reapplied to the committed fix: 4/4 pass after only full-version comment conflict resolution. Existing integration instability from the first local run is linked to pm-slack-standup-maint1014 rather than duplicated; local full-gate retry remains in progress."
+  "2026-10-17T10:13:56.658Z",codex-agent,"Local packed acceptance repeatedly exceeded existing deadlines, including under the installed CI runtime and isolated temporary storage. The unchanged package passes regular Node 22/26 CI. Add a temporary read-only workflow to execute the exact npm and Bun release commands independently with clean CI identity; remove the workflow after recording receipts. Preserve the existing timeouts, thresholds, action SHAs and final implementation scope."
 files[8]{path,scope}:
   .github/workflows/ci.yml,project
   .github/workflows/codeql.yml,project
