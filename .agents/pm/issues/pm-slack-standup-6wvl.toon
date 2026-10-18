@@ -6,11 +6,9 @@ status: in_progress
 priority: 1
 tags: []
 created_at: "2026-10-16T22:29:54.869Z"
-updated_at: "2026-10-18T04:21:53.856Z"
-assignee: codex-agent
-claim_principal: codex-agent
+updated_at: "2026-10-18T04:34:27.883Z"
 author: codex-agent
-comments[22]{created_at,author,text}:
+comments[23]{created_at,author,text}:
   "2026-10-16T22:30:26.055Z",codex-agent,"Root cause: test/workflow-security.test.ts freezes individual reviewed commits and covers only two workflows. Replace eligibility with owner, SHA and version properties across every workflow. Docker references will be rejected explicitly; local actions remain allowed. Known offline tag evidence will validate comments without rejecting future unknown commits. Full semantic-version comments replace existing major-only comments."
   "2026-10-16T22:33:09.729Z",codex-agent,"Behavioural revert proof: restoring only the prior commit-equality implementation under the new tests exits 1, rejecting future SHA pins and failing adversarial assertions. The fixed gate passes 4/4. Applied the original PR 126 diff locally, resolved only its legacy major-version comments to full v7.1.0 annotations, and reran all four tests successfully. Restored the original dependency revision afterward; no Dependabot branch was edited."
   "2026-10-17T09:26:17.963Z",codex-agent,Resumed partial work and fast-forwarded to current main. Verified existing action SHA annotations against upstream tag refs; retain only comment normalization in workflows. Reviewing parser bypass cases before acceptance and re-running the Dependabot patch proof and behavioural revert locally.
@@ -33,6 +31,7 @@ comments[22]{created_at,author,text}:
   "2026-10-18T04:18:10.555Z",codex-agent,"Round 3: read both unresolved threads and the complete review body. Scope pin validation to jobs.<job>.uses and jobs.<job>.steps[*].uses; reject raw multiline scalar sources even when YAML folds an escaped line break. Keep existing hostile-reference coverage in real workflow contexts and prove each fix independently on revert."
   "2026-10-18T04:19:57.868Z",codex-agent,"Round 3: validate only actual jobs.<job>.uses and jobs.<job>.steps[*].uses AST locations; with/env fields named uses remain ordinary values. Reject CR/LF anywhere in the raw scalar source before local-action or SHA acceptance, including escaped quoted line breaks. Existing hostile reference fragments now run inside actual job/step mappings. node --test test/workflow-security.test.ts passes 11/11 with zero skips. Independent revert proofs retain all tests: removing only the AST location filter fails the ordinary-input regression (1/1); removing only the raw source-line guard fails the escaped multiline regression (1/1). Restoring both passes 11/11. Both unresolved threads are valid; the review body contains no additional outside-diff/nitpick findings."
   "2026-10-18T04:21:53.856Z",codex-agent,"Run exact npm and Bun release:check commands with isolated CI identity on dedicated GitHub runners through a temporary read-only validation workflow. Local gates continue; remove the workflow before final delivery. This reuses the prior round validation approach without changing thresholds or packed-host deadlines."
+  "2026-10-18T04:34:24.981Z",codex-agent,"Round 3 release gates PASS at 847589481f7a95c4ce6b2c6edc8993e26475069b with isolated HOME and disabled global/system Git identity: npm run release:check and bun run release:check each pass 265/265, zero failures/skips/cancellations/todos, 100% lines/statements/branches/functions across all 11 production sources. Canonical-reader acceptance passes 1/1 and all five packed npm/Bun scenarios pass in each gate. CI receipts: https://github.com/unbraind/pm-slack-standup/actions/runs/39097252572/job/117586157755 and https://github.com/unbraind/pm-slack-standup/actions/runs/39097252572/job/117586157631 . The temporary validation workflow is now removed; validator and regression source are unchanged. Duplicate local full runs were stopped on the overloaded host; no local full-pass claim is made. Both review replies were posted after pushing. Leave item in progress for orchestrator verification."
 files[8]{path,scope}:
   .github/workflows/ci.yml,project
   .github/workflows/codeql.yml,project
