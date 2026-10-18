@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
+
 ## 2026.10.14 - 2026-10-14
 
 ### Fixed
