@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
-import { isScalar, parseDocument, visit } from "yaml";
+import { isPair, isScalar, isSeq, parseDocument, visit } from "yaml";
 
 /** Owners whose external actions and reusable workflows may run here. */
 const TRUSTED_OWNERS = new Set(["actions", "oven-sh", "github", "dependabot", "unbraind"]);
@@ -14,17 +14,23 @@ const OBSERVED_VERSIONS = new Map<string, string>([
   ["oven-sh/setup-bun@v2.2.0", "0c5077e51419868618aeaa5fe8019c62421857d6"],
 ]);
 
-/** Check every parsed uses pair; local actions are allowed and Docker actions are refused. */
+/** Check action and reusable-workflow uses paths; local actions are allowed and Docker actions refused. */
 function assertActionPins(workflow: string): void {
   const document = parseDocument(workflow);
   assert.deepEqual(document.errors, [], "workflow must be valid YAML");
   visit(document, {
     Alias() { assert.fail("workflow aliases require a separate pin-policy review"); },
-    Pair(_key, pair) {
+    Pair(_key, pair, path) {
       if (!isScalar(pair.key) || pair.key.value !== "uses") return;
+      const keys = path.filter(isPair).map(parent => isScalar(parent.key) ? parent.key.value : undefined);
+      // Direct job mappings have two ancestor pairs; step mappings also pass through a sequence.
+      const jobReference = path.length === 6 && keys.length === 2;
+      const stepReference = path.length === 9 && keys.length === 3 && keys[2] === "steps" && isSeq(path.at(-2));
+      if (keys[0] !== "jobs" || typeof keys[1] !== "string" || (!jobReference && !stepReference)) return;
       const value = pair.value;
       assert.ok(isScalar(value) && typeof value.value === "string", "uses must contain one literal reference");
       assert.ok(["PLAIN", "QUOTE_DOUBLE", "QUOTE_SINGLE"].includes(value.type!), "uses must be a single-line scalar");
+      assert.doesNotMatch(workflow.slice(value.range![0], value.range![1]), /[\r\n]/, "uses must be a single-line scalar");
       const reference = value.value;
       if (reference.startsWith("./")) return;
       assert.ok(!reference.startsWith("docker://"), "Docker actions are not permitted by the action-pin policy");
@@ -88,18 +94,25 @@ test("workflow inventory ignores uses text nested inside a with input", () => {
 `]);
 });
 
+/** Embed hostile reference fragments in actual job or step locations before validation. */
+function assertReferenceFragment(source: string): void {
+  const prefix = source.startsWith("-") ? "jobs:\n  check:\n    steps:\n" : "jobs:\n  check:\n";
+  const indent = source.startsWith("-") ? "      " : "    ";
+  assertActionPins(prefix + source.split("\n").map(line => indent + line).join("\n"));
+}
+
 test("the pin gate accepts future commits without refreshing a commit allow-list", () => {
-  assertActionPins(`- uses: actions/setup-node@${"a".repeat(40)} # v99.2.3`);
-  assertActionPins(`uses: actions/setup-node@${"a".repeat(40)} # v99.2.3`);
-  assertActionPins("- uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v99.2.3");
-  assertActionPins('- uses: "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1" # v7.1.0');
-  assertActionPins("uses: 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1' # v7.1.0");
-  assertActionPins("- uses: ./actions/local");
+  assertReferenceFragment(`- uses: actions/setup-node@${"a".repeat(40)} # v99.2.3`);
+  assertReferenceFragment(`uses: actions/setup-node@${"a".repeat(40)} # v99.2.3`);
+  assertReferenceFragment("- uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v99.2.3");
+  assertReferenceFragment('- uses: "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1" # v7.1.0');
+  assertReferenceFragment("uses: 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1' # v7.1.0");
+  assertReferenceFragment("- uses: ./actions/local");
 });
 
 test("the pin gate rejects malformed version-comment spacing and missing v prefixes", () => {
   for (const comment of ["#v7.1.0", "#  v7.1.0", "#    v7.1.0", "#\tv7.1.0", "# \tv7.1.0", "# 7.1.0"]) {
-    assert.throws(() => assertActionPins(`- uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 ${comment}`), comment);
+    assert.throws(() => assertReferenceFragment(`- uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 ${comment}`), comment);
   }
 });
 
@@ -120,7 +133,7 @@ test("the pin gate rejects mutable, undocumented and untrusted external referenc
     `actions/setup-node@${"g".repeat(40)} # v7.1.0`,
     `${"actions/setup-node@" + sha} # v7.1.0 trailing`,
     `|\n    actions/setup-node@${sha} # v7.1.0`,
-  ]) assert.throws(() => assertActionPins(`- uses: ${reference}`), reference);
+  ]) assert.throws(() => assertReferenceFragment(`- uses: ${reference}`), reference);
   for (const body of [
     '- { uses: "actions/setup-node@main" }',
     '"uses": actions/setup-node@main # v7.1.0',
@@ -129,7 +142,7 @@ test("the pin gate rejects mutable, undocumented and untrusted external referenc
     `- uses: actions/setup-node@${sha}\n  # v7.1.0`,
     `- uses: &pin actions/setup-node@${sha} # v7.1.0\n- uses: *pin`,
     'uses: ./local\nuses: actions/setup-node@main',
-  ]) assert.throws(() => assertActionPins(body), body);
+  ]) assert.throws(() => assertReferenceFragment(body), body);
 });
 
 test("read-only CI checkouts never persist repository credentials", () => {
@@ -143,5 +156,39 @@ test("read-only CI checkouts never persist repository credentials", () => {
       /^\s*persist-credentials:\s*false\s*$/m,
       "every read-only CI checkout must disable persisted credentials",
     );
+  }
+});
+
+
+test("pin policy ignores ordinary inputs named uses at job and step scope", () => {
+  assertActionPins(`jobs:
+  reusable:
+    uses: unbraind/example/.github/workflows/check.yml@${"a".repeat(40)} # v99.2.3
+    with:
+      uses: ordinary job input
+  check:
+    env:
+      uses: ordinary environment value
+    steps:
+      - uses: ./actions/local
+        with:
+          uses: ordinary step input
+      - run: echo ready
+        env:
+          uses: ordinary step environment
+`);
+});
+
+test("pin policy rejects escaped multiline source references before local or SHA acceptance", () => {
+  for (const reference of [`actions/setup-node@${"a".repeat(40)}`, "./actions/local"]) {
+    for (const newline of ["\n", "\r\n"]) {
+      const split = reference.length - 4;
+      const scalar = '"' + reference.slice(0, split) + "\\" + newline + "          " + reference.slice(split) + '" # v99.2.3';
+      assert.throws(() => assertActionPins(`jobs:
+  check:
+    steps:
+      - uses: ${scalar}
+`), /uses must be a single-line scalar/);
+    }
   }
 });

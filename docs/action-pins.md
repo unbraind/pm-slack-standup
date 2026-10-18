@@ -28,3 +28,8 @@ security tests passed. The original patch has comment-format conflicts with the
 required full-version migration; these are resolved to the new full version,
 without changing any other patch content. This formatting migration is part of the gate repair;
 the dependency bump remains owned by Dependabot.
+
+Pin validation applies only to `jobs.<job_id>.uses` and
+`jobs.<job_id>.steps[*].uses`. Inputs or environment fields named `uses` are
+ordinary values. Every reference, including a local action, must occupy one
+physical source line; escaped line breaks in quoted YAML scalars are refused.
