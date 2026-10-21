@@ -1,0 +1,30 @@
+id: pm-slack-standup-murn
+title: Show declared decision requests in periodic standups
+description: "Present explicit human or agent decision requests with alternatives, response deadlines, canonical evidence and acknowledgment links."
+type: Feature
+status: in_progress
+priority: 2
+tags[3]: added,decisions,standup
+created_at: "2026-10-21T20:31:22.856Z"
+updated_at: "2026-10-21T20:42:52.204Z"
+assignee: codex-agent
+claim_principal: codex-agent
+author: codex-agent
+acceptance_criteria: Only declared requests appear; closed and superseded decisions disappear deterministically; private alternatives respect disclosure policy. Typed SDK and CLI provide bounded TOON/JSON with typed refusals and remedies; README and example; non-git public tracker validation; npm and Bun CI release gates.
+comments[5]{created_at,author,text}:
+  "2026-10-21T20:31:41.362Z",codex-agent,"Overlap rechecked against CLI 2026.10.21 and pinned SDK 2026.10.17: core plan decision stores text, rationale and evidence; pm-brief decisionsNeeded selects active Decision items for general context; pm-slack owns notification transport. No existing explicit decision-request standup contract was found. This feature owns periodic presentation and acknowledgment linkage only. Reconciliation PR #141 items are excluded. Plan: an explicit standup-decision-request tag plus a versioned declaration in the item body; public-only alternative disclosure, terminal/superseded suppression, deterministic bounded SDK and CLI reports, opt-in standup section, non-git regressions and public tracker copy validation. Dependency pins stay unchanged."
+  "2026-10-21T20:37:56.113Z",codex-agent,"Implemented public typed declaration/report/refusal contracts, read-only standup decisions command, and opt-in periodic sections. Limits: at most 10 rows, default compact JSON projection budget 8192 bytes, whole-row omissions with counts and remedy. Tagged requests are excluded from ordinary work buckets when enabled so JSON exports cannot copy private alternatives from source bodies. Deadlines and IDs define ordering; terminal states suppress obsolete declarations. Local targeted checks and real no-git lifecycle tests are being verified; CI runs both npm and Bun full release gates without lowering thresholds."
+  "2026-10-21T20:39:54.308Z",codex-agent,"Read-only public snapshot validation at main 765b440ce656692c73bbcbafb5102ac3b3c8324b: 96 complete items (5 in_progress, 5 open, 84 closed, 2 canceled), 2 Decision items, 0 explicitly declared requests, 0 emitted/omitted. Compact JSON report 201 bytes; full plain standup 8172 bytes. All 198 copied tracker files remained SHA-256 identical. Copy had no git directory; source files were read-only. Positive SDK/registered CLI tests use a separate initialized non-git tracker and a PATH with Node and pm only. Targeted new-module c8 evidence: 100% statements/branches/functions/lines, 5/5 tests."
+  "2026-10-21T20:40:30.227Z",codex-agent,"Behavioral revert proof: replaced only collectDecisionRequests with the pre-feature empty-section behavior, rebuilt dist, and ran node --test --test-name-pattern=\"only declared|periodic text\" test/decision-requests.test.ts. Both selected regressions failed (0 pass, 2 fail), including missing active requests and missing periodic presentation. Restored the implementation and rebuilt. Adjacent exporter/unit regressions pass 93/93; typecheck, test typecheck, lint, docstring (102 declarations) and duplication (0%) pass. No full local release gate was run because of the CPU constraint."
+  "2026-10-21T20:42:52.200Z",codex-agent,"Pinned pm test runner passed the linked decision regressions: 5 tests, 5 pass, 0 failures. Result tracking is disabled by existing project policy, so the receipt is recorded here without changing that policy. Local health has an existing global-extension host/SDK version-skew finding; tracker history and item data were not repaired or rewritten. Full CI uses clean installed dependencies. CLI and SDK pins remain unchanged."
+files[3]{path,scope,note}:
+  decision-requests.ts,project,Typed presentation implementation
+  index.ts,project,CLI and renderer integration
+  test/decision-requests.test.ts,project,Lifecycle privacy and non-git regressions
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/decision-requests.test.ts,project,codex-agent,"2026-10-21T20:37:52.251Z",local_mutation,feat/decision-request-sections
+docs[3]{path,scope,note}:
+  docs/decision-requests-validation.md,project,Measured public tracker copy validation
+  docs/decision-requests.md,project,Schema and CLI SDK examples
+  README.md,project,Decision requests and no-git usage
+body: ""
