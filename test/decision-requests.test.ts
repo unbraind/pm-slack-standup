@@ -114,7 +114,9 @@ test("periodic text and Block Kit carry only public alternatives and safe acknow
   assert.equal(blocks.fallback, buildTextMessage(data, { ...opts, format: "slack" }));
   assert.ok(blocks.blocks.some((block) => block.type === "section" && "text" in block && (block.text as { type: string }).type === "plain_text"));
   assert.doesNotMatch(JSON.stringify(blocks), /SECRET/);
-  assert.equal(buildStandupData(inputs, { ...opts, includeDecisions: false }).decisions, undefined);
+  const withoutSection = buildStandupData(inputs, { ...opts, includeDecisions: false });
+  assert.equal(withoutSection.decisions, undefined);
+  assert.doesNotMatch(JSON.stringify(withoutSection), /SECRET|PRIVATE-TITLE/);
   assert.doesNotMatch(buildTextMessage(buildStandupData(inputs, { ...opts, includeDecisions: false }), opts), /Decision requests/);
   const long = collectDecisionRequests(Array.from({ length: 10 }, (_, index) => item(declaration({
     prompt: "😀".repeat(70), evidence: ["https://example.org/" + "a".repeat(400)],
@@ -155,6 +157,8 @@ test("real SDK and registered CLI read and suppress requests in a non-git tracke
     const toon = decodeToon(execFileSync(process.execPath, args, cliOptions));
     assert.deepEqual(toon, json);
     assert.equal(json.total, 1);
+    const ordinaryExport = await runtimeCommand(fixture, "standup export", { format: "json" });
+    assert.doesNotMatch(String(ordinaryExport.output), /SECRET/);
     const exported = await runtimeCommand(fixture, "standup export", { format: "json", includeDecisions: true });
     assert.doesNotMatch(String(exported.output), /SECRET/);
     assert.equal(JSON.parse(String(exported.output)).decisions.total, 1);

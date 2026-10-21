@@ -56,9 +56,9 @@ The request must explicitly declare `disclosure: public`. A private declaration
 is withheld entirely. Every alternative must explicitly declare `public` or
 `private`; private labels never enter the projection, text, or Block Kit. Only
 the withheld count appears. Titles, general body prose, and unknown fields are
-never copied into the decision section. When `--include-decisions` is enabled,
-declared requests are also excluded from ordinary work buckets, so JSON exports
-contain the public projection instead of their source bodies. Terminal item states and terminal
+never copied into the decision section. Declared requests are excluded from
+ordinary work buckets even when the optional section is disabled. JSON exports
+never contain their source bodies; `--include-decisions` adds their public projection. Terminal item states and terminal
 request states suppress a request before validating obsolete payload details.
 Untagged decisions are ignored, including malformed old notes. A malformed
 active declaration refuses the entire report instead of silently dropping it.

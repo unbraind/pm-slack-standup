@@ -1250,8 +1250,8 @@ export function buildStandupData(
     team && team.length > 0
       ? items.filter((i) => !isNullish(i.assignee) && team.includes(i.assignee))
       : items;
-  // Declared requests use only the public projection, including in JSON exports.
-  const work = opts.includeDecisions ? visible.filter((item) => !isDecisionRequestItem(item)) : visible;
+  // Declared requests never enter raw work buckets, including exports without the optional section.
+  const work = visible.filter((item) => !isDecisionRequestItem(item));
   const isDone = (i: PmItem) => DONE_STATUSES.has(statusOf(i));
   // An item is "blocked" for standup purposes when its status is blocked/
   // on_hold OR it carries a blocked_by dependency — but a done item is never
@@ -2593,16 +2593,16 @@ export default defineExtension({
     api.registerPreflight({
       // EVERY registered command path, not just `standup`. `slack-standup` is
       // registered as a full command sharing `runStandupCommand`, not as a
-      // Commander alias, and `standup export` is its own path — the runtime
+      // Commander alias, and both standup subcommands have their own paths. The runtime
       // matches each by its exact normalized name, so a scope naming only
-      // `standup` left the other two outside this override entirely. The
+      // `standup` would leave the alias and subcommands outside this override. The
       // registration is a pass-through today, so nothing misbehaves at runtime,
       // but the declared scope is this package's ownership claim as `pm health`
       // reads it, and if the override ever becomes authoritative the omitted
       // paths would silently escape its gate. The smoke test derives the
       // expected list from the real activation, so a newly registered command
       // path cannot be added without appearing here.
-      commands: ["standup", "slack-standup", "standup export"],
+      commands: ["standup", "slack-standup", "standup export", "standup decisions"],
       // Mirror the handler's contract without aborting here (the runtime
       // swallows throws from preflight). An empty delta is an explicit
       // pass-through that leaves the runtime's preflight decision untouched.

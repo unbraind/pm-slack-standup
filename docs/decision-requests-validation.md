@@ -8,6 +8,8 @@ non-git scratch directory. Its 198 files were made read-only. The package's
 canonical complete-list reader read the copy, then `collectDecisionRequests`
 and a plain standup with decisions and completed work enabled were rendered.
 SHA-256 hashes of every copied tracker file were identical before and after.
+A Git discovery ceiling confirmed that the copy was outside a repository; a
+second complete read with only Node on PATH also returned 96 items and zero requests.
 No declaration was added to the public snapshot to fabricate a positive result.
 
 | Measurement | Result |
