@@ -2303,7 +2303,7 @@ function sharedPresentationFlags(): FlagDefinition[] {
 
 export default defineExtension({
   name: "pm-slack-standup",
-  version: "2026.10.20",
+  version: "2026.10.21",
 
   activate(api) {
     // Each host activation owns its capability decision, including old hosts
