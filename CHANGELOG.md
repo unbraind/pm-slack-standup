@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2026.10.21 - 2026-10-21
 
 ### Changed
 
@@ -12,6 +12,7 @@
 - Propagate the docstring gate entry guard fix ([pm-slack-standup-9d6m](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-9d6m.toon))
 - Track published pm-github apply-path limitations exposed by certification review ([pm-slack-standup-bhg0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bhg0.toon))
 - Check external action pin properties without freezing Dependabot revisions ([pm-slack-standup-6wvl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-6wvl.toon))
+- Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ### Security
 
@@ -21,12 +22,6 @@
 
 - Enable GitHub CodeQL code scanning ([pm-slack-standup-52od](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-52od.toon))
 - Certify pm-slack-standup on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates ([pm-slack-standup-74w8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-74w8.toon))
-
-## 2026.10.21 - 2026-10-21
-
-### Fixed
-
-- Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ## 2026.10.14 - 2026-10-14
 

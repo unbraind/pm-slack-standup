@@ -6,10 +6,11 @@ status: closed
 priority: 1
 tags: []
 created_at: "2026-10-16T22:29:54.869Z"
-updated_at: "2026-10-21T19:23:24.585Z"
+updated_at: "2026-10-22T11:16:43.736Z"
 closed_at: "2026-10-21T18:48:09.851Z"
 completed_at: "2026-10-21T18:48:09.851Z"
 author: codex-agent
+release: 2026.10.21
 comments[25]{created_at,author,text}:
   "2026-10-16T22:30:26.055Z",codex-agent,"Root cause: test/workflow-security.test.ts freezes individual reviewed commits and covers only two workflows. Replace eligibility with owner, SHA and version properties across every workflow. Docker references will be rejected explicitly; local actions remain allowed. Known offline tag evidence will validate comments without rejecting future unknown commits. Full semantic-version comments replace existing major-only comments."
   "2026-10-16T22:33:09.729Z",codex-agent,"Behavioural revert proof: restoring only the prior commit-equality implementation under the new tests exits 1, rejecting future SHA pins and failing adversarial assertions. The fixed gate passes 4/4. Applied the original PR 126 diff locally, resolved only its legacy major-version comments to full v7.1.0 annotations, and reran all four tests successfully. Restored the original dependency revision afterward; no Dependabot branch was edited."

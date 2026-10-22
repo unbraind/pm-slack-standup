@@ -6,10 +6,11 @@ status: closed
 priority: 1
 tags[1]: changed
 created_at: "2026-10-14T10:10:55.397Z"
-updated_at: "2026-10-21T18:50:46.266Z"
+updated_at: "2026-10-22T11:16:23.865Z"
 closed_at: "2026-10-21T18:50:40.976Z"
 completed_at: "2026-10-21T18:50:40.976Z"
 author: codex-agent
+release: 2026.10.21
 comments[8]{created_at,author,text}:
   "2026-10-14T10:11:06.341Z",codex-agent,"Plan: author this package own thin caller, pin workflow SHA and pm-github to 2026.10.13, and verify isolated npm/Bun release gates without changing thresholds. Remove fast-glob and any jscpd4 alias; pin pm-ops 2026.10.14. Published changelog reviewed: attestation alias/function rejection, read-only pack prepare, release repair and Windows proof support. Duplication now uses Node glob with jscpd 5. No workflow dispatch, bot requests, merges, or source function changes."
   "2026-10-14T10:11:58.359Z",codex-agent,"Audit before: full 4 vulnerabilities (4 high), production 0. After: full 0, production 0; npm ls braces is empty. The caller runs at 17 2 * * * UTC. It validates access, previews the complete plan, imports with --gate, verifies repeat-import idempotency and privacy, then checks strict health before commit/push/PR. SHA pin matches published pm-github 2026.10.13. Actionlint skipped: binary missing and offline npx registry metadata unavailable. GitHub Actions PR-creation setting verified enabled. No direct fast-glob imports in authored scripts. The package prepare contract will be checked independently."

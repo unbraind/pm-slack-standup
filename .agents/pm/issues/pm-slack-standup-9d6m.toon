@@ -6,10 +6,11 @@ status: closed
 priority: 2
 tags[2]: docstrings,gate
 created_at: "2026-08-10T05:45:10.472Z"
-updated_at: "2026-10-21T19:13:38.883Z"
+updated_at: "2026-10-22T11:16:51.536Z"
 closed_at: "2026-10-21T19:13:35.025Z"
 completed_at: "2026-10-21T19:13:35.025Z"
 author: pi-agent
+release: 2026.10.21
 comments[1]{created_at,author,text}:
   "2026-10-21T19:12:08.118Z",codex-agent,"author=codex-agent,\"text=Authorized tracker reconciliation, audit 2026-10-21. Reverified current main 765b440ce656: merged #30 (72fecfb); docstring entrypoint guard and its delivery retained; source tree exactly matches the audited snapshot. **Propagate the docstring gate entry guard fix.** [PR #30](https://github.com/unbraind/pm-slack-standup/pull/30) propagates the docstring main-invocation guard error and tests a non-vacuous entrypoint failure.\""
 notes[5]{created_at,author,text}:

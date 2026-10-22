@@ -6,10 +6,11 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-08-22T18:01:59.324Z"
-updated_at: "2026-10-21T19:09:22.108Z"
+updated_at: "2026-10-22T11:15:56.746Z"
 closed_at: "2026-10-21T19:09:14.121Z"
 completed_at: "2026-10-21T19:09:14.121Z"
 author: "harness:ox-alpha"
+release: 2026.10.21
 comments[1]{created_at,author,text}:
   "2026-10-21T19:07:46.128Z",codex-agent,"author=codex-agent,\"text=Authorized tracker reconciliation, audit 2026-10-21. Reverified current main 765b440ce656: CodeQL workflow retained; source tree exactly matches the audited snapshot. **Enable GitHub CodeQL code scanning.** .github/workflows/codeql.yml is present on main and registers code scanning. The request to enable the workflow is delivered; this is not a whole-package security certification.\""
 notes[1]{created_at,author,text}:
