@@ -17,7 +17,8 @@
     "dist/",
     "manifest.json",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/decision-requests.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -99,10 +100,12 @@
       }
     },
     "docs": [
+      "docs/decision-requests.md",
       "README.md",
       "CHANGELOG.md"
     ],
     "examples": [
+      "docs/decision-requests.md",
       "README.md"
     ]
   },

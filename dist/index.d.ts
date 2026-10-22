@@ -1,3 +1,5 @@
+import type { DecisionRequestReport } from "./decision-requests.ts";
+export * from "./decision-requests.ts";
 /**
  * Error type that carries the numeric exit code pm's command runtime expects.
  *
@@ -86,6 +88,8 @@ export declare function readCompleteStandupItems(parsed: unknown): PmItem[];
  * (both still subsets of `done`).
  */
 export interface StandupData {
+    /** Optional public-only decision section, populated by --include-decisions. */
+    decisions?: DecisionRequestReport;
     wip: PmItem[];
     blocked: PmItem[];
     done: PmItem[];
@@ -95,6 +99,8 @@ export interface StandupData {
     doneToday?: PmItem[];
 }
 export interface StandupOptions {
+    /** Include explicitly declared decision requests in the periodic presentation. */
+    includeDecisions?: boolean;
     channel?: string;
     format: Format;
     includeDone: boolean;
