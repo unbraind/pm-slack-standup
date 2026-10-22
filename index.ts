@@ -4,6 +4,10 @@ import { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync, existsSy
 import { basename, resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { collectDecisionRequests, isDecisionRequestItem, renderDecisionRequests } from "./decision-requests.ts";
+import type { DecisionRequestReport } from "./decision-requests.ts";
+export * from "./decision-requests.ts";
+
 import { certifyCompleteListResult, inspectCompleteListResult } from "@unbrained/pm-cli/sdk";
 import type {
   CommandHandlerContext,
@@ -279,6 +283,8 @@ export function readCompleteStandupItems(parsed: unknown): PmItem[] {
  * (both still subsets of `done`).
  */
 export interface StandupData {
+  /** Optional public-only decision section, populated by --include-decisions. */
+  decisions?: DecisionRequestReport;
   wip: PmItem[];
   blocked: PmItem[];
   done: PmItem[];
@@ -291,6 +297,8 @@ export interface StandupData {
 }
 
 export interface StandupOptions {
+  /** Include explicitly declared decision requests in the periodic presentation. */
+  includeDecisions?: boolean;
   channel?: string;
   format: Format;
   includeDone: boolean;
@@ -1242,6 +1250,8 @@ export function buildStandupData(
     team && team.length > 0
       ? items.filter((i) => !isNullish(i.assignee) && team.includes(i.assignee))
       : items;
+  // Declared requests never enter raw work buckets, including exports without the optional section.
+  const work = visible.filter((item) => !isDecisionRequestItem(item));
   const isDone = (i: PmItem) => DONE_STATUSES.has(statusOf(i));
   // An item is "blocked" for standup purposes when its status is blocked/
   // on_hold OR it carries a blocked_by dependency — but a done item is never
@@ -1249,11 +1259,11 @@ export function buildStandupData(
   const isBlocked = (i: PmItem) =>
     !isDone(i) && (BLOCKED_STATUSES.has(statusOf(i)) || hasBlockedByDep(i));
 
-  const wip = visible.filter((i) => WIP_STATUSES.has(statusOf(i)) && !isBlocked(i));
-  const blocked = visible.filter(isBlocked);
-  const open = visible.filter((i) => OPEN_STATUSES.has(statusOf(i)) && !isBlocked(i));
+  const wip = work.filter((i) => WIP_STATUSES.has(statusOf(i)) && !isBlocked(i));
+  const blocked = work.filter(isBlocked);
+  const open = work.filter((i) => OPEN_STATUSES.has(statusOf(i)) && !isBlocked(i));
   const done = opts.includeDone
-    ? visible.filter((i) => isDone(i) && withinWindow(i, sinceMs))
+    ? work.filter((i) => isDone(i) && withinWindow(i, sinceMs))
     : [];
 
   const sortedOpen = [...open].sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
@@ -1261,6 +1271,7 @@ export function buildStandupData(
   const upNext = upNextCount === Infinity ? sortedOpen : sortedOpen.slice(0, upNextCount);
 
   const data: StandupData = { wip, blocked, done, upNext, total: visible.length };
+  if (opts.includeDecisions) data.decisions = collectDecisionRequests(visible);
 
   if (opts.splitYesterday && done.length > 0) {
     const todayKey = localDayKeyOf(now);
@@ -1603,6 +1614,7 @@ export function buildTextMessage(data: StandupData, opts: StandupOptions): strin
     }
   }
 
+  if (data.decisions) lines.push("", renderDecisionRequests(data.decisions, opts.format === "plain" ? "plain" : "slack"));
   return lines.join("\n");
 }
 
@@ -1784,6 +1796,29 @@ export function buildBlockKit(data: StandupData, opts: StandupOptions): { blocks
     type: "context",
     elements: footerElements,
   });
+
+  if (data.decisions) {
+    // Plain-text blocks avoid treating declaration text as Slack formatting or mentions.
+    // Split only on line boundaries: a fixed code-point cut can divide an evidence,
+    // acknowledgment, or Acknowledge URL across two blocks. Declaration bounds keep
+    // each rendered line under this UTF-16 budget, which is also under Slack's 3000-unit cap.
+    const decisionBlockLimit = 2400;
+    const chunks: string[] = [];
+    let current = "";
+    for (const line of renderDecisionRequests(data.decisions, "plain").split("\n")) {
+      const next = current === "" ? line : `${current}\n${line}`;
+      if (current !== "" && next.length > decisionBlockLimit) {
+        chunks.push(current);
+        current = line;
+      } else {
+        current = next;
+      }
+    }
+    chunks.push(current);
+    for (const chunk of chunks) {
+      blocks.push({ type: "section", text: { type: "plain_text", text: chunk, emoji: false } });
+    }
+  }
 
   // Plain-text fallback mirrors the slack-mrkdwn text message.
   const fallback = buildTextMessage(data, { ...opts, format: "slack" });
@@ -2004,6 +2039,7 @@ export function resolveStandupOptions(
   const days = parseDays(readStrOption(options, "days"));
   const splitYesterday = readBoolOption(options, "yesterday");
   const opts: StandupOptions = {
+    includeDecisions: readBoolOption(options, "include-decisions"),
     channel: readStrOption(options, "channel"),
     format,
     // `--yesterday` is meaningless without a Done section, so it implies
@@ -2297,6 +2333,7 @@ function sharedPresentationFlags(): FlagDefinition[] {
   return [
     { long: "--include-blockers", description: "Highlight blocked rows with a 🚨 marker in every format so impediments stand out" },
     { long: "--team", value_name: "list", description: "Filter the standup to items assigned to the given members (comma list, e.g. alice,bob); items with no assignee are hidden" },
+    { long: "--include-decisions", description: "Append explicitly tagged public decision requests with deadlines, alternatives and evidence" },
     { long: "--compact", description: "Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted)" },
   ];
 }
@@ -2522,6 +2559,26 @@ export default defineExtension({
     });
 
     api.registerCommand({
+      name: "standup decisions",
+      description: "Read declared public decision requests as compact TOON or JSON",
+      intent: "Present active human or agent requests with public alternatives, deadlines and acknowledgment links without posting or writing",
+      examples: ["pm standup decisions", "pm standup decisions --json --limit 3"],
+      flags: [
+        { long: "--limit", value_name: "count", description: "Maximum requests (1..10, default 10); omissions are disclosed" },
+        { long: "--output-bytes", value_name: "bytes", description: "Compact JSON projection budget (512..32768, default 8192); whole rows only" },
+      ],
+      /** Read a complete tracker through the existing canonical reader; no git is required. */
+      run(ctx: CommandHandlerContext) {
+        const options = {
+          limit: Number(readStrOption(ctx.options, "limit") ?? 10),
+          outputBytes: Number(readStrOption(ctx.options, "output-bytes") ?? 8192),
+        };
+        collectDecisionRequests([], options);
+        return collectDecisionRequests(fetchAllItems(ctx.pm_root), options);
+      },
+    });
+
+    api.registerCommand({
       name: "slack-standup",
       description: "Alias for `pm standup` (same behavior and flags)",
       intent: "Run the standup workflow using a package-name-aligned command path for agent discoverability",
@@ -2553,16 +2610,16 @@ export default defineExtension({
     api.registerPreflight({
       // EVERY registered command path, not just `standup`. `slack-standup` is
       // registered as a full command sharing `runStandupCommand`, not as a
-      // Commander alias, and `standup export` is its own path — the runtime
+      // Commander alias, and both standup subcommands have their own paths. The runtime
       // matches each by its exact normalized name, so a scope naming only
-      // `standup` left the other two outside this override entirely. The
+      // `standup` would leave the alias and subcommands outside this override. The
       // registration is a pass-through today, so nothing misbehaves at runtime,
       // but the declared scope is this package's ownership claim as `pm health`
       // reads it, and if the override ever becomes authoritative the omitted
       // paths would silently escape its gate. The smoke test derives the
       // expected list from the real activation, so a newly registered command
       // path cannot be added without appearing here.
-      commands: ["standup", "slack-standup", "standup export"],
+      commands: ["standup", "slack-standup", "standup export", "standup decisions"],
       // Mirror the handler's contract without aborting here (the runtime
       // swallows throws from preflight). An empty delta is an explicit
       // pass-through that leaves the runtime's preflight decision untouched.
@@ -2660,6 +2717,7 @@ export default defineExtension({
               up_next: data.upNext,
               done: data.done,
             },
+            decisions: data.decisions,
             slack: { text: fallback, blocks },
           },
           null,

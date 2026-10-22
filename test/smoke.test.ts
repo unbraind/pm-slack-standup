@@ -132,7 +132,7 @@ test("the preflight scope covers every registered command path", async () => {
   );
   assert.deepEqual(
     registered,
-    ["slack-standup", "standup", "standup export"],
+    ["slack-standup", "standup", "standup decisions", "standup export"],
     "the registered command paths this scope is derived from",
   );
 });

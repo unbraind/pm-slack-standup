@@ -90,6 +90,7 @@ pm slack-standup [flags]   # alias with identical behavior
 | `--schedule <when>` | string | — | Schedule the post instead of sending now: `HH:MM` (daily, local time) or a 5-field cron expression (`min hour dom mon dow`). The process waits until the next fire time, then posts. Combine with `--dry-run` to preview the resolved schedule without waiting |
 | `--include-blockers` | boolean | `false` | Highlight blocked rows with a 🚨 marker in every format so impediments stand out at a glance |
 | `--team <list>` | string | — | Filter the standup to items assigned to the given members (comma list, e.g. `alice,bob`); items with no assignee are hidden |
+| `--include-decisions` | boolean | `false` | Append declared public decision requests, deadlines, alternatives and acknowledgment links |
 | `--compact` | boolean | `false` | Render a shorter one-line-per-section standup (titles only, no per-item bullets / grouping sub-headers, empty sections omitted) |
 
 > **Note on `text`:** the legacy `--format text` value is still accepted as an alias for `plain`.
@@ -350,6 +351,24 @@ This compiles `index.ts` to `dist/index.js`.
 ```bash
 npm run dev   # watch mode
 ```
+
+## Decision requests
+
+Use `pm standup decisions` for compact TOON, or `pm standup decisions --json`
+for an agent-readable JSON report. Add `--include-decisions` to a standup or
+export to show declared requests with alternatives, response deadlines, canonical
+evidence and acknowledgment links. Only Decision items tagged
+`standup-decision-request` with an explicit versioned body declaration qualify.
+Closed, complete, and superseded requests disappear; private alternatives stay withheld.
+The SDK exports `collectDecisionRequests`, its typed contracts, and actionable
+`DecisionRequestRefusal` errors. See the [schema, CLI and SDK example](docs/decision-requests.md).
+
+## Without git
+
+Standup previews, decision reports, exports and Slack posts work from a plain
+initialized tracker with no Git executable. Slack posting needs a webhook and
+network access; previews and decision reports only read tracker data. Package
+release and GitHub workflows need a Git repository.
 
 ## How It Works
 
