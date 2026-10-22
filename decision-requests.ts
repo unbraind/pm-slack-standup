@@ -118,13 +118,14 @@ function declaration(item: PmItem): DecisionRequestDeclaration {
   const alternatives = parsed.alternatives;
   const deadline = parsed.responseBy;
   if (parsed.state !== "pending" || parsed.disclosure !== "public" || !label(parsed.prompt)
-    || !["human", "agent", "either"].includes(String(parsed.audience))
+    || (parsed.audience !== "human" && parsed.audience !== "agent" && parsed.audience !== "either")
     || typeof deadline !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(deadline)
     || !Number.isFinite(Date.parse(deadline)) || new Date(deadline).toISOString() !== deadline
     || !Array.isArray(parsed.evidence) || parsed.evidence.length < 1 || parsed.evidence.length > 3 || !parsed.evidence.every(link)
     || !link(parsed.acknowledgeAt) || (parsed.acknowledgment !== undefined && !link(parsed.acknowledgment))
     || !Array.isArray(alternatives) || alternatives.length < 2 || alternatives.length > 6
-    || !alternatives.every((entry: unknown) => record(entry) && label(entry.label) && ["public", "private"].includes(String(entry.disclosure)))) {
+    || !alternatives.every((entry: unknown) => record(entry) && label(entry.label)
+      && (entry.disclosure === "public" || entry.disclosure === "private"))) {
     throw new DecisionRequestRefusal("invalid_request", remedy, item.id);
   }
   return parsed as unknown as DecisionRequestDeclaration;

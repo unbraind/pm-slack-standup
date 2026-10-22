@@ -107,6 +107,22 @@ test("invalid options and declarations have typed, actionable refusals with no p
   }
 });
 
+for (const field of ["audience", "alternative disclosure"] as const) {
+  test(`${field} rejects non-string declaration enums through the item refusal`, () => {
+    const allowed = field === "audience" ? ["human", "agent", "either"] : ["public", "private"];
+    const invalid: unknown[] = [...allowed.map((value) => [value]), ...allowed.map((value) => [[value]]),
+      [], {}, { toString: null }, { toString: "human" }, undefined, null, true, false, 0, 1];
+    for (const value of invalid) {
+      const change = field === "audience" ? { audience: value } : { alternatives: [
+        { label: "Safe option", disclosure: "public" }, { label: "SECRET option", disclosure: value },
+      ] };
+      assert.throws(() => collectDecisionRequests([item(declaration(change))]), (error: unknown) =>
+        error instanceof DecisionRequestRefusal && error.itemId === "decision-1" && error.code === "invalid_request"
+        && error.exitCode === 2 && !error.message.includes("SECRET"), `${field}: ${JSON.stringify(value)}`);
+    }
+  });
+}
+
 test("periodic text and Block Kit carry only public alternatives and safe acknowledgment links", () => {
   const { opts } = resolveStandupOptions({ includeDecisions: true }, "plain");
   const value = declaration({ prompt: "Choose <route> & @channel 😀", audience: "either" });

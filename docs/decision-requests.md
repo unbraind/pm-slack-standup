@@ -45,7 +45,9 @@ response. Acknowledgment alone does not resolve the request. Update its state
 to `closed` or `superseded`, or close/cancel the Decision item, to remove it.
 Deadlines do not auto-close requests: overdue requests remain visible first.
 
-`audience` is `human`, `agent`, or `either`. `responseBy` is an exact UTC ISO
+`audience` is `human`, `agent`, or `either`. Audience and disclosure values must
+be strings; arrays, objects, and other JSON shapes produce an item-scoped typed
+refusal without string coercion. `responseBy` is an exact UTC ISO
 instant with milliseconds. Public labels and prompts are nonempty single-line
 strings of at most 160 UTF-16 units; alternatives number 2–6. Evidence has 1–3
 credential-free HTTPS URLs, each at most 512 units; acknowledgment links use the
