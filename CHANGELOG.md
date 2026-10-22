@@ -2,9 +2,26 @@
 
 ## 2026.10.21 - 2026-10-21
 
+### Changed
+
+- Adopt pm-github 2026.10.16: default-branch-safe gated sync and daily gated closeout PRs ([pm-slack-standup-0bdz](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-0bdz.toon))
+- Enable the gated GitHub issue sync and drop the braces chain ([pm-slack-standup-maint1014](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-maint1014.toon))
+
 ### Fixed
 
+- Propagate the docstring gate entry guard fix ([pm-slack-standup-9d6m](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-9d6m.toon))
+- Track published pm-github apply-path limitations exposed by certification review ([pm-slack-standup-bhg0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bhg0.toon))
+- Check external action pin properties without freezing Dependabot revisions ([pm-slack-standup-6wvl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-6wvl.toon))
 - Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
+
+### Security
+
+- Restore a clean full audit after the unpatched braces advisory is resolved ([pm-slack-standup-2sjh](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-2sjh.toon))
+
+### Other
+
+- Enable GitHub CodeQL code scanning ([pm-slack-standup-52od](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-52od.toon))
+- Certify pm-slack-standup on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates ([pm-slack-standup-74w8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-74w8.toon))
 
 ## 2026.10.14 - 2026-10-14
 

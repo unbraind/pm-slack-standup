@@ -2,10 +2,19 @@ id: pm-slack-standup-bhg0
 title: Track published pm-github apply-path limitations exposed by certification review
 description: "PR #105 Greptile statically identified cancellation status omission, repeated export duplicates and duplicate project drafts after partially failed status/tag updates in installed pm-github 2026.10.4. Generated runtime payload is excluded from consumer Git scope. Canonical upstream fixes and synthetic write acceptance remain separate; this task authorizes only read-only sync preview, which was zero-case."
 type: Issue
-status: open
+status: closed
 priority: 1
 tags: []
 created_at: "2026-10-04T12:10:50.275Z"
-updated_at: "2026-10-04T12:10:50.275Z"
+updated_at: "2026-10-22T11:17:12.445Z"
+closed_at: "2026-10-21T18:57:44.638Z"
+completed_at: "2026-10-21T18:57:44.638Z"
 author: codex-sol
+release: 2026.10.21
+dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
+  pmc-xndl,related,"2026-10-21T18:56:47.836Z",codex-agent,global,detected
+comments[2]{created_at,author,text}:
+  "2026-10-21T18:55:52.588Z",codex-agent,"author=codex-agent,\"text=Authorized tracker reconciliation, audit 2026-10-21. Reverified current main 765b440ce656: canonical pmc-xndl exists and audit overlap remains unchanged; source tree exactly matches the audited snapshot. **Track published pm-github apply-path limitations exposed by certification review.** Canonical id: pmc-xndl in pm-changelog. Both consumer reports enumerate the same five pm-github export/project apply-path limitations; fixes belong in pm-github, not separate standup implementation. Canonical item: pmc-xndl (https://github.com/unbraind/pm-changelog/blob/main/.agents/pm/issues/pmc-xndl.toon).\""
+  "2026-10-22T11:17:12.443Z",codex-agent,"Review evidence clarification for PR #141: this consumer description originally lists three apply-path limitations (cancellation omission, repeat-export duplicates and project-draft duplication). All three are covered by the five limitations in canonical pmc-xndl, whose current status is open. The duplicate closure and release association record tracking consolidation only; they do not claim upstream fixes or synthetic write-path acceptance. Earlier comments remain in append-only history."
+close_reason: duplicate of pmc-xndl
 body: ""
