@@ -6,10 +6,12 @@ status: in_progress
 priority: 2
 tags[3]: added,decisions,standup
 created_at: "2026-10-21T20:31:22.856Z"
-updated_at: "2026-10-22T13:42:04.460Z"
+updated_at: "2026-10-22T15:32:09.898Z"
+assignee: codex-agent
+claim_principal: codex-agent
 author: codex-agent
 acceptance_criteria: Only declared requests appear; closed and superseded decisions disappear deterministically; private alternatives respect disclosure policy. Typed SDK and CLI provide bounded TOON/JSON with typed refusals and remedies; README and example; non-git public tracker validation; npm and Bun CI release gates.
-comments[17]{created_at,author,text}:
+comments[20]{created_at,author,text}:
   "2026-10-21T20:31:41.362Z",codex-agent,"Overlap rechecked against CLI 2026.10.21 and pinned SDK 2026.10.17: core plan decision stores text, rationale and evidence; pm-brief decisionsNeeded selects active Decision items for general context; pm-slack owns notification transport. No existing explicit decision-request standup contract was found. This feature owns periodic presentation and acknowledgment linkage only. Reconciliation PR #141 items are excluded. Plan: an explicit standup-decision-request tag plus a versioned declaration in the item body; public-only alternative disclosure, terminal/superseded suppression, deterministic bounded SDK and CLI reports, opt-in standup section, non-git regressions and public tracker copy validation. Dependency pins stay unchanged."
   "2026-10-21T20:37:56.113Z",codex-agent,"Implemented public typed declaration/report/refusal contracts, read-only standup decisions command, and opt-in periodic sections. Limits: at most 10 rows, default compact JSON projection budget 8192 bytes, whole-row omissions with counts and remedy. Tagged requests are excluded from ordinary work buckets when enabled so JSON exports cannot copy private alternatives from source bodies. Deadlines and IDs define ordering; terminal states suppress obsolete declarations. Local targeted checks and real no-git lifecycle tests are being verified; CI runs both npm and Bun full release gates without lowering thresholds."
   "2026-10-21T20:39:54.308Z",codex-agent,"Read-only public snapshot validation at main 765b440ce656692c73bbcbafb5102ac3b3c8324b: 96 complete items (5 in_progress, 5 open, 84 closed, 2 canceled), 2 Decision items, 0 explicitly declared requests, 0 emitted/omitted. Compact JSON report 201 bytes; full plain standup 8172 bytes. All 198 copied tracker files remained SHA-256 identical. Copy had no git directory; source files were read-only. Positive SDK/registered CLI tests use a separate initialized non-git tracker and a PATH with Node and pm only. Targeted new-module c8 evidence: 100% statements/branches/functions/lines, 5/5 tests."
@@ -27,18 +29,36 @@ comments[17]{created_at,author,text}:
   "2026-10-22T13:12:33.700Z",codex-agent,"Round 2 regression proof for PRRT_kwDOTbNzVM6vMWp8: the two new non-string enum tests first failed 0/2 on the pre-fix code, accepting singleton arrays instead of refusing. After direct original-value comparisons, the complete decision suite passed 7/7, including real non-git SDK/CLI lifecycle tests. Independently restored only the audience coercion guard: selected audience regression failed 0/1 with Missing expected exception. Restored the fix, then restored only the alternative disclosure coercion guard: its selected regression failed 0/1. Fixed source restored byte-identically in finally blocks; targeted restored tests pass 2/2 and the pinned linked runner passes 2/2. Arrays, nested arrays, objects with null or non-callable toString, undefined/null, booleans and numbers all produce item-scoped invalid_request, exit 2, without secret labels in the error. Whole-PR same-class review confirmed other declaration fields validate original values and contain no further enum coercion. Rebuilt committed dist and updated the packaged schema documentation; pins and thresholds unchanged."
   "2026-10-22T13:33:58.407Z",codex-agent,"Round 2 local gates: clean-identity npm run release:check passed 272/272, zero failures/skips/canceled/todo, all 12 runtime sources at 100 percent statements/branches/functions/lines, canonical-reader 1/1, all 5 packed scenarios, and every remaining release check. The first Bun full gate passed 271/272; only the existing inherited-npm_execpath packed matrix reached its unchanged 290-second subprocess deadline (ETIMEDOUT). All source coverage dimensions were 100 percent and both new enum tests passed. This same matrix passed in the npm gate. Retry only the failed full Bun gate with the existing package cache and clean Git identity; no assertion, timeout, dependency or threshold change."
   "2026-10-22T13:42:03.310Z",codex-agent,"Round 2 acceptance complete: clean-identity npm run release:check and bun run release:check both passed locally on Node 26.12.0, each 272/272 tests with zero failures/skips/canceled/todo, all 12 runtime sources at 100 percent statements/branches/functions/lines, canonical-reader 1/1, and all 5 packed npm/Bun current/minimum/global scenarios. Both gates passed typecheck, lint, build, zero duplication (0/9805 lines), 102 documented declarations, zero production vulnerabilities, package/changelog/date/attestation checks. The first Bun attempt had one inherited-npm_execpath ETIMEDOUT at its existing 290-second limit; the full retry passed with the existing package cache. No assertions, timeouts, thresholds or dependencies changed. Two independent revert proofs and 7/7 focused plus 2/2 linked results are recorded above. Committed dist is rebuilt. No new pm CLI/SDK API defect observed; existing project policy disables linked-test result persistence. Leave in progress and release ownership for orchestrator verification."
-files[6]{path,scope,note}:
-  .gitattributes,project,Pinned merge installer extension fence required for strict health
-  .github/workflows/ci.yml,project,Full npm and Bun CI release gates
-  decision-requests.ts,project,Typed presentation implementation
-  index.ts,project,CLI and renderer integration
-  test/decision-requests.test.ts,project,Lifecycle privacy and non-git regressions
-  test/smoke.test.ts,project,Registered command and preflight scope contract
-tests[4]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  "2026-10-22T15:15:05.001Z",codex-agent,"Review round 3: upstream and worktree clean at 1759c44; main is contained. Read all comments in every unresolved thread and latest CodeRabbit body with no pagination gaps or outside-diff findings. Two valid findings: PRRT_kwDOTbNzVM6vQFWf documents build:test although it emits no dist, and PRRT_kwDOTbNzVM6vQFWv reads the tracker before validating decision bounds. Add the production build to the documented standalone sequence; validate parsed options through collectDecisionRequests before the canonical read, retaining one source of bounds rules. Add real non-git failing-reader regression and demonstrate documented build necessity in an isolated source copy. Preserve earlier reviewed fixes and PR #141."
+  "2026-10-22T15:20:38.861Z",codex-agent,"Round 3 regression proofs: removing only the handler precheck makes the retained option regression fail 0/1 because an actual strict canonical read of a corrupted item overrides invalid_options. Fixed handler restores all eight invalid string-bound cases to typed invalid_options, exit 2, no item ID; valid bounds still surface the source failure. Removing only npm run build from the validation guide makes its integration regression fail 0/1 with TS2307: build:test imports dist through the public consumer fixture. The build must precede build:test as well as standalone execution. Both fixed files restored byte-identically in finally blocks. Focused node --test test/decision-requests.test.ts test/decision-validation-guide.test.ts passes 9/9, no failures/skips/canceled/todo; linked selected regressions pass 2/2. The guide regression copies actual source/configuration into a fresh non-git directory without dist, executes every documented command and requires nonempty successful child-test receipts with inherited runner context removed. Whole-PR review found no other instance: package test/coverage scripts already build first, CI checks committed dist, standup/export resolve presentation options before source reads, and the SDK example supplies fixed valid bounds. npm ci passed 165 packages added, 206 audited, zero vulnerabilities. Full npm and Bun release gates follow at unchanged thresholds."
+  "2026-10-22T15:32:09.885Z",codex-agent,"Round 3 local npm release gate: 272/274 passed, zero skips/canceled/todo. Only the two existing packed acceptance matrices (npm_execpath inherited and unset) failed, each ETIMEDOUT at its unchanged 290-second subprocess bound. Both new regressions passed, including the documentation recipe executing actual child tests. Whole-source coverage is incomplete (98.2 statements/lines, 99.83 branches, 99.29 functions) because packed acceptance paths timed out; the decision module itself is 100 percent in all four dimensions. Do not claim local full release acceptance. Full Bun gate is being attempted separately. Push the code, rebuilt dist and these honest receipts for CI verification of both complete release gates at the exact code head, with all 100 percent thresholds, assertions and timeouts retained."
+files[7]:
+  - path: .gitattributes
+    scope: project
+    note: Pinned merge installer extension fence required for strict health
+  - path: .github/workflows/ci.yml
+    scope: project
+    note: Full npm and Bun CI release gates
+  - path: decision-requests.ts
+    scope: project
+    note: Typed presentation implementation
+  - path: index.ts
+    scope: project
+    note: CLI and renderer integration
+  - path: test/decision-requests.test.ts
+    scope: project
+    note: Lifecycle privacy and non-git regressions
+  - path: test/decision-validation-guide.test.ts
+    scope: project
+  - path: test/smoke.test.ts
+    scope: project
+    note: Registered command and preflight scope contract
+tests[5]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test test/decision-requests.test.ts,project,codex-agent,"2026-10-21T20:37:52.251Z",local_mutation,feat/decision-request-sections
   node --test test/smoke.test.ts,project,codex-agent,"2026-10-21T20:48:37.866Z",local_mutation,feat/decision-request-sections
   node --test --test-name-pattern='only declared|deadline and ID|invalid options|periodic text' test/decision-requests.test.ts,project,pi-agent,"2026-10-22T09:42:24.954Z",local_mutation,feat/decision-request-sections
   node --test --test-name-pattern='non-string declaration enums' test/decision-requests.test.ts,project,codex-agent,"2026-10-22T13:12:31.211Z",local_mutation,feat/decision-request-sections
+  node --test --test-name-pattern='decision options refuse|documented decision verification' test/decision-requests.test.ts test/decision-validation-guide.test.ts,project,codex-agent,"2026-10-22T15:18:39.817Z",local_mutation,feat/decision-request-sections
 docs[3]{path,scope,note}:
   docs/decision-requests-validation.md,project,Measured public tracker copy validation
   docs/decision-requests.md,project,Schema and CLI SDK examples

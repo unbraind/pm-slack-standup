@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, symlinkSync } from "node:fs";
+import { cpSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
   collectDecisionRequests, renderDecisionRequests, DecisionRequestRefusal, DECISION_REQUEST_TAG,
@@ -227,6 +227,22 @@ test("real SDK and registered CLI read and suppress requests in a non-git tracke
     if (oldCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = oldCeiling;
     await removeRuntimeFixture(fixture);
   }
+});
+
+test("decision options refuse before a failing non-git tracker read", async () => {
+  const fixture = await runtimeFixture();
+  try {
+    writeFileSync(join(fixture.pmRoot, "issues", "runtime-invalid.toon"), "id: [broken\n");
+    assert.throws(() => fetchAllItems(fixture.pmRoot), /pm list --all failed/);
+    for (const options of [{ limit: "no" }, { limit: "0" }, { limit: "11" }, { limit: "1.5" },
+      { outputBytes: "no" }, { outputBytes: "511" }, { outputBytes: "32769" }, { outputBytes: "512.5" }]) {
+      await assert.rejects(runtimeCommand(fixture, "standup decisions", options), (error: unknown) =>
+        error instanceof DecisionRequestRefusal && error.code === "invalid_options" && error.exitCode === 2
+        && error.itemId === undefined);
+    }
+    await assert.rejects(runtimeCommand(fixture, "standup decisions", { limit: "1", outputBytes: "512" }),
+      /pm list --all failed/);
+  } finally { await removeRuntimeFixture(fixture); }
 });
 
 // Compile-time consumer proof: the SDK declaration is importable from the public package entry.

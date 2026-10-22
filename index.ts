@@ -2569,10 +2569,12 @@ export default defineExtension({
       ],
       /** Read a complete tracker through the existing canonical reader; no git is required. */
       run(ctx: CommandHandlerContext) {
-        return collectDecisionRequests(fetchAllItems(ctx.pm_root), {
+        const options = {
           limit: Number(readStrOption(ctx.options, "limit") ?? 10),
           outputBytes: Number(readStrOption(ctx.options, "output-bytes") ?? 8192),
-        });
+        };
+        collectDecisionRequests([], options);
+        return collectDecisionRequests(fetchAllItems(ctx.pm_root), options);
       },
     });
 

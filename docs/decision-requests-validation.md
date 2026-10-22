@@ -35,6 +35,7 @@ Targeted verification:
 
 ```sh
 npm run typecheck
+npm run build
 npm run build:test
 npm run lint
 npm run docstring
