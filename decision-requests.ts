@@ -85,7 +85,7 @@ function record(value: unknown): value is Record<string, unknown> {
 
 /** Bound public display strings and disallow multiline/control-character injection. */
 function label(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0 && value.length <= 160 && !/[\u0000-\u001f\u007f]/u.test(value);
+  return typeof value === "string" && value.trim().length > 0 && value.length <= 160 && !/[\p{Cc}\u2028\u2029]/u.test(value);
 }
 
 /** Require credential-free canonical HTTPS links, including optional evidence anchors. */
@@ -93,7 +93,7 @@ function link(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 512) return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password && !/[\s<>|]/u.test(value);
+    return url.protocol === "https:" && !url.username && !url.password && !/[\s<>|\p{Cc}]/u.test(value);
   } catch { return false; }
 }
 
@@ -105,7 +105,7 @@ export function isDecisionRequestItem(item: PmItem): boolean {
 /** Read one explicit declaration; fail closed rather than emitting an incomplete request. */
 function declaration(item: PmItem): DecisionRequestDeclaration {
   const blocks = [...(item.body ?? "").matchAll(/^```standup-decision-request\r?\n([\s\S]*?)\r?\n```\s*$/gmu)];
-  const remedy = "Use one standup-decision-request JSON fence matching the README schema; explicitly classify every alternative and link only approved public evidence.";
+  const remedy = "Use one standup-decision-request JSON fence matching the schema in docs/decision-requests.md; explicitly classify every alternative and link only approved public evidence.";
   let parsed: unknown;
   try {
     if (blocks.length !== 1) throw new Error();

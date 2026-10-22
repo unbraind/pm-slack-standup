@@ -53,6 +53,8 @@ strings of at most 160 UTF-16 units; alternatives number 2â€“6. Evidence has 1â€
 credential-free HTTPS URLs, each at most 512 units; acknowledgment links use the
 same rule. Only publish URLs and labels approved for public disclosure. URL
 validation cannot determine whether the linked resource is public.
+Prompts, labels, and URLs reject C0, DEL, and C1 control characters and Unicode
+line/paragraph separators.
 
 The request must explicitly declare `disclosure: public`. A private declaration
 is withheld entirely. Every alternative must explicitly declare `public` or

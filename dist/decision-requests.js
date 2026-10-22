@@ -37,7 +37,7 @@ function record(value) {
 }
 /** Bound public display strings and disallow multiline/control-character injection. */
 function label(value) {
-    return typeof value === "string" && value.trim().length > 0 && value.length <= 160 && !/[\u0000-\u001f\u007f]/u.test(value);
+    return typeof value === "string" && value.trim().length > 0 && value.length <= 160 && !/[\p{Cc}\u2028\u2029]/u.test(value);
 }
 /** Require credential-free canonical HTTPS links, including optional evidence anchors. */
 function link(value) {
@@ -45,7 +45,7 @@ function link(value) {
         return false;
     try {
         const url = new URL(value);
-        return url.protocol === "https:" && !url.username && !url.password && !/[\s<>|]/u.test(value);
+        return url.protocol === "https:" && !url.username && !url.password && !/[\s<>|\p{Cc}]/u.test(value);
     }
     catch {
         return false;
@@ -58,7 +58,7 @@ export function isDecisionRequestItem(item) {
 /** Read one explicit declaration; fail closed rather than emitting an incomplete request. */
 function declaration(item) {
     const blocks = [...(item.body ?? "").matchAll(/^```standup-decision-request\r?\n([\s\S]*?)\r?\n```\s*$/gmu)];
-    const remedy = "Use one standup-decision-request JSON fence matching the README schema; explicitly classify every alternative and link only approved public evidence.";
+    const remedy = "Use one standup-decision-request JSON fence matching the schema in docs/decision-requests.md; explicitly classify every alternative and link only approved public evidence.";
     let parsed;
     try {
         if (blocks.length !== 1)

@@ -100,11 +100,32 @@ test("invalid options and declarations have typed, actionable refusals with no p
     { alternatives: [{ label: "valid", disclosure: "public" }, { label: "", disclosure: "private" }] },
   ];
   for (const change of changes) assert.throws(() => collectDecisionRequests([item(declaration(change))]), (error: unknown) =>
-    error instanceof DecisionRequestRefusal && error.code === "invalid_request" && error.remedy.includes("README")
+    error instanceof DecisionRequestRefusal && error.code === "invalid_request" && error.remedy.includes("docs/decision-requests.md")
     && error.message.includes("for item decision-1") && !error.message.includes("SECRET") && !error.message.includes("Choose the release route"));
   for (const malformed of [undefined, "", "```standup-decision-request\n{invalid}\n```", body(declaration()) + "\n" + body(declaration())]) {
     assert.throws(() => collectDecisionRequests([item(undefined, { body: malformed })]), DecisionRequestRefusal);
   }
+});
+
+test("declaration links and labels reject terminal controls and line separators without echoing payloads", () => {
+  const forbidden = [...Array.from({ length: 0xa0 }, (_, code) => code).filter((code) => code <= 0x1f || code >= 0x7f),
+    0x2028, 0x2029];
+  for (const code of forbidden) {
+    const control = String.fromCharCode(code);
+    const url = `https://example.org/${control}[2J`;
+    const text = `SECRET${control}option`;
+    const changes = [{ evidence: [url] }, { acknowledgeAt: url }, { acknowledgment: url }, { prompt: text },
+      { alternatives: [{ label: "Public option", disclosure: "public" }, { label: text, disclosure: "private" }] }];
+    for (const change of changes) {
+      assert.throws(() => collectDecisionRequests([item(declaration(change))]), (error: unknown) =>
+        error instanceof DecisionRequestRefusal && error.code === "invalid_request" && error.exitCode === 2
+        && error.itemId === "decision-1" && !error.message.includes(control) && !error.message.includes("SECRET"),
+      `control U+${code.toString(16)} in ${Object.keys(change)[0]}`);
+    }
+  }
+  const safe = collectDecisionRequests([item(declaration({ prompt: "Choose café 😀", evidence: ["https://example.org/%1B%5B2J"] }))]);
+  assert.equal(safe.requests[0].prompt, "Choose café 😀");
+  assert.deepEqual(safe.requests[0].evidence, ["https://example.org/%1B%5B2J"]);
 });
 
 for (const field of ["audience", "alternative disclosure"] as const) {
@@ -178,7 +199,7 @@ test("real SDK and registered CLI read and suppress requests in a non-git tracke
     const created = await fixture.client.create({ type: "Decision", title: "Explicit release input", tags: DECISION_REQUEST_TAG, body: body(declaration()) });
     const cli = resolve("node_modules/@unbrained/pm-cli/dist/cli.js");
     const source = join(fixture.directory, "extension-source"); mkdirSync(source);
-    for (const file of ["dist", "package.json", "manifest.json", "README.md"]) cpSync(resolve(file), join(source, file), { recursive: true });
+    for (const file of ["dist", "docs", "package.json", "manifest.json", "README.md"]) cpSync(resolve(file), join(source, file), { recursive: true });
     execFileSync(process.execPath, [cli, "--path", fixture.pmRoot, "package", "install", source, "--project"], {
       cwd: fixture.directory, encoding: "utf8", env: { ...process.env, PM_GLOBAL_PATH: join(fixture.directory, "global") },
     });
@@ -218,9 +239,13 @@ test("real SDK and registered CLI read and suppress requests in a non-git tracke
     await fixture.client.close(created.item.id, "Synthetic decision resolved");
     assert.equal((await runtimeCommand(fixture, "standup decisions")).total, 0);
     const invalid = await fixture.client.create({ type: "Decision", title: "Invalid declared request", tags: DECISION_REQUEST_TAG, body: "invalid" });
-    assert.throws(() => execFileSync(process.execPath, [...args, "--json"], { ...cliOptions, stdio: "pipe" }),
-      (error: unknown) => error instanceof Error && "status" in error && error.status === 2 && "stderr" in error
-        && String(error.stderr).includes(`for item ${invalid.item.id}`));
+    for (const invalidBody of ["invalid", body(declaration({ evidence: ["https://example.org/\u001b[2J"] }))]) {
+      await fixture.client.update(invalid.item.id, { body: invalidBody });
+      assert.throws(() => execFileSync(process.execPath, [...args, "--json"], { ...cliOptions, stdio: "pipe" }),
+        (error: unknown) => error instanceof Error && "status" in error && error.status === 2 && "stderr" in error
+          && String(error.stderr).includes(`for item ${invalid.item.id}`)
+          && String(error.stderr).includes("docs/decision-requests.md") && !String(error.stderr).includes("\u001b"));
+    }
     await assert.rejects(runtimeCommand(fixture, "standup decisions"), DecisionRequestRefusal);
   } finally {
     if (oldPath === undefined) delete process.env.PATH; else process.env.PATH = oldPath;
