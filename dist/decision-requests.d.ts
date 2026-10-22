@@ -39,7 +39,11 @@ export interface DecisionRequestReport {
 }
 /** Machine-readable refusal codes, independent of CLI wording. */
 export type DecisionRequestRefusalCode = "invalid_options" | "invalid_request" | "unsupported_version";
-/** Typed CLI/SDK refusal; messages never interpolate declaration values. */
+/**
+ * Typed CLI/SDK refusal.
+ * The message names the canonical item id when one is known, because the CLI
+ * prints only `message`, and never interpolates declaration values.
+ */
 export declare class DecisionRequestRefusal extends Error {
     /** Usage failure understood by the extension command runtime. */
     readonly exitCode = 2;

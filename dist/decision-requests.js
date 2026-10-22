@@ -1,6 +1,10 @@
 /** Explicit opt-in tag; ordinary Decision items never become requests implicitly. */
 export const DECISION_REQUEST_TAG = "standup-decision-request";
-/** Typed CLI/SDK refusal; messages never interpolate declaration values. */
+/**
+ * Typed CLI/SDK refusal.
+ * The message names the canonical item id when one is known, because the CLI
+ * prints only `message`, and never interpolates declaration values.
+ */
 export class DecisionRequestRefusal extends Error {
     /** Usage failure understood by the extension command runtime. */
     exitCode = 2;
@@ -11,14 +15,22 @@ export class DecisionRequestRefusal extends Error {
     /** Canonical item to repair, absent for option refusals. */
     itemId;
     constructor(code, remedy, itemId) {
-        super(`Decision requests refused (${code}). ${remedy}`);
+        const subject = itemId === undefined
+            ? `Decision requests refused (${code})`
+            : `Decision requests refused (${code}) for item ${itemId}`;
+        super(`${subject}. ${remedy}`);
         this.name = "DecisionRequestRefusal";
         this.code = code;
         this.remedy = remedy;
         this.itemId = itemId;
     }
 }
-const terminal = new Set(["closed", "done", "completed", "canceled", "cancelled", "superseded", "archived", "resolved", "rejected"]);
+/**
+ * Item states that suppress a request before payload validation.
+ * Includes the standup done alias `complete` so a finished Decision cannot
+ * abort the report when its old declaration is incomplete.
+ */
+const terminal = new Set(["closed", "done", "complete", "completed", "canceled", "cancelled", "superseded", "archived", "resolved", "rejected"]);
 /** Narrow untrusted JSON without asserting a declaration shape. */
 function record(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -93,7 +105,7 @@ export function collectDecisionRequests(items, options = {}) {
     }
     const requests = [];
     for (const item of items) {
-        if (!isDecisionRequestItem(item) || terminal.has(item.status.toLowerCase()))
+        if (!isDecisionRequestItem(item) || terminal.has(item.status.trim().toLowerCase()))
             continue;
         const value = declaration(item);
         if (value.state !== "pending" || value.disclosure !== "public")

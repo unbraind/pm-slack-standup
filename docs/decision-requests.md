@@ -58,8 +58,9 @@ is withheld entirely. Every alternative must explicitly declare `public` or
 the withheld count appears. Titles, general body prose, and unknown fields are
 never copied into the decision section. Declared requests are excluded from
 ordinary work buckets even when the optional section is disabled. JSON exports
-never contain their source bodies; `--include-decisions` adds their public projection. Terminal item states and terminal
-request states suppress a request before validating obsolete payload details.
+never contain their source bodies; `--include-decisions` adds their public projection. Terminal item states
+(including the standup done alias `complete`, compared after trimming) and terminal request states suppress a
+request before validating obsolete payload details.
 Untagged decisions are ignored, including malformed old notes. A malformed
 active declaration refuses the entire report instead of silently dropping it.
 
@@ -94,5 +95,8 @@ try {
 `DecisionRequestRefusal` carries `exitCode: 2`, `code`, `remedy`, and optional
 `itemId`. Codes are `invalid_options` (use documented bounds), `invalid_request`
 (repair the declaration), and `unsupported_version` (use version 1 or a compatible
-package). The CLI fails nonzero with the remedy; SDK consumers retain the typed
-properties. The canonical reader separately refuses incomplete tracker reads.
+package). The CLI fails nonzero with the remedy; when `itemId` is set the message
+names that item, because the command runtime prints only the message. SDK consumers
+retain the typed properties. The canonical reader separately refuses incomplete tracker reads.
+Block Kit decision sections are plain text and split only on line boundaries, so an
+evidence or acknowledgment URL is never divided across blocks.

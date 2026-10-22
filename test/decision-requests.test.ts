@@ -33,7 +33,8 @@ function item(value: unknown = declaration(), overrides: Partial<PmItem> = {}): 
 test("only declared active requests appear; disclosure and lifecycle suppression are deterministic", () => {
   const active = item(declaration({ acknowledgment: "https://example.org/ack", audience: "agent" }));
   const inputs = [active, item(null, { tags: [] }), item(null, { type: "Task" }), item(null, { type: undefined }),
-    item(null, { tags: undefined }), ...["closed", "done", "completed", "canceled", "cancelled", "superseded", "archived", "resolved", "rejected"]
+    item(null, { tags: undefined }), ...["closed", "done", "complete", "completed", "canceled", "cancelled", "superseded", "archived", "resolved", "rejected",
+      " COMPLETE ", " closed"]
       .map((status) => item(null, { status })),
     item({ version: 1, state: "closed" }), item({ version: 1, state: "superseded" }), item({ version: 1, disclosure: "private" })];
   const report = collectDecisionRequests(inputs);
@@ -50,6 +51,7 @@ test("only declared active requests appear; disclosure and lifecycle suppression
   assert.equal(collectDecisionRequests([item(declaration({ alternatives: [
     { label: "secret one", disclosure: "private" }, { label: "secret two", disclosure: "private" },
   ] }))]).requests[0].alternatives.length, 0);
+  assert.equal(collectDecisionRequests([item(declaration(), { status: " open" })]).total, 1);
 });
 
 test("deadline and ID ordering, complete-row byte budgets and row caps retain honest omissions", () => {
@@ -67,13 +69,20 @@ test("deadline and ID ordering, complete-row byte budgets and row caps retain ho
   assert.equal(bounded.requests.length, 1);
   assert.equal(bounded.omitted, 2);
   assert.match(bounded.remedy, /--output-bytes/);
+  // Three emoji prompts are 1328 UTF-16 units but 1748 UTF-8 bytes. A collector that
+  // budgets with string length keeps two rows (952 units, 1232 bytes) and fails this bound.
+  const wide = ["a", "b", "c"].map((id) => item(declaration({ prompt: "😀".repeat(70) }), { id }));
+  const wideReport = collectDecisionRequests(wide, { outputBytes: 1024 });
+  assert.ok(Buffer.byteLength(JSON.stringify(wideReport)) <= 1024);
+  assert.ok(wideReport.omitted > 0);
   assert.equal(collectDecisionRequests([]).total, 0);
 });
 
 test("invalid options and declarations have typed, actionable refusals with no private payload", () => {
   for (const options of [{ limit: 0 }, { limit: 11 }, { limit: 1.5 }, { limit: NaN }, { outputBytes: 511 }, { outputBytes: 32769 }, { outputBytes: NaN }]) {
     assert.throws(() => collectDecisionRequests([], options), (error: unknown) => error instanceof DecisionRequestRefusal
-      && error.code === "invalid_options" && error.exitCode === 2 && error.remedy.includes("Use --") && error.itemId === undefined);
+      && error.code === "invalid_options" && error.exitCode === 2 && error.remedy.includes("Use --") && error.itemId === undefined
+      && !error.message.includes("for item"));
   }
   for (const value of [null, [], 1, { version: 2 }]) {
     assert.throws(() => collectDecisionRequests([item(value)]), (error: unknown) => error instanceof DecisionRequestRefusal
@@ -91,7 +100,8 @@ test("invalid options and declarations have typed, actionable refusals with no p
     { alternatives: [{ label: "valid", disclosure: "public" }, { label: "", disclosure: "private" }] },
   ];
   for (const change of changes) assert.throws(() => collectDecisionRequests([item(declaration(change))]), (error: unknown) =>
-    error instanceof DecisionRequestRefusal && error.code === "invalid_request" && error.remedy.includes("README") && !error.message.includes("SECRET"));
+    error instanceof DecisionRequestRefusal && error.code === "invalid_request" && error.remedy.includes("README")
+    && error.message.includes("for item decision-1") && !error.message.includes("SECRET") && !error.message.includes("Choose the release route"));
   for (const malformed of [undefined, "", "```standup-decision-request\n{invalid}\n```", body(declaration()) + "\n" + body(declaration())]) {
     assert.throws(() => collectDecisionRequests([item(undefined, { body: malformed })]), DecisionRequestRefusal);
   }
@@ -128,6 +138,20 @@ test("periodic text and Block Kit carry only public alternatives and safe acknow
       assert.equal(Buffer.from((block.text as { text: string }).text).toString(), (block.text as { text: string }).text);
     }
   }
+  const evidenceUrl = "https://example.org/" + "a".repeat(512 - "https://example.org/".length);
+  const linked = collectDecisionRequests(["decision-0", "decision-1"].map((id) => item(declaration({
+    evidence: [evidenceUrl, evidenceUrl, evidenceUrl],
+  }), { id })), { outputBytes: 32768 });
+  const linkedBlocks = buildBlockKit({ ...data, decisions: linked }, opts).blocks
+    .flatMap((block) => block.type === "section" && "text" in block && (block.text as { type: string }).type === "plain_text"
+      ? [(block.text as { text: string }).text] : []);
+  const evidenceLine = `Evidence: ${evidenceUrl} ${evidenceUrl} ${evidenceUrl}`;
+  assert.ok(evidenceLine.length > 1200);
+  assert.ok(linkedBlocks.some((text) => text.includes(evidenceLine)));
+  assert.ok(linkedBlocks.some((text) => text.includes("Acknowledge: https://example.org/decision")));
+  assert.equal(linkedBlocks.join("\n"), renderDecisionRequests(linked, "plain"));
+  assert.ok(linkedBlocks.every((text) => text.length <= 2400));
+  assert.ok(linkedBlocks.length > 1);
 });
 
 test("real SDK and registered CLI read and suppress requests in a non-git tracker with no git on PATH", async () => {
@@ -177,7 +201,10 @@ test("real SDK and registered CLI read and suppress requests in a non-git tracke
     assert.equal((await runtimeCommand(fixture, "standup decisions")).total, 1);
     await fixture.client.close(created.item.id, "Synthetic decision resolved");
     assert.equal((await runtimeCommand(fixture, "standup decisions")).total, 0);
-    await fixture.client.create({ type: "Decision", title: "Invalid declared request", tags: DECISION_REQUEST_TAG, body: "invalid" });
+    const invalid = await fixture.client.create({ type: "Decision", title: "Invalid declared request", tags: DECISION_REQUEST_TAG, body: "invalid" });
+    assert.throws(() => execFileSync(process.execPath, [...args, "--json"], { ...cliOptions, stdio: "pipe" }),
+      (error: unknown) => error instanceof Error && "status" in error && error.status === 2 && "stderr" in error
+        && String(error.stderr).includes(`for item ${invalid.item.id}`));
     await assert.rejects(runtimeCommand(fixture, "standup decisions"), DecisionRequestRefusal);
   } finally {
     if (oldPath === undefined) delete process.env.PATH; else process.env.PATH = oldPath;

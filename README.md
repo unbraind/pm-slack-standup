@@ -359,7 +359,7 @@ for an agent-readable JSON report. Add `--include-decisions` to a standup or
 export to show declared requests with alternatives, response deadlines, canonical
 evidence and acknowledgment links. Only Decision items tagged
 `standup-decision-request` with an explicit versioned body declaration qualify.
-Closed and superseded requests disappear; private alternatives stay withheld.
+Closed, complete, and superseded requests disappear; private alternatives stay withheld.
 The SDK exports `collectDecisionRequests`, its typed contracts, and actionable
 `DecisionRequestRefusal` errors. See the [schema, CLI and SDK example](docs/decision-requests.md).
 

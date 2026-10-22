@@ -1799,9 +1799,24 @@ export function buildBlockKit(data: StandupData, opts: StandupOptions): { blocks
 
   if (data.decisions) {
     // Plain-text blocks avoid treating declaration text as Slack formatting or mentions.
-    const text = renderDecisionRequests(data.decisions, "plain");
-    for (const chunk of text.matchAll(/[\s\S]{1,1200}/gu)) {
-      blocks.push({ type: "section", text: { type: "plain_text", text: chunk[0], emoji: false } });
+    // Split only on line boundaries: a fixed code-point cut can divide an evidence,
+    // acknowledgment, or Acknowledge URL across two blocks. Declaration bounds keep
+    // each rendered line under this UTF-16 budget, which is also under Slack's 3000-unit cap.
+    const decisionBlockLimit = 2400;
+    const chunks: string[] = [];
+    let current = "";
+    for (const line of renderDecisionRequests(data.decisions, "plain").split("\n")) {
+      const next = current === "" ? line : `${current}\n${line}`;
+      if (current !== "" && next.length > decisionBlockLimit) {
+        chunks.push(current);
+        current = line;
+      } else {
+        current = next;
+      }
+    }
+    chunks.push(current);
+    for (const chunk of chunks) {
+      blocks.push({ type: "section", text: { type: "plain_text", text: chunk, emoji: false } });
     }
   }
 

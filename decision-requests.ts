@@ -42,7 +42,11 @@ export interface DecisionRequestReport {
 /** Machine-readable refusal codes, independent of CLI wording. */
 export type DecisionRequestRefusalCode = "invalid_options" | "invalid_request" | "unsupported_version";
 
-/** Typed CLI/SDK refusal; messages never interpolate declaration values. */
+/**
+ * Typed CLI/SDK refusal.
+ * The message names the canonical item id when one is known, because the CLI
+ * prints only `message`, and never interpolates declaration values.
+ */
 export class DecisionRequestRefusal extends Error {
   /** Usage failure understood by the extension command runtime. */
   readonly exitCode = 2;
@@ -53,7 +57,10 @@ export class DecisionRequestRefusal extends Error {
   /** Canonical item to repair, absent for option refusals. */
   readonly itemId?: string;
   constructor(code: DecisionRequestRefusalCode, remedy: string, itemId?: string) {
-    super(`Decision requests refused (${code}). ${remedy}`);
+    const subject = itemId === undefined
+      ? `Decision requests refused (${code})`
+      : `Decision requests refused (${code}) for item ${itemId}`;
+    super(`${subject}. ${remedy}`);
     this.name = "DecisionRequestRefusal";
     this.code = code;
     this.remedy = remedy;
@@ -64,7 +71,12 @@ export class DecisionRequestRefusal extends Error {
 /** Optional row cap; the hard maximum keeps periodic Slack messages and agent reports small. */
 export interface DecisionRequestOptions { limit?: number; outputBytes?: number }
 
-const terminal = new Set(["closed", "done", "completed", "canceled", "cancelled", "superseded", "archived", "resolved", "rejected"]);
+/**
+ * Item states that suppress a request before payload validation.
+ * Includes the standup done alias `complete` so a finished Decision cannot
+ * abort the report when its old declaration is incomplete.
+ */
+const terminal = new Set(["closed", "done", "complete", "completed", "canceled", "cancelled", "superseded", "archived", "resolved", "rejected"]);
 
 /** Narrow untrusted JSON without asserting a declaration shape. */
 function record(value: unknown): value is Record<string, unknown> {
@@ -134,7 +146,7 @@ export function collectDecisionRequests(items: readonly PmItem[], options: Decis
   }
   const requests: StandupDecisionRequest[] = [];
   for (const item of items) {
-    if (!isDecisionRequestItem(item) || terminal.has(item.status.toLowerCase())) continue;
+    if (!isDecisionRequestItem(item) || terminal.has(item.status.trim().toLowerCase())) continue;
     const value = declaration(item);
     if (value.state !== "pending" || value.disclosure !== "public") continue;
     const alternatives = value.alternatives.filter((entry) => entry.disclosure === "public").map((entry) => entry.label);
