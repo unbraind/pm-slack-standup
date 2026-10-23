@@ -1,0 +1,27 @@
+id: pm-slack-standup-defb
+title: Revalidate delivered decision-request sections on the current public tracker
+description: Refresh acceptance and real-data evidence for the existing decision-request feature delivered by PR #142 without duplicating its SDK or commands.
+type: Task
+status: in_progress
+priority: 2
+tags[2]: decisions,verification
+created_at: "2026-10-23T20:00:04.282Z"
+updated_at: "2026-10-23T20:02:48.264Z"
+author: codex-agent
+acceptance_criteria: "Only declared requests appear; closed/superseded decisions disappear deterministically; private alternatives respect disclosure policy. Verify typed SDK and CLI compact TOON/JSON, typed refusals with remedies, README and example, read-only non-git public tracker measurements, targeted local checks, and unchanged npm/Bun CI release gates."
+parent: pm-slack-standup-murn
+comments[4]{created_at,author,text}:
+  "2026-10-23T20:00:49.452Z",codex-agent,"Overlap check: PR #142 already delivered this scope on main; retain parent pm-slack-standup-murn and use this new child solely for requested current acceptance evidence. Core lifecycle/plan owns decisions, core query/next separates human-gated decisions, pm-brief owns general context and proposal comparisons, and pm-slack owns transport delivery receipts. Standup owns periodic explicit requests and response linkage; no core behavior is reimplemented. Registry reports CLI 2026.10.23; keep repository SDK pin 2026.10.20 unchanged per queue rules. Plan: targeted existing behavioral and real SDK/CLI regressions, fresh read-only public snapshot, refreshed documentation, and npm/Bun release gates in CI."
+  "2026-10-23T20:02:44.126Z",codex-agent,"Current acceptance evidence: npm run typecheck, npm run lint, npm run build and npm run build:test passed. node --test test/decision-requests.test.ts test/runtime-export.test.ts test/units.test.ts passed 102/102 (9 decision and 93 export/unit), zero failures/skips/cancellations/todo. Required pm test pm-slack-standup-defb --run --progress also passed both linked commands with those same 102 tests. Existing result tracking policy is disabled, so record receipt here without changing policy. Native PmClient/listAllComplete and certifyCompleteListResult were used for independent complete-corpus verification, with no tracker parser or core lifecycle implementation added."
+  "2026-10-23T20:02:44.823Z",codex-agent,"Fresh real-data measurement: public main 72775d7df1f6471243bbda349a3212b65e048a65 was archived into a non-git scratch project. All 202 tracker files and directories were read-only; before/after SHA-256 matched 202/202. Canonical package and native SDK readers agreed on 98 IDs: 2 in_progress, 2 open, 92 closed, 2 canceled; 2 Decisions, 0 declared requests, 0 emitted, 0 omitted. Compact JSON 201 bytes; plain standup with decisions/completed work 8456 bytes. Both complete reads and render ran with only Node on PATH and a Git discovery ceiling. Snapshot was not seeded with synthetic requests. Positive/lifecycle/privacy assertions use separate real SDK-created synthetic non-git trackers."
+  "2026-10-23T20:02:45.595Z",codex-agent,"Fresh behavioral revert proof: replaced only collectDecisionRequests with the empty-section behavior, then ran node --test --test-name-pattern=\"only declared|periodic text\" test/decision-requests.test.ts. Both retained regressions failed (0/2 pass). Restored the original function byte-identically in finally; the same command passed 2/2 afterward. This follow-up changes docs and PM evidence only; no runtime or dist delta. Initial archive attempt hit the Node default stdout buffer; corrected by writing the archive directly to a scratch file, then all measurements passed. No pm SDK/CLI defect was found. Disclosure approval remains author-owned; TOON whitespace differs from the compact-JSON projection budget."
+files[3]{path,scope}:
+  decision-requests.ts,project
+  index.ts,project
+  test/decision-requests.test.ts,project
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/decision-requests.test.ts,project,codex-agent,"2026-10-23T20:00:50.128Z",local_mutation,feat/decision-request-sections
+  node --test test/runtime-export.test.ts test/units.test.ts,project,codex-agent,"2026-10-23T20:00:50.852Z",local_mutation,feat/decision-request-sections
+docs[1]{path,scope}:
+  docs/decision-requests-validation.md,project
+body: ""
