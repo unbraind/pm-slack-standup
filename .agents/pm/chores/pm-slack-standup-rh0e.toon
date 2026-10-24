@@ -2,12 +2,17 @@ id: pm-slack-standup-rh0e
 title: Correct tracker reconciliation review records
 description: Address PR #141 review findings by reconciling observed audit results and release associations against the audited main snapshot; preserve prior history and leave this review item in progress for orchestrator verification.
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-22T11:14:49.857Z"
-updated_at: "2026-10-22T11:21:10.415Z"
+updated_at: "2026-10-24T23:14:39.454Z"
+closed_at: "2026-10-24T21:48:13.657Z"
+completed_at: "2026-10-22T20:28:52.000Z"
 author: codex-agent
+resolution: Corrects per-item reconciliation delivery and release-history evidence while retaining immutable prior event streams.
+expected_result: Address PR #141 review findings by reconciling observed audit results and release associations against the audited main snapshot; preserve prior history and leave this review item in progress for orchestrator verification.
+actual_result: "https://github.com/unbraind/pm-slack-standup/pull/141, merged 2026-10-22T20:28:52Z, merge f584c70f4deba5b97cac1c3ddff680585f09e5e8: Corrects per-item reconciliation delivery and release-history evidence while retaining immutable prior event streams."
 comments[2]{created_at,author,text}:
   "2026-10-22T11:15:45.955Z",codex-agent,"PR #141 review: read every unresolved thread and all comments, plus the latest CodeRabbit body; two valid threads and no outside-diff findings, with no pagination gaps. Branch is current with remote and already contains main. Rechecked main and v2026.10.21 at 765b440ce656692c73bbcbafb5102ac3b3c8324b; seven source evidence files are byte-identical, three cited fixes are ancestors, canonical pmc-xndl exists, and fresh full/production audits each exit 0 with total zero. Before correction: eight closed items lack a release and appear under Unreleased; 2sjh actual_result still says four high findings. Add release 2026.10.21 to those eight records and correct the observed audit result through normal append-only updates. Whole-diff review also found undated historical certification claims in 74w8; qualify them as dated evidence. Existing terminal states will remain unchanged; this review item stays in progress."
   "2026-10-22T11:21:01.723Z",codex-agent,"PR #141 evidence proof and gates: before, 2sjh reported four high findings despite a zero-findings closure and eight delivered records lacked release associations, yielding eight Unreleased entries. After normal pinned CLI updates, all eight associate with 2026.10.21, retain their existing closed states, and appear in that released section; zero reconciled entries remain under Unreleased. All eight existing history files retain byte-identical prefixes against both main and pre-review HEAD; earlier four-high and historical NOT READY results remain preserved. Thread PRRT_kwDOTbNzVM6vD4AB is corrected by a dated zero-findings actual_result matching fresh full and production audit JSON. Thread PRRT_kwDOTbNzVM6vD4AJ is corrected by eight release associations and regeneration. Same-class self-review qualifies 74w8 as historical dated certification and clarifies the three consumer limitations covered by canonical pmc-xndl, which remains open. npm ci passed (165 packages added, 206 audited, zero vulnerabilities); linked git diff --check passed 1/1 evidence command; changelog:full and changelog:check passed. Clean-identity strict pm health passes after pinned merge install, with only two pre-existing advisory warnings. Restoring the baseline tracked merge fence exposes merge_fence_drift; the normal install hook regenerates it before CI health. Exclude that generated source-control change to preserve this tracker-only PR; the fence correction is already carried by PR #142. No behavioral implementation revert applies to this metadata-only change; the rechecked source/tag/audit/record evidence is the proof. No new pm CLI/SDK API defect observed. Leave this review item in progress for orchestrator verification."
@@ -26,4 +31,5 @@ tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   git diff --check,project,codex-agent,"2026-10-22T11:17:36.206Z",local_mutation,chore/reconcile-tracker-1021
 docs[1]{path,scope}:
   CHANGELOG.md,project
+close_reason: "https://github.com/unbraind/pm-slack-standup/pull/141, merged 2026-10-22T20:28:52Z, merge f584c70f4deba5b97cac1c3ddff680585f09e5e8: Corrects per-item reconciliation delivery and release-history evidence while retaining immutable prior event streams."
 body: ""

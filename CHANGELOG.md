@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add --format blocks, --schedule, --include-blockers, --team, --compact to pm-slack-standup ([pm-slack-standup-9o06](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-9o06.toon))
+- Show declared decision requests in periodic standups ([pm-slack-standup-murn](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-murn.toon))
+
+### Other
+
+- Correct tracker reconciliation review records ([pm-slack-standup-rh0e](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-rh0e.toon))
+- Revalidate delivered decision-request sections on the current public tracker ([pm-slack-standup-defb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-defb.toon))
+
 ## 2026.10.21 - 2026-10-21
 
 ### Changed
@@ -231,12 +243,6 @@
 ### Other
 
 - Harden release bun-verify so registry-mirror lag cannot block the GitHub release ([pm-slack-standup-do6k](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-do6k.toon))
-
-## 2026.7.10 - 2026-07-10
-
-### Added
-
-- Add --format blocks, --schedule, --include-blockers, --team, --compact to pm-slack-standup ([pm-slack-standup-9o06](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-9o06.toon))
 
 ## 2026.7.7 - 2026-07-07
 

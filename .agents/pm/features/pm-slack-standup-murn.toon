@@ -2,13 +2,18 @@ id: pm-slack-standup-murn
 title: Show declared decision requests in periodic standups
 description: "Present explicit human or agent decision requests with alternatives, response deadlines, canonical evidence and acknowledgment links."
 type: Feature
-status: in_progress
+status: closed
 priority: 2
 tags[3]: added,decisions,standup
 created_at: "2026-10-21T20:31:22.856Z"
-updated_at: "2026-10-23T20:02:47.600Z"
+updated_at: "2026-10-24T23:14:38.030Z"
+closed_at: "2026-10-24T21:48:13.503Z"
+completed_at: "2026-10-23T20:13:31.000Z"
 author: codex-agent
 acceptance_criteria: Only declared requests appear; closed and superseded decisions disappear deterministically; private alternatives respect disclosure policy. Typed SDK and CLI provide bounded TOON/JSON with typed refusals and remedies; README and example; non-git public tracker validation; npm and Bun CI release gates.
+resolution: "Latest implementing documentation/validation PR completes PR 142 decision-request standups with current public-tracker evidence, disclosure rules, actionable outputs and npm/Bun CI."
+expected_result: Only declared requests appear; closed and superseded decisions disappear deterministically; private alternatives respect disclosure policy. Typed SDK and CLI provide bounded TOON/JSON with typed refusals and remedies; README and example; non-git public tracker validation; npm and Bun CI release gates.
+actual_result: "https://github.com/unbraind/pm-slack-standup/pull/147, merged 2026-10-23T20:13:31Z, merge f1d1187f4b5c447f4d6f03c24353298cabaa598c: Latest implementing documentation/validation PR completes PR 142 decision-request standups with current public-tracker evidence, disclosure rules, actionable outputs and npm/Bun CI."
 comments[26]{created_at,author,text}:
   "2026-10-21T20:31:41.362Z",codex-agent,"Overlap rechecked against CLI 2026.10.21 and pinned SDK 2026.10.17: core plan decision stores text, rationale and evidence; pm-brief decisionsNeeded selects active Decision items for general context; pm-slack owns notification transport. No existing explicit decision-request standup contract was found. This feature owns periodic presentation and acknowledgment linkage only. Reconciliation PR #141 items are excluded. Plan: an explicit standup-decision-request tag plus a versioned declaration in the item body; public-only alternative disclosure, terminal/superseded suppression, deterministic bounded SDK and CLI reports, opt-in standup section, non-git regressions and public tracker copy validation. Dependency pins stay unchanged."
   "2026-10-21T20:37:56.113Z",codex-agent,"Implemented public typed declaration/report/refusal contracts, read-only standup decisions command, and opt-in periodic sections. Limits: at most 10 rows, default compact JSON projection budget 8192 bytes, whole-row omissions with counts and remedy. Tagged requests are excluded from ordinary work buckets when enabled so JSON exports cannot copy private alternatives from source bodies. Deadlines and IDs define ordering; terminal states suppress obsolete declarations. Local targeted checks and real no-git lifecycle tests are being verified; CI runs both npm and Bun full release gates without lowering thresholds."
@@ -68,4 +73,5 @@ docs[3]{path,scope,note}:
   docs/decision-requests-validation.md,project,Measured public tracker copy validation
   docs/decision-requests.md,project,Schema and CLI SDK examples
   README.md,project,Decision requests and no-git usage
+close_reason: "https://github.com/unbraind/pm-slack-standup/pull/147, merged 2026-10-23T20:13:31Z, merge f1d1187f4b5c447f4d6f03c24353298cabaa598c: Latest implementing documentation/validation PR completes PR 142 decision-request standups with current public-tracker evidence, disclosure rules, actionable outputs and npm/Bun CI."
 body: ""
