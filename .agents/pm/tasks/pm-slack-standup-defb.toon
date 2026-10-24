@@ -2,14 +2,19 @@ id: pm-slack-standup-defb
 title: Revalidate delivered decision-request sections on the current public tracker
 description: Refresh acceptance and real-data evidence for the existing decision-request feature delivered by PR #142 without duplicating its SDK or commands.
 type: Task
-status: in_progress
+status: closed
 priority: 2
 tags[2]: decisions,verification
 created_at: "2026-10-23T20:00:04.282Z"
-updated_at: "2026-10-23T20:02:48.264Z"
+updated_at: "2026-10-24T21:48:13.327Z"
+closed_at: "2026-10-24T21:48:13.287Z"
+completed_at: "2026-10-24T21:48:13.287Z"
 author: codex-agent
 acceptance_criteria: "Only declared requests appear; closed/superseded decisions disappear deterministically; private alternatives respect disclosure policy. Verify typed SDK and CLI compact TOON/JSON, typed refusals with remedies, README and example, read-only non-git public tracker measurements, targeted local checks, and unchanged npm/Bun CI release gates."
 parent: pm-slack-standup-murn
+resolution: "Revalidates declared decision-only requests, terminal/superseded removal and disclosure-safe alternatives through compact no-git SDK/CLI and measured current public-tracker CI evidence."
+expected_result: "Only declared requests appear; closed/superseded decisions disappear deterministically; private alternatives respect disclosure policy. Verify typed SDK and CLI compact TOON/JSON, typed refusals with remedies, README and example, read-only non-git public tracker measurements, targeted local checks, and unchanged npm/Bun CI release gates."
+actual_result: "https://github.com/unbraind/pm-slack-standup/pull/147, merged 2026-10-23T20:13:31Z, merge f1d1187f4b5c447f4d6f03c24353298cabaa598c: Revalidates declared decision-only requests, terminal/superseded removal and disclosure-safe alternatives through compact no-git SDK/CLI and measured current public-tracker CI evidence."
 comments[4]{created_at,author,text}:
   "2026-10-23T20:00:49.452Z",codex-agent,"Overlap check: PR #142 already delivered this scope on main; retain parent pm-slack-standup-murn and use this new child solely for requested current acceptance evidence. Core lifecycle/plan owns decisions, core query/next separates human-gated decisions, pm-brief owns general context and proposal comparisons, and pm-slack owns transport delivery receipts. Standup owns periodic explicit requests and response linkage; no core behavior is reimplemented. Registry reports CLI 2026.10.23; keep repository SDK pin 2026.10.20 unchanged per queue rules. Plan: targeted existing behavioral and real SDK/CLI regressions, fresh read-only public snapshot, refreshed documentation, and npm/Bun release gates in CI."
   "2026-10-23T20:02:44.126Z",codex-agent,"Current acceptance evidence: npm run typecheck, npm run lint, npm run build and npm run build:test passed. node --test test/decision-requests.test.ts test/runtime-export.test.ts test/units.test.ts passed 102/102 (9 decision and 93 export/unit), zero failures/skips/cancellations/todo. Required pm test pm-slack-standup-defb --run --progress also passed both linked commands with those same 102 tests. Existing result tracking policy is disabled, so record receipt here without changing policy. Native PmClient/listAllComplete and certifyCompleteListResult were used for independent complete-corpus verification, with no tracker parser or core lifecycle implementation added."
@@ -24,4 +29,5 @@ tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test test/runtime-export.test.ts test/units.test.ts,project,codex-agent,"2026-10-23T20:00:50.852Z",local_mutation,feat/decision-request-sections
 docs[1]{path,scope}:
   docs/decision-requests-validation.md,project
+close_reason: "https://github.com/unbraind/pm-slack-standup/pull/147, merged 2026-10-23T20:13:31Z, merge f1d1187f4b5c447f4d6f03c24353298cabaa598c: Revalidates declared decision-only requests, terminal/superseded removal and disclosure-safe alternatives through compact no-git SDK/CLI and measured current public-tracker CI evidence."
 body: ""
