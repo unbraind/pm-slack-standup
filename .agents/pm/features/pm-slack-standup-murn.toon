@@ -6,9 +6,9 @@ status: closed
 priority: 2
 tags[3]: added,decisions,standup
 created_at: "2026-10-21T20:31:22.856Z"
-updated_at: "2026-10-24T21:48:13.548Z"
+updated_at: "2026-10-24T23:14:38.030Z"
 closed_at: "2026-10-24T21:48:13.503Z"
-completed_at: "2026-10-24T21:48:13.503Z"
+completed_at: "2026-10-23T20:13:31.000Z"
 author: codex-agent
 acceptance_criteria: Only declared requests appear; closed and superseded decisions disappear deterministically; private alternatives respect disclosure policy. Typed SDK and CLI provide bounded TOON/JSON with typed refusals and remedies; README and example; non-git public tracker validation; npm and Bun CI release gates.
 resolution: "Latest implementing documentation/validation PR completes PR 142 decision-request standups with current public-tracker evidence, disclosure rules, actionable outputs and npm/Bun CI."

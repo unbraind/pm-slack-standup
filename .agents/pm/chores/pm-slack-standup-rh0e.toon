@@ -6,9 +6,9 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-10-22T11:14:49.857Z"
-updated_at: "2026-10-24T21:48:13.680Z"
+updated_at: "2026-10-24T23:14:39.454Z"
 closed_at: "2026-10-24T21:48:13.657Z"
-completed_at: "2026-10-24T21:48:13.657Z"
+completed_at: "2026-10-22T20:28:52.000Z"
 author: codex-agent
 resolution: Corrects per-item reconciliation delivery and release-history evidence while retaining immutable prior event streams.
 expected_result: Address PR #141 review findings by reconciling observed audit results and release associations against the audited main snapshot; preserve prior history and leave this review item in progress for orchestrator verification.
