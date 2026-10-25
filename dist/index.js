@@ -5,7 +5,9 @@ import { basename, resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { collectDecisionRequests, isDecisionRequestItem, renderDecisionRequests } from "./decision-requests.js";
 export * from "./decision-requests.js";
-import { certifyCompleteListResult, inspectCompleteListResult } from "@unbrained/pm-cli/sdk";
+import { certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE, PmClient, readSettings, resolveRuntimeStatusRegistry, } from "@unbrained/pm-cli/sdk";
+import { classifyStandupItem, DEFAULT_STATUS_REGISTRY } from "./status-roles.js";
+export { classifyStandupItem, hasBlockedByDep } from "./status-roles.js";
 /**
  * Local stand-in for the SDK's `defineExtension` identity helper.
  *
@@ -18,39 +20,12 @@ const defineExtension = (module) => module;
 // ---------------------------------------------------------------------------
 // Error contract
 // ---------------------------------------------------------------------------
-// pm's extension command runtime only treats a thrown error as a cleanly
-// handled non-zero exit when the error carries a numeric `exitCode` property
-// (see @unbrained/pm-cli runCommandHandler). A plain `Error` makes the runtime
-// fall through to its "unhandled" path, which RE-INVOKES the command handler a
-// second time and exits with a generic code.
-//
-// We mirror the SDK's EXIT_CODE contract here rather than importing it, to keep
-// this package's dependency on `@unbrained/pm-cli` type-only and add no runtime
-// module edge. Note the reason is availability, not impossibility: the SDK IS
-// importable at runtime wherever the package's own `node_modules` is populated
-// (upstream pm-cli#717), but a standalone-installed extension is not guaranteed
-// that, so taking a value import here would make activation depend on it.
-const EXIT_CODE = {
-    GENERIC_FAILURE: 1,
-    USAGE: 2,
-    NOT_FOUND: 3,
-};
-/**
- * Error type that carries the numeric exit code pm's command runtime expects.
- *
- * pm's extension runtime only treats a thrown error as a cleanly-handled
- * non-zero exit when the error exposes a numeric `exitCode`; a plain
- * {@link Error} makes the runtime re-invoke the handler and exit with a generic
- * code, so every intentional failure path in this package throws a
- * {@link CommandError} instead.
- */
+/** Compatibility constructor retaining instanceof checks while the SDK owns expected errors. */
 export class CommandError extends Error {
-    /** Numeric exit code pm's runtime reads off the thrown error (see EXIT_CODE). */
-    exitCode;
     constructor(message, exitCode = EXIT_CODE.GENERIC_FAILURE) {
-        super(message);
-        this.name = "CommandError";
-        this.exitCode = exitCode;
+        const expected = createPmCliExpectedError(message, { exitCode });
+        super(expected.message);
+        Object.assign(this, expected);
     }
 }
 /**
@@ -900,12 +875,31 @@ export function fetchAllItems(pmRoot, pmBin = resolvePmBin()) {
     }
     return readCompleteStandupItems(envelope);
 }
-const WIP_STATUSES = new Set(["in_progress", "wip", "doing"]);
-const BLOCKED_STATUSES = new Set(["blocked", "on_hold"]);
-const OPEN_STATUSES = new Set(["open", "todo", "new", "draft"]);
-const DONE_STATUSES = new Set(["closed", "done", "complete", "completed"]);
-function statusOf(item) {
-    return (item.status ?? "").trim().toLowerCase();
+/** Read through the invocation's host client, certifying rows and fresh history before use. */
+export async function readSdkStandupItems(ctx) {
+    const client = ctx.sdk?.client ?? new PmClient({ pmRoot: ctx.pm_root, noExtensions: true });
+    try {
+        const items = readCompleteStandupItems(await client.listAllComplete({ includeBody: true }));
+        for (const item of items) {
+            // The history action rereads and verifies the chain and current document; a cached event index is insufficient.
+            const history = await client.run("history", { id: item.id, options: {
+                    verify: true, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full",
+                } });
+            if (!isRecord(history) || !isRecord(history.verification) || history.verification.ok !== true) {
+                throw new CommandError(`Standup history integrity verification failed for ${item.id}.`);
+            }
+        }
+        return items;
+    }
+    catch (error) {
+        if (error instanceof CommandError)
+            throw error;
+        throw new CommandError(`pm list --all failed: ${String(error)}`);
+    }
+}
+/** Resolve tracker lifecycle roles with the SDK's settings loader. */
+export async function readStandupStatusRegistry(pmRoot) {
+    return resolveRuntimeStatusRegistry((await readSettings(pmRoot)).schema);
 }
 /**
  * True when an item's last activity falls within the [sinceMs, now] window.
@@ -916,27 +910,6 @@ export function withinWindow(item, sinceMs) {
         return true;
     const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
     return isNaN(ts) ? false : ts >= sinceMs;
-}
-/**
- * True when an item carries a `blocked_by` dependency, regardless of its
- * status. pm surfaces this either as a top-level `blocked_by` string (item ID
- * or free-text reason) or as one/more `dependencies` entries with
- * `kind: "blocked_by"`. Used to surface impediments that are NOT explicitly
- * status=blocked under the Blocked section.
- */
-export function hasBlockedByDep(item) {
-    const top = item.blocked_by;
-    if (typeof top === "string" && top.trim().length > 0)
-        return true;
-    const deps = item.dependencies;
-    if (Array.isArray(deps)) {
-        for (const d of deps) {
-            if (d && typeof d.kind === "string" && d.kind.trim().toLowerCase() === "blocked_by") {
-                return true;
-            }
-        }
-    }
-    return false;
 }
 /**
  * Whole days an item has been blocked, for stale-impediment highlighting.
@@ -950,8 +923,8 @@ export function hasBlockedByDep(item) {
  * @param now - Reference epoch-ms instant (defaults to the current time).
  * @returns The age in whole days, or `undefined` when the item is not blocked or undated.
  */
-export function blockedAgeDays(item, now = Date.now()) {
-    if (!BLOCKED_STATUSES.has(statusOf(item)) && !hasBlockedByDep(item))
+export function blockedAgeDays(item, now = Date.now(), registry = DEFAULT_STATUS_REGISTRY) {
+    if (!classifyStandupItem(item, registry).blocked)
         return undefined;
     const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
     if (isNaN(ts))
@@ -1002,23 +975,20 @@ export function buildStandupData(items, opts, sinceMs = NaN, now = Date.now()) {
         : items;
     // Declared requests never enter raw work buckets, including exports without the optional section.
     const work = visible.filter((item) => !isDecisionRequestItem(item));
-    const isDone = (i) => DONE_STATUSES.has(statusOf(i));
-    // An item is "blocked" for standup purposes when its status is blocked/
-    // on_hold OR it carries a blocked_by dependency — but a done item is never
-    // re-surfaced as blocked (a closed impediment is no longer an impediment).
-    const isBlocked = (i) => !isDone(i) && (BLOCKED_STATUSES.has(statusOf(i)) || hasBlockedByDep(i));
-    const wip = work.filter((i) => WIP_STATUSES.has(statusOf(i)) && !isBlocked(i));
-    const blocked = work.filter(isBlocked);
-    const open = work.filter((i) => OPEN_STATUSES.has(statusOf(i)) && !isBlocked(i));
+    const registry = opts.statusRegistry ?? DEFAULT_STATUS_REGISTRY;
+    const classified = work.map((item) => ({ item, roles: classifyStandupItem(item, registry) }));
+    const wip = classified.filter(({ roles }) => roles.active).map(({ item }) => item);
+    const blocked = classified.filter(({ roles }) => roles.blocked).map(({ item }) => item);
+    const open = classified.filter(({ roles }) => roles.open).map(({ item }) => item);
     const done = opts.includeDone
-        ? work.filter((i) => isDone(i) && withinWindow(i, sinceMs))
+        ? classified.filter(({ item, roles }) => roles.done && withinWindow(item, sinceMs)).map(({ item }) => item)
         : [];
     const sortedOpen = [...open].sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
     const upNextCount = opts.upNextCount ?? DEFAULT_UP_NEXT;
     const upNext = upNextCount === Infinity ? sortedOpen : sortedOpen.slice(0, upNextCount);
     const data = { wip, blocked, done, upNext, total: visible.length };
     if (opts.includeDecisions)
-        data.decisions = collectDecisionRequests(visible);
+        data.decisions = collectDecisionRequests(visible, { statusRegistry: registry });
     if (opts.splitYesterday && done.length > 0) {
         const todayKey = localDayKeyOf(now);
         const yesterdayKey = localDayKeyOf(now - 86_400_000);
@@ -1120,7 +1090,7 @@ function mentionFor(item, mentionMap) {
  * @param withPriority - When true, append the numeric priority.
  * @returns The composed one-line item string.
  */
-export function itemText(item, mentionMap, withPriority = false) {
+export function itemText(item, mentionMap, withPriority = false, registry = DEFAULT_STATUS_REGISTRY) {
     const label = typeLabel(item);
     const title = label ? `${label} ${item.title}` : item.title;
     const prio = withPriority && !isNullish(item.priority) ? ` (priority ${item.priority})` : "";
@@ -1136,30 +1106,19 @@ export function itemText(item, mentionMap, withPriority = false) {
         if (blockers.length > 0)
             context.push(`blocked by ${blockers.join(", ")}`);
     }
-    const ageDays = blockedAgeDays(item);
+    const ageDays = blockedAgeDays(item, Date.now(), registry);
     if (ageDays !== undefined && ageDays >= 3)
         context.push(`stale ${ageDays}d`);
     const blockedContext = context.length > 0 ? ` (${context.join("; ")})` : "";
     return `${title}${prio}${blockedContext}${mentionFor(item, mentionMap)}`;
 }
 /**
- * True when an item is a blocker for standup purposes: status is blocked/
- * on_hold OR it carries a `blocked_by` dependency. (A closed item is never a
- * blocker.) Used by `--include-blockers` highlighting.
- */
-function isBlockerItem(item) {
-    // A closed/done item is never a blocker: a stale `blocked_by` dependency
-    // on a completed item must not resurface it with a 🚨 marker (e.g. when
-    // `--include-done --include-blockers` are combined).
-    return !DONE_STATUSES.has(statusOf(item)) && (BLOCKED_STATUSES.has(statusOf(item)) || hasBlockedByDep(item));
-}
-/**
  * Render one item line, applying `--include-blockers` highlighting (a 🚨
  * prefix on blocked rows) when enabled. Otherwise identical to `itemText`.
  */
 function itemLine(item, opts, withPriority) {
-    const base = itemText(item, opts.mentionMap, withPriority);
-    if (opts.includeBlockers && isBlockerItem(item))
+    const base = itemText(item, opts.mentionMap, withPriority, opts.statusRegistry);
+    if (opts.includeBlockers && classifyStandupItem(item, opts.statusRegistry).blocked)
         return `🚨 ${base}`;
     return base;
 }
@@ -1173,9 +1132,9 @@ function compactSectionLine(def, opts) {
         return "";
     // Honor `--include-blockers`: prefix blocked item titles with 🚨 so the
     // marker is not lost in compact mode (README says blockers are highlighted
-    // in every format). Done items are never blockers (see isBlockerItem).
+    // in every format). Done items are never blockers (see classifyStandupItem).
     const titles = def.items
-        .map((i) => (opts.includeBlockers && isBlockerItem(i) ? `🚨 ${i.title}` : i.title))
+        .map((i) => (opts.includeBlockers && classifyStandupItem(i, opts.statusRegistry).blocked ? `🚨 ${i.title}` : i.title))
         .join("; ");
     return `${def.emoji} ${def.title} (${def.items.length}): ${titles}`;
 }
@@ -2003,7 +1962,8 @@ export default defineExtension({
             }
             // Fetch and bucket the standup AFTER any schedule wait, so a scheduled
             // (non-dry-run) post reflects the current pm state at fire time.
-            const items = fetchAllItems(ctx.pm_root);
+            const items = await readSdkStandupItems(ctx);
+            Object.assign(opts, { statusRegistry: await readStandupStatusRegistry(ctx.pm_root) });
             const data = buildStandupData(items, opts, sinceMs);
             // `--compare <path>`: read a PRIOR standup JSON and attach per-section
             // trend deltas. Pure local file read; a missing/malformed/wrong-shape
@@ -2135,13 +2095,14 @@ export default defineExtension({
                 { long: "--output-bytes", value_name: "bytes", description: "Compact JSON projection budget (512..32768, default 8192); whole rows only" },
             ],
             /** Read a complete tracker through the existing canonical reader; no git is required. */
-            run(ctx) {
+            async run(ctx) {
                 const options = {
                     limit: Number(readStrOption(ctx.options, "limit") ?? 10),
                     outputBytes: Number(readStrOption(ctx.options, "output-bytes") ?? 8192),
                 };
                 collectDecisionRequests([], options);
-                return collectDecisionRequests(fetchAllItems(ctx.pm_root), options);
+                const items = await readSdkStandupItems(ctx);
+                return collectDecisionRequests(items, { ...options, statusRegistry: await readStandupStatusRegistry(ctx.pm_root) });
             },
         });
         api.registerCommand({
@@ -2250,7 +2211,8 @@ export default defineExtension({
             const { opts, sinceMs } = resolveStandupOptions(ctx.options, "markdown");
             const exportOpts = opts;
             const historyDir = readStrOption(ctx.options, "history-dir");
-            const items = fetchAllItems(ctx.pm_root);
+            const items = await readSdkStandupItems(ctx);
+            Object.assign(opts, { statusRegistry: await readStandupStatusRegistry(ctx.pm_root) });
             const data = buildStandupData(items, exportOpts, sinceMs);
             const snapshotDate = localDayKeyOf(Date.now());
             const buildJsonSnapshot = () => {
