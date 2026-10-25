@@ -8,7 +8,11 @@ import { collectDecisionRequests, isDecisionRequestItem, renderDecisionRequests 
 import type { DecisionRequestReport } from "./decision-requests.ts";
 export * from "./decision-requests.ts";
 
-import { certifyCompleteListResult, inspectCompleteListResult } from "@unbrained/pm-cli/sdk";
+import {
+  certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE,
+  PmClient, readSettings, resolveRuntimeStatusRegistry, normalizeStatusInputWithRegistry, statusIsTerminal,
+} from "@unbrained/pm-cli/sdk";
+import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
 import type {
   CommandHandlerContext,
   ExtensionModule,
@@ -29,40 +33,14 @@ const defineExtension = <TModule extends ExtensionModule>(module: TModule): TMod
 // Error contract
 // ---------------------------------------------------------------------------
 
-// pm's extension command runtime only treats a thrown error as a cleanly
-// handled non-zero exit when the error carries a numeric `exitCode` property
-// (see @unbrained/pm-cli runCommandHandler). A plain `Error` makes the runtime
-// fall through to its "unhandled" path, which RE-INVOKES the command handler a
-// second time and exits with a generic code.
-//
-// We mirror the SDK's EXIT_CODE contract here rather than importing it, to keep
-// this package's dependency on `@unbrained/pm-cli` type-only and add no runtime
-// module edge. Note the reason is availability, not impossibility: the SDK IS
-// importable at runtime wherever the package's own `node_modules` is populated
-// (upstream pm-cli#717), but a standalone-installed extension is not guaranteed
-// that, so taking a value import here would make activation depend on it.
-const EXIT_CODE = {
-  GENERIC_FAILURE: 1,
-  USAGE: 2,
-  NOT_FOUND: 3,
-} as const;
-
-/**
- * Error type that carries the numeric exit code pm's command runtime expects.
- *
- * pm's extension runtime only treats a thrown error as a cleanly-handled
- * non-zero exit when the error exposes a numeric `exitCode`; a plain
- * {@link Error} makes the runtime re-invoke the handler and exit with a generic
- * code, so every intentional failure path in this package throws a
- * {@link CommandError} instead.
- */
+/** Compatibility constructor retaining instanceof checks while the SDK owns expected errors. */
 export class CommandError extends Error {
-  /** Numeric exit code pm's runtime reads off the thrown error (see EXIT_CODE). */
-  exitCode: number;
+  /** Numeric exit code assigned by the SDK expected-error factory. */
+  declare exitCode: number;
   constructor(message: string, exitCode: number = EXIT_CODE.GENERIC_FAILURE) {
-    super(message);
-    this.name = "CommandError";
-    this.exitCode = exitCode;
+    const expected = createPmCliExpectedError(message, { exitCode });
+    super(expected.message);
+    Object.assign(this, expected);
   }
 }
 
@@ -297,6 +275,8 @@ export interface StandupData {
 }
 
 export interface StandupOptions {
+  /** Configured lifecycle roles for the current tracker; omitted for pure presentation inputs. */
+  statusRegistry?: RuntimeStatusRegistry;
   /** Include explicitly declared decision requests in the periodic presentation. */
   includeDecisions?: boolean;
   channel?: string;
@@ -1141,13 +1121,47 @@ export function fetchAllItems(pmRoot: string, pmBin: string | PmLaunch = resolve
   return readCompleteStandupItems(envelope);
 }
 
-const WIP_STATUSES = new Set(["in_progress", "wip", "doing"]);
-const BLOCKED_STATUSES = new Set(["blocked", "on_hold"]);
-const OPEN_STATUSES = new Set(["open", "todo", "new", "draft"]);
-const DONE_STATUSES = new Set(["closed", "done", "complete", "completed"]);
+/** Default lifecycle registry for standalone presentation helpers. */
+const DEFAULT_STATUS_REGISTRY = resolveRuntimeStatusRegistry({
+  version: 1, files: {}, statuses: [], fields: [], workflow: {}, unknown_field_policy: "allow",
+});
 
-function statusOf(item: PmItem): string {
-  return (item.status ?? "").trim().toLowerCase();
+/** Legacy display spellings retained as presentation aliases, after configured SDK aliases. */
+const PRESENTATION_STATUS_ALIASES: Readonly<Record<string, string>> = {
+  wip: "in_progress", doing: "in_progress", on_hold: "blocked", todo: "open", new: "open",
+  done: "closed", complete: "closed", completed: "closed",
+};
+
+/** Resolve lifecycle identities through the configured SDK registry before display aliases. */
+function statusOf(item: PmItem, registry: RuntimeStatusRegistry = DEFAULT_STATUS_REGISTRY): string {
+  const status = (item.status ?? "").trim().toLowerCase();
+  return normalizeStatusInputWithRegistry(status, registry) ?? PRESENTATION_STATUS_ALIASES[status] ?? status;
+}
+
+/** Read through the invocation's host client, certifying rows and fresh history before use. */
+export async function readSdkStandupItems(ctx: Pick<CommandHandlerContext, "pm_root" | "sdk">): Promise<PmItem[]> {
+  const client = ctx.sdk?.client ?? new PmClient({ pmRoot: ctx.pm_root, noExtensions: true });
+  try {
+    const items = readCompleteStandupItems(await client.listAllComplete({ includeBody: true }));
+    for (const item of items) {
+      // The history action rereads and verifies the chain and current document; a cached event index is insufficient.
+      const history = await client.run("history", { id: item.id, options: {
+        verify: true, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full",
+      } });
+      if (!isRecord(history) || !isRecord(history.verification) || history.verification.ok !== true) {
+        throw new CommandError(`Standup history integrity verification failed for ${item.id}.`);
+      }
+    }
+    return items;
+  } catch (error) {
+    if (error instanceof CommandError) throw error;
+    throw new CommandError(`pm list --all failed: ${String(error)}`);
+  }
+}
+
+/** Resolve tracker lifecycle roles with the SDK's settings loader. */
+export async function readStandupStatusRegistry(pmRoot: string): Promise<RuntimeStatusRegistry> {
+  return resolveRuntimeStatusRegistry((await readSettings(pmRoot)).schema);
 }
 
 /**
@@ -1193,8 +1207,8 @@ export function hasBlockedByDep(item: PmItem): boolean {
  * @param now - Reference epoch-ms instant (defaults to the current time).
  * @returns The age in whole days, or `undefined` when the item is not blocked or undated.
  */
-export function blockedAgeDays(item: PmItem, now: number = Date.now()): number | undefined {
-  if (!BLOCKED_STATUSES.has(statusOf(item)) && !hasBlockedByDep(item)) return undefined;
+export function blockedAgeDays(item: PmItem, now: number = Date.now(), registry: RuntimeStatusRegistry = DEFAULT_STATUS_REGISTRY): number | undefined {
+  if (!registry.blocked_statuses.has(statusOf(item, registry)) && !hasBlockedByDep(item)) return undefined;
   const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
   if (isNaN(ts)) return undefined;
   return Math.max(0, Math.floor((now - ts) / 86_400_000));
@@ -1252,16 +1266,18 @@ export function buildStandupData(
       : items;
   // Declared requests never enter raw work buckets, including exports without the optional section.
   const work = visible.filter((item) => !isDecisionRequestItem(item));
-  const isDone = (i: PmItem) => DONE_STATUSES.has(statusOf(i));
+  const registry = opts.statusRegistry ?? DEFAULT_STATUS_REGISTRY;
+  const isTerminal = (i: PmItem) => statusIsTerminal(statusOf(i, registry), registry);
+  const isDone = (i: PmItem) => isTerminal(i) && registry.terminal_done_statuses.has(statusOf(i, registry));
   // An item is "blocked" for standup purposes when its status is blocked/
   // on_hold OR it carries a blocked_by dependency — but a done item is never
   // re-surfaced as blocked (a closed impediment is no longer an impediment).
   const isBlocked = (i: PmItem) =>
-    !isDone(i) && (BLOCKED_STATUSES.has(statusOf(i)) || hasBlockedByDep(i));
+    !isTerminal(i) && (registry.blocked_statuses.has(statusOf(i, registry)) || hasBlockedByDep(i));
 
-  const wip = work.filter((i) => WIP_STATUSES.has(statusOf(i)) && !isBlocked(i));
+  const wip = work.filter((i) => statusOf(i, registry) === registry.in_progress_status && !isBlocked(i));
   const blocked = work.filter(isBlocked);
-  const open = work.filter((i) => OPEN_STATUSES.has(statusOf(i)) && !isBlocked(i));
+  const open = work.filter((i) => (statusOf(i, registry) === registry.open_status || registry.draft_statuses.has(statusOf(i, registry))) && !isBlocked(i));
   const done = opts.includeDone
     ? work.filter((i) => isDone(i) && withinWindow(i, sinceMs))
     : [];
@@ -1400,7 +1416,7 @@ function mentionFor(item: PmItem, mentionMap: Record<string, string>): string {
  * @param withPriority - When true, append the numeric priority.
  * @returns The composed one-line item string.
  */
-export function itemText(item: PmItem, mentionMap: Record<string, string>, withPriority = false): string {
+export function itemText(item: PmItem, mentionMap: Record<string, string>, withPriority = false, registry: RuntimeStatusRegistry = DEFAULT_STATUS_REGISTRY): string {
   const label = typeLabel(item);
   const title = label ? `${label} ${item.title}` : item.title;
   const prio = withPriority && !isNullish(item.priority) ? ` (priority ${item.priority})` : "";
@@ -1414,7 +1430,7 @@ export function itemText(item: PmItem, mentionMap: Record<string, string>, withP
       .filter((id): id is string => Boolean(id));
     if (blockers.length > 0) context.push(`blocked by ${blockers.join(", ")}`);
   }
-  const ageDays = blockedAgeDays(item);
+  const ageDays = blockedAgeDays(item, Date.now(), registry);
   if (ageDays !== undefined && ageDays >= 3) context.push(`stale ${ageDays}d`);
   const blockedContext = context.length > 0 ? ` (${context.join("; ")})` : "";
   return `${title}${prio}${blockedContext}${mentionFor(item, mentionMap)}`;
@@ -1425,11 +1441,11 @@ export function itemText(item: PmItem, mentionMap: Record<string, string>, withP
  * on_hold OR it carries a `blocked_by` dependency. (A closed item is never a
  * blocker.) Used by `--include-blockers` highlighting.
  */
-function isBlockerItem(item: PmItem): boolean {
+function isBlockerItem(item: PmItem, registry: RuntimeStatusRegistry = DEFAULT_STATUS_REGISTRY): boolean {
   // A closed/done item is never a blocker: a stale `blocked_by` dependency
   // on a completed item must not resurface it with a 🚨 marker (e.g. when
   // `--include-done --include-blockers` are combined).
-  return !DONE_STATUSES.has(statusOf(item)) && (BLOCKED_STATUSES.has(statusOf(item)) || hasBlockedByDep(item));
+  return !statusIsTerminal(statusOf(item, registry), registry) && (registry.blocked_statuses.has(statusOf(item, registry)) || hasBlockedByDep(item));
 }
 
 /**
@@ -1437,8 +1453,8 @@ function isBlockerItem(item: PmItem): boolean {
  * prefix on blocked rows) when enabled. Otherwise identical to `itemText`.
  */
 function itemLine(item: PmItem, opts: StandupOptions, withPriority: boolean): string {
-  const base = itemText(item, opts.mentionMap, withPriority);
-  if (opts.includeBlockers && isBlockerItem(item)) return `🚨 ${base}`;
+  const base = itemText(item, opts.mentionMap, withPriority, opts.statusRegistry);
+  if (opts.includeBlockers && isBlockerItem(item, opts.statusRegistry)) return `🚨 ${base}`;
   return base;
 }
 
@@ -1453,7 +1469,7 @@ function compactSectionLine(def: SectionDef, opts: StandupOptions): string {
   // marker is not lost in compact mode (README says blockers are highlighted
   // in every format). Done items are never blockers (see isBlockerItem).
   const titles = def.items
-    .map((i) => (opts.includeBlockers && isBlockerItem(i) ? `🚨 ${i.title}` : i.title))
+    .map((i) => (opts.includeBlockers && isBlockerItem(i, opts.statusRegistry) ? `🚨 ${i.title}` : i.title))
     .join("; ");
   return `${def.emoji} ${def.title} (${def.items.length}): ${titles}`;
 }
@@ -2420,7 +2436,8 @@ export default defineExtension({
 
       // Fetch and bucket the standup AFTER any schedule wait, so a scheduled
       // (non-dry-run) post reflects the current pm state at fire time.
-      const items = fetchAllItems(ctx.pm_root);
+      const items = await readSdkStandupItems(ctx);
+      Object.assign(opts, { statusRegistry: await readStandupStatusRegistry(ctx.pm_root) });
       const data = buildStandupData(items, opts, sinceMs);
 
       // `--compare <path>`: read a PRIOR standup JSON and attach per-section
@@ -2568,13 +2585,13 @@ export default defineExtension({
         { long: "--output-bytes", value_name: "bytes", description: "Compact JSON projection budget (512..32768, default 8192); whole rows only" },
       ],
       /** Read a complete tracker through the existing canonical reader; no git is required. */
-      run(ctx: CommandHandlerContext) {
+      async run(ctx: CommandHandlerContext) {
         const options = {
           limit: Number(readStrOption(ctx.options, "limit") ?? 10),
           outputBytes: Number(readStrOption(ctx.options, "output-bytes") ?? 8192),
         };
         collectDecisionRequests([], options);
-        return collectDecisionRequests(fetchAllItems(ctx.pm_root), options);
+        return collectDecisionRequests(await readSdkStandupItems(ctx), options);
       },
     });
 
@@ -2691,7 +2708,8 @@ export default defineExtension({
       const exportOpts: StandupOptions = opts;
       const historyDir = readStrOption(ctx.options, "history-dir");
 
-      const items = fetchAllItems(ctx.pm_root);
+      const items = await readSdkStandupItems(ctx);
+      Object.assign(opts, { statusRegistry: await readStandupStatusRegistry(ctx.pm_root) });
       const data = buildStandupData(items, exportOpts, sinceMs);
       const snapshotDate = localDayKeyOf(Date.now());
 

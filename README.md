@@ -370,9 +370,20 @@ initialized tracker with no Git executable. Slack posting needs a webhook and
 network access; previews and decision reports only read tracker data. Package
 release and GitHub workflows need a Git repository.
 
+The supported host floor is pm CLI 2026.10.20. Configured status aliases and
+terminal roles are authoritative; canceled items with old blocker links now stay
+out of the Blocked section. Invalid history now refuses a report even after SDK
+caches were primed. Legacy display aliases such as `doing`, `on_hold`, and `done`
+remain supported unless the tracker explicitly defines them differently. Expected
+errors use the SDK discriminator and reject nonpositive or nonfinite exit codes.
+
+The exported synchronous `fetchAllItems(pmRoot, pmBin)` remains a standalone CLI
+adapter for callers selecting an executable. Its buffer and timeout settings
+apply only to that adapter; hosted commands use the SDK directly.
+
 ## How It Works
 
-1. Reads every item once via canonical `pm --path <root> list --all --json --include-body --strict-read --no-truncate --output-budget unbounded --output-limit unbounded --output-include full`, certifies the complete corpus with the public pm SDK, and buckets it locally into In Progress, Blocked, open (Up Next) and optionally Done. Any open/in-progress item with a `blocked_by` dependency (top-level or in `dependencies[]`) is re-bucketed into Blocked; closed items are never re-surfaced as blocked.
+1. Reads every item through the host SDK `client.listAllComplete({ includeBody: true })`, retains complete-corpus certification, and freshly verifies each item history and its current document through the SDK history action before rendering, posting or exporting. Lifecycle roles come from SDK settings and the runtime status registry; presentation buckets remain In Progress, Blocked, open (Up Next) and optionally Done. Any open/in-progress item with a `blocked_by` dependency (top-level or in `dependencies[]`) is re-bucketed into Blocked; terminal items (including canceled work) are never re-surfaced as blocked.
 2. Sorts open items by priority (ascending) and takes the top N as "Up Next" (default 3; set with `--up-next <n>`, or `--all-open` to show the entire open backlog).
 3. Builds a Slack Block Kit `blocks` array (header + a section per bucket + context footer) plus a plain-text `fallback`, optionally grouped by assignee and annotated with Slack mentions. Section titles/emoji can be overridden with `--section-labels`, and `--yesterday` expands Done into Done Yesterday / Done Today.
 4. In `--dry-run`, prints the message in the chosen `--format` and exits without any network call. Otherwise posts `{ text, blocks }` to each target (the base webhook plus any `--channels`) using Node.js native `https`. A missing webhook (on a real post) raises a structured `CommandError`; a failed post does too **unless** `--fallback-to-stdout` is set, in which case the rendered standup is printed to stdout and the command exits 0.

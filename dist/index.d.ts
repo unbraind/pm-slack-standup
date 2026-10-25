@@ -1,16 +1,10 @@
 import type { DecisionRequestReport } from "./decision-requests.ts";
 export * from "./decision-requests.ts";
-/**
- * Error type that carries the numeric exit code pm's command runtime expects.
- *
- * pm's extension runtime only treats a thrown error as a cleanly-handled
- * non-zero exit when the error exposes a numeric `exitCode`; a plain
- * {@link Error} makes the runtime re-invoke the handler and exit with a generic
- * code, so every intentional failure path in this package throws a
- * {@link CommandError} instead.
- */
+import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+import type { CommandHandlerContext } from "@unbrained/pm-cli/sdk/authoring";
+/** Compatibility constructor retaining instanceof checks while the SDK owns expected errors. */
 export declare class CommandError extends Error {
-    /** Numeric exit code pm's runtime reads off the thrown error (see EXIT_CODE). */
+    /** Numeric exit code assigned by the SDK expected-error factory. */
     exitCode: number;
     constructor(message: string, exitCode?: number);
 }
@@ -99,6 +93,8 @@ export interface StandupData {
     doneToday?: PmItem[];
 }
 export interface StandupOptions {
+    /** Configured lifecycle roles for the current tracker; omitted for pure presentation inputs. */
+    statusRegistry?: RuntimeStatusRegistry;
     /** Include explicitly declared decision requests in the periodic presentation. */
     includeDecisions?: boolean;
     channel?: string;
@@ -366,6 +362,10 @@ export declare function pmReadTimeoutMs(): number;
  * pinned binary gets the same platform-correct launch instead of bypassing it.
  */
 export declare function fetchAllItems(pmRoot: string, pmBin?: string | PmLaunch): PmItem[];
+/** Read through the invocation's host client, certifying rows and fresh history before use. */
+export declare function readSdkStandupItems(ctx: Pick<CommandHandlerContext, "pm_root" | "sdk">): Promise<PmItem[]>;
+/** Resolve tracker lifecycle roles with the SDK's settings loader. */
+export declare function readStandupStatusRegistry(pmRoot: string): Promise<RuntimeStatusRegistry>;
 /**
  * True when an item's last activity falls within the [sinceMs, now] window.
  * NaN sinceMs means "no window" → always true.
@@ -391,7 +391,7 @@ export declare function hasBlockedByDep(item: PmItem): boolean;
  * @param now - Reference epoch-ms instant (defaults to the current time).
  * @returns The age in whole days, or `undefined` when the item is not blocked or undated.
  */
-export declare function blockedAgeDays(item: PmItem, now?: number): number | undefined;
+export declare function blockedAgeDays(item: PmItem, now?: number, registry?: RuntimeStatusRegistry): number | undefined;
 /**
  * Local-day key (YYYY-MM-DD in the host's local timezone) for an item's last
  * activity. Used by the `--yesterday` split. Falls back to created_at, then
@@ -439,7 +439,7 @@ export declare function resolveSections(data: StandupData, opts: StandupOptions)
  * @param withPriority - When true, append the numeric priority.
  * @returns The composed one-line item string.
  */
-export declare function itemText(item: PmItem, mentionMap: Record<string, string>, withPriority?: boolean): string;
+export declare function itemText(item: PmItem, mentionMap: Record<string, string>, withPriority?: boolean, registry?: RuntimeStatusRegistry): string;
 /**
  * Group a list of items by the configured field (assignee, sprint, type or
  * milestone). Items missing the field bucket under a synthetic "_none" key
