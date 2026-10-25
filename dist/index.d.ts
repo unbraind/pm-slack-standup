@@ -1,6 +1,7 @@
 import type { DecisionRequestReport } from "./decision-requests.ts";
 export * from "./decision-requests.ts";
 import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+export { classifyStandupItem, hasBlockedByDep } from "./status-roles.ts";
 import type { CommandHandlerContext } from "@unbrained/pm-cli/sdk/authoring";
 /** Compatibility constructor retaining instanceof checks while the SDK owns expected errors. */
 export declare class CommandError extends Error {
@@ -371,14 +372,6 @@ export declare function readStandupStatusRegistry(pmRoot: string): Promise<Runti
  * NaN sinceMs means "no window" → always true.
  */
 export declare function withinWindow(item: PmItem, sinceMs: number): boolean;
-/**
- * True when an item carries a `blocked_by` dependency, regardless of its
- * status. pm surfaces this either as a top-level `blocked_by` string (item ID
- * or free-text reason) or as one/more `dependencies` entries with
- * `kind: "blocked_by"`. Used to surface impediments that are NOT explicitly
- * status=blocked under the Blocked section.
- */
-export declare function hasBlockedByDep(item: PmItem): boolean;
 /**
  * Whole days an item has been blocked, for stale-impediment highlighting.
  *

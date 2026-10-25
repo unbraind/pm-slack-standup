@@ -1,4 +1,5 @@
 import type { PmItem } from "./index.ts";
+import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
 /** Explicit opt-in tag; ordinary Decision items never become requests implicitly. */
 export declare const DECISION_REQUEST_TAG = "standup-decision-request";
 /** Versioned, author-declared public presentation contract stored in the item body. */
@@ -59,6 +60,8 @@ export declare class DecisionRequestRefusal extends Error {
 export interface DecisionRequestOptions {
     limit?: number;
     outputBytes?: number;
+    /** Tracker lifecycle roles, shared with the work-section and blocker classifier. */
+    statusRegistry?: RuntimeStatusRegistry;
 }
 /** Identify opted-in Decision items without examining or copying their body. */
 export declare function isDecisionRequestItem(item: PmItem): boolean;

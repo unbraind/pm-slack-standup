@@ -54,7 +54,7 @@ test("real tracker records exercise dependency context, grouping, windows, and r
     bare.updated_at = "invalid";
     assert.equal(withinWindow(bare, 0), false);
     Reflect.deleteProperty(bare, "status");
-    assert.equal(buildStandupData([bare], opts).wip.length, 0);
+    assert.throws(() => buildStandupData([bare], opts), /status is not registered/);
     const open = fixture.items.filter((item) => item.status === "open").map((item) => ({ ...item }));
     for (const item of open) Reflect.deleteProperty(item, "priority");
     Reflect.deleteProperty(opts, "upNextCount");

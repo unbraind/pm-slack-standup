@@ -8,7 +8,7 @@ import test from "node:test";
 test("documented decision verification works in a source copy without dist", () => {
   const directory = mkdtempSync(join(tmpdir(), "standup-decision-guide-"));
   try {
-    for (const path of ["index.ts", "decision-requests.ts", "tsconfig.json", "tsconfig.test.json", "package.json",
+    for (const path of ["index.ts", "decision-requests.ts", "status-roles.ts", "tsconfig.json", "tsconfig.test.json", "package.json",
       "package-lock.json", "manifest.json", "README.md", "CHANGELOG.md", ".gitignore", "docs", "scripts", "test"]) {
       cpSync(resolve(path), join(directory, path), { recursive: true });
     }

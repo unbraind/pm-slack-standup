@@ -1,3 +1,4 @@
+import { classifyStandupItem } from "./status-roles.js";
 /** Explicit opt-in tag; ordinary Decision items never become requests implicitly. */
 export const DECISION_REQUEST_TAG = "standup-decision-request";
 /**
@@ -25,12 +26,6 @@ export class DecisionRequestRefusal extends Error {
         this.itemId = itemId;
     }
 }
-/**
- * Item states that suppress a request before payload validation.
- * Includes the standup done alias `complete` so a finished Decision cannot
- * abort the report when its old declaration is incomplete.
- */
-const terminal = new Set(["closed", "done", "complete", "completed", "canceled", "cancelled", "superseded", "archived", "resolved", "rejected"]);
 /** Narrow untrusted JSON without asserting a declaration shape. */
 function record(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -106,7 +101,7 @@ export function collectDecisionRequests(items, options = {}) {
     }
     const requests = [];
     for (const item of items) {
-        if (!isDecisionRequestItem(item) || terminal.has(item.status.trim().toLowerCase()))
+        if (!isDecisionRequestItem(item) || classifyStandupItem(item, options.statusRegistry).terminal)
             continue;
         const value = declaration(item);
         if (value.state !== "pending" || value.disclosure !== "public")

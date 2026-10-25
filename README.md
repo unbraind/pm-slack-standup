@@ -10,7 +10,7 @@ A [pm-cli](https://github.com/unbraind/pm-cli) extension that posts your current
 - Group section items by `status` (default), `assignee`, `sprint`, `type`, or `milestone` (`--group-by`); items without the field bucket under a friendly fallback label (e.g. `(no milestone)`)
 - **Configurable "Up Next" size** — `--up-next <n>` sets how many open items the Up Next section shows (default 3), or `--all-open` shows the **entire** open backlog so nothing is silently truncated
 - Choose which sections to render and in what order with `--sections` (`in_progress`, `blocked`, `done`, `up_next`); a dedicated **Blocked** section always surfaces blocked items
-- **Impediment inference** — the Blocked section surfaces not only `status=blocked` items but any open/in-progress item carrying a `blocked_by` dependency (top-level or in `dependencies[]`), so dependency-blocked work is never hidden
+- **Impediment inference** — the Blocked section surfaces not only blocked-role items but any nonterminal item carrying a `blocked_by` dependency (top-level or in `dependencies[]`), so dependency-blocked work is never hidden
 - **Blocked-work context** — blocked/dependency-blocked rows include the blocker id/reason and mark blockers stale after 3+ days since last activity
 - **Yesterday/Today split** (`--yesterday`) — split the Done section into **Done Yesterday** / **Done Today** by the local-day boundary (implies `--include-done`)
 - **Multi-channel posting** (`--channels #a,#b`) — post the same standup to several channel names and/or webhook URLs in one run, each message labelled with its own channel
@@ -359,7 +359,7 @@ for an agent-readable JSON report. Add `--include-decisions` to a standup or
 export to show declared requests with alternatives, response deadlines, canonical
 evidence and acknowledgment links. Only Decision items tagged
 `standup-decision-request` with an explicit versioned body declaration qualify.
-Closed, complete, and superseded requests disappear; private alternatives stay withheld.
+Requests with any configured terminal lifecycle role disappear; private alternatives stay withheld.
 The SDK exports `collectDecisionRequests`, its typed contracts, and actionable
 `DecisionRequestRefusal` errors. See the [schema, CLI and SDK example](docs/decision-requests.md).
 
@@ -374,7 +374,8 @@ The supported host floor is pm CLI 2026.10.20. Configured status aliases and
 terminal roles are authoritative; canceled items with old blocker links now stay
 out of the Blocked section. Invalid history now refuses a report even after SDK
 caches were primed. Legacy display aliases such as `doing`, `on_hold`, and `done`
-remain supported unless the tracker explicitly defines them differently. Expected
+remain supported by the default standalone presentation registry. Hosted reads use
+only the tracker's configured statuses and aliases. Expected
 errors use the SDK discriminator and reject nonpositive or nonfinite exit codes.
 
 The exported synchronous `fetchAllItems(pmRoot, pmBin)` remains a standalone CLI
@@ -383,7 +384,7 @@ apply only to that adapter; hosted commands use the SDK directly.
 
 ## How It Works
 
-1. Reads every item through the host SDK `client.listAllComplete({ includeBody: true })`, retains complete-corpus certification, and freshly verifies each item history and its current document through the SDK history action before rendering, posting or exporting. Lifecycle roles come from SDK settings and the runtime status registry; presentation buckets remain In Progress, Blocked, open (Up Next) and optionally Done. Any open/in-progress item with a `blocked_by` dependency (top-level or in `dependencies[]`) is re-bucketed into Blocked; terminal items (including canceled work) are never re-surfaced as blocked.
+1. Reads every item through the host SDK `client.listAllComplete({ includeBody: true })`, retains complete-corpus certification, and freshly verifies each item history and its current document through the SDK history action before rendering, posting or exporting. One shared classifier resolves lifecycle roles and aliases from the SDK runtime status registry for work sections, blocker highlighting and decision requests. Every active-role status enters In Progress unless it has a draft/default-open role (Up Next) or a blocker (Blocked); terminal-done roles enter Done when requested. Canceled and other terminal roles remain suppressed. Unregistered or unclassified statuses refuse the report instead of silently disappearing. Any nonterminal item with a `blocked_by` dependency (top-level or in `dependencies[]`) is re-bucketed into Blocked; terminal items (including canceled work) are never re-surfaced as blocked.
 2. Sorts open items by priority (ascending) and takes the top N as "Up Next" (default 3; set with `--up-next <n>`, or `--all-open` to show the entire open backlog).
 3. Builds a Slack Block Kit `blocks` array (header + a section per bucket + context footer) plus a plain-text `fallback`, optionally grouped by assignee and annotated with Slack mentions. Section titles/emoji can be overridden with `--section-labels`, and `--yesterday` expands Done into Done Yesterday / Done Today.
 4. In `--dry-run`, prints the message in the chosen `--format` and exits without any network call. Otherwise posts `{ text, blocks }` to each target (the base webhook plus any `--channels`) using Node.js native `https`. A missing webhook (on a real post) raises a structured `CommandError`; a failed post does too **unless** `--fallback-to-stdout` is set, in which case the rendered standup is printed to stdout and the command exits 0.

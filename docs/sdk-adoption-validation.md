@@ -71,7 +71,7 @@ test/sdk-adoption.test.ts`. Normal verification uses
 `node --test test/sdk-adoption.test.ts test/sdk-adoption-differential.test.ts`,
 `npm run typecheck`, `npm run lint`, and the unchanged npm/Bun release gates.
 
-## Measured gates
+## Original adoption gates (commit `70a6185`)
 
 Both `npm run release:check` and `bun run release:check` pass with an isolated
 home and global Git configuration disabled. Each runs 280 passing tests, one
@@ -90,3 +90,64 @@ extensions are outside this package's gate environment.
 The patch removes 56 lines from `index.ts`, including the replaced status and
 error ownership code and obsolete explanations. Generated declarations and
 JavaScript are rebuilt with the source.
+
+
+## Status-role review closure
+
+The original adoption still compared one configured in-progress name and one
+open name, so extra active or default-open statuses could disappear. Decision
+requests also retained an independent list of terminal names.
+
+`status-roles.ts` now owns `classifyStandupItem`. Every lifecycle decision in
+bucketing, stale-blocker age, ordinary and compact blocker highlighting, and
+both periodic and direct decision reporting calls this helper. It resolves
+aliases with `normalizeStatusInputWithRegistry`, reads SDK role sets and status
+definitions, and uses `statusIsTerminal`. No configured status name chooses its
+meaning. Remaining `status` comparisons concern process exits, HTTP responses,
+option grouping or input shape; declaration `state` values remain the separate
+versioned decision-request protocol.
+
+Terminal roles take precedence over blocker edges. Canceled roles suppress
+completion even when combined with a done role. Nonterminal blocked work enters
+Blocked; draft/default-open roles enter Up Next; every remaining active role
+enters In Progress. Terminal-done work follows the include-done/date-window
+policy; canceled and generic terminal work stays suppressed. Team filters,
+section selection and the normal Up Next cap remain explicit presentation
+policies. Unregistered or roleless statuses without a blocker refuse the report.
+Legacy standalone spellings are configured as aliases of SDK default role
+definitions; they never override a tracker's own definitions.
+
+The independent seeded property oracle generates 64 actual SDK registries with
+opaque renamed identities, aliases, 2-4 statuses per role, mixed roles, randomly
+selected workflow defaults and random items. Across every all-open/include-done
+combination, five team-filter modes and three date-window modes, it checks
+3,840 bucket cases, 61,440 section selections and 223,200 item classifications.
+Each eligible item is present exactly once; intentional filtering, terminal
+suppression and open-item caps match the declared role plan. A separate
+adversarial registry gives familiar names such as closed, open and canceled
+different roles. Real SDK tracker tests include reviewing with role active,
+an additional default-open status, terminal decision suppression and previews
+and exports with no Git or PM executable on PATH.
+
+Four isolated behavioral reverts each fail the same property suite: replacing
+active roles with one in-progress identity, replacing default-open roles with
+one open identity, removing terminal suppression from blocker classification,
+and restoring the decision collector's fixed terminal names. Restoring the
+shared classifier passes all new tests and the existing cache-integrity tests.
+
+
+The corrected role-closure npm and Bun release gates each pass 283/283 tests,
+canonical reader acceptance and all five packed scenarios with bounded local
+test parallelism. All 13 source files measure 100% in every coverage dimension:
+4,075/4,075 lines and statements, 139/139 functions and 1,268/1,268 branches.
+No source exclusions, timeout changes or threshold reductions were introduced.
+The prior malformed-status fixture now requires an explicit refusal instead
+of expecting silent omission; source-copy verification includes the new module.
+
+A final source differential rerun after the role-class fix passes all 22
+command/export comparisons on the same public 100-item and 89-item tracker
+archives, with authoritative byte hashes unchanged. The pinned tracker-linked
+test runner passes both linked commands (four SDK/integrity tests and three
+role/property tests). The corrected targeted run also passes all 11 tests,
+including runtime renderer behavior. Dependency pins and CI workflows remain
+unchanged.

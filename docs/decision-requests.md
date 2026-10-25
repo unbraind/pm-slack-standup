@@ -62,8 +62,7 @@ is withheld entirely. Every alternative must explicitly declare `public` or
 the withheld count appears. Titles, general body prose, and unknown fields are
 never copied into the decision section. Declared requests are excluded from
 ordinary work buckets even when the optional section is disabled. JSON exports
-never contain their source bodies; `--include-decisions` adds their public projection. Terminal item states
-(including the standup done alias `complete`, compared after trimming) and terminal request states suppress a
+never contain their source bodies; `--include-decisions` adds their public projection. SDK terminal lifecycle roles (including custom statuses and registered aliases) and terminal request states suppress a
 request before validating obsolete payload details.
 Untagged decisions are ignored, including malformed old notes. A malformed
 active declaration refuses the entire report instead of silently dropping it.
@@ -79,13 +78,16 @@ work-section filters do not hide pending requests.
 
 ```ts
 import {
-  collectDecisionRequests, fetchAllItems, DecisionRequestRefusal,
+  collectDecisionRequests, readSdkStandupItems, readStandupStatusRegistry, DecisionRequestRefusal,
   type DecisionRequestDeclaration,
 } from "pm-slack-standup";
 
 const declarationVersion: DecisionRequestDeclaration["version"] = 1;
 try {
-  const report = collectDecisionRequests(fetchAllItems(".agents/pm"), { limit: 3 });
+  const pmRoot = ".agents/pm";
+  const report = collectDecisionRequests(await readSdkStandupItems({ pm_root: pmRoot }), {
+    limit: 3, statusRegistry: await readStandupStatusRegistry(pmRoot),
+  });
   console.log(declarationVersion, report.requests, report.omitted);
 } catch (error) {
   if (error instanceof DecisionRequestRefusal) {

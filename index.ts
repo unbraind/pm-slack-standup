@@ -10,9 +10,11 @@ export * from "./decision-requests.ts";
 
 import {
   certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE,
-  PmClient, readSettings, resolveRuntimeStatusRegistry, normalizeStatusInputWithRegistry, statusIsTerminal,
+  PmClient, readSettings, resolveRuntimeStatusRegistry,
 } from "@unbrained/pm-cli/sdk";
 import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+import { classifyStandupItem, DEFAULT_STATUS_REGISTRY } from "./status-roles.ts";
+export { classifyStandupItem, hasBlockedByDep } from "./status-roles.ts";
 import type {
   CommandHandlerContext,
   ExtensionModule,
@@ -1121,23 +1123,6 @@ export function fetchAllItems(pmRoot: string, pmBin: string | PmLaunch = resolve
   return readCompleteStandupItems(envelope);
 }
 
-/** Default lifecycle registry for standalone presentation helpers. */
-const DEFAULT_STATUS_REGISTRY = resolveRuntimeStatusRegistry({
-  version: 1, files: {}, statuses: [], fields: [], workflow: {}, unknown_field_policy: "allow",
-});
-
-/** Legacy display spellings retained as presentation aliases, after configured SDK aliases. */
-const PRESENTATION_STATUS_ALIASES: Readonly<Record<string, string>> = {
-  wip: "in_progress", doing: "in_progress", on_hold: "blocked", todo: "open", new: "open",
-  done: "closed", complete: "closed", completed: "closed",
-};
-
-/** Resolve lifecycle identities through the configured SDK registry before display aliases. */
-function statusOf(item: PmItem, registry: RuntimeStatusRegistry = DEFAULT_STATUS_REGISTRY): string {
-  const status = (item.status ?? "").trim().toLowerCase();
-  return normalizeStatusInputWithRegistry(status, registry) ?? PRESENTATION_STATUS_ALIASES[status] ?? status;
-}
-
 /** Read through the invocation's host client, certifying rows and fresh history before use. */
 export async function readSdkStandupItems(ctx: Pick<CommandHandlerContext, "pm_root" | "sdk">): Promise<PmItem[]> {
   const client = ctx.sdk?.client ?? new PmClient({ pmRoot: ctx.pm_root, noExtensions: true });
@@ -1175,27 +1160,6 @@ export function withinWindow(item: PmItem, sinceMs: number): boolean {
 }
 
 /**
- * True when an item carries a `blocked_by` dependency, regardless of its
- * status. pm surfaces this either as a top-level `blocked_by` string (item ID
- * or free-text reason) or as one/more `dependencies` entries with
- * `kind: "blocked_by"`. Used to surface impediments that are NOT explicitly
- * status=blocked under the Blocked section.
- */
-export function hasBlockedByDep(item: PmItem): boolean {
-  const top = item.blocked_by;
-  if (typeof top === "string" && top.trim().length > 0) return true;
-  const deps = item.dependencies;
-  if (Array.isArray(deps)) {
-    for (const d of deps) {
-      if (d && typeof d.kind === "string" && d.kind.trim().toLowerCase() === "blocked_by") {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-/**
  * Whole days an item has been blocked, for stale-impediment highlighting.
  *
  * Only items that are blocked (by status or a `blocked_by` dependency) are
@@ -1208,7 +1172,7 @@ export function hasBlockedByDep(item: PmItem): boolean {
  * @returns The age in whole days, or `undefined` when the item is not blocked or undated.
  */
 export function blockedAgeDays(item: PmItem, now: number = Date.now(), registry: RuntimeStatusRegistry = DEFAULT_STATUS_REGISTRY): number | undefined {
-  if (!registry.blocked_statuses.has(statusOf(item, registry)) && !hasBlockedByDep(item)) return undefined;
+  if (!classifyStandupItem(item, registry).blocked) return undefined;
   const ts = Date.parse(item.updated_at ?? item.created_at ?? "");
   if (isNaN(ts)) return undefined;
   return Math.max(0, Math.floor((now - ts) / 86_400_000));
@@ -1267,19 +1231,12 @@ export function buildStandupData(
   // Declared requests never enter raw work buckets, including exports without the optional section.
   const work = visible.filter((item) => !isDecisionRequestItem(item));
   const registry = opts.statusRegistry ?? DEFAULT_STATUS_REGISTRY;
-  const isTerminal = (i: PmItem) => statusIsTerminal(statusOf(i, registry), registry);
-  const isDone = (i: PmItem) => isTerminal(i) && registry.terminal_done_statuses.has(statusOf(i, registry));
-  // An item is "blocked" for standup purposes when its status is blocked/
-  // on_hold OR it carries a blocked_by dependency — but a done item is never
-  // re-surfaced as blocked (a closed impediment is no longer an impediment).
-  const isBlocked = (i: PmItem) =>
-    !isTerminal(i) && (registry.blocked_statuses.has(statusOf(i, registry)) || hasBlockedByDep(i));
-
-  const wip = work.filter((i) => statusOf(i, registry) === registry.in_progress_status && !isBlocked(i));
-  const blocked = work.filter(isBlocked);
-  const open = work.filter((i) => (statusOf(i, registry) === registry.open_status || registry.draft_statuses.has(statusOf(i, registry))) && !isBlocked(i));
+  const classified = work.map((item) => ({ item, roles: classifyStandupItem(item, registry) }));
+  const wip = classified.filter(({ roles }) => roles.active).map(({ item }) => item);
+  const blocked = classified.filter(({ roles }) => roles.blocked).map(({ item }) => item);
+  const open = classified.filter(({ roles }) => roles.open).map(({ item }) => item);
   const done = opts.includeDone
-    ? work.filter((i) => isDone(i) && withinWindow(i, sinceMs))
+    ? classified.filter(({ item, roles }) => roles.done && withinWindow(item, sinceMs)).map(({ item }) => item)
     : [];
 
   const sortedOpen = [...open].sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
@@ -1287,7 +1244,7 @@ export function buildStandupData(
   const upNext = upNextCount === Infinity ? sortedOpen : sortedOpen.slice(0, upNextCount);
 
   const data: StandupData = { wip, blocked, done, upNext, total: visible.length };
-  if (opts.includeDecisions) data.decisions = collectDecisionRequests(visible);
+  if (opts.includeDecisions) data.decisions = collectDecisionRequests(visible, { statusRegistry: registry });
 
   if (opts.splitYesterday && done.length > 0) {
     const todayKey = localDayKeyOf(now);
@@ -1437,24 +1394,12 @@ export function itemText(item: PmItem, mentionMap: Record<string, string>, withP
 }
 
 /**
- * True when an item is a blocker for standup purposes: status is blocked/
- * on_hold OR it carries a `blocked_by` dependency. (A closed item is never a
- * blocker.) Used by `--include-blockers` highlighting.
- */
-function isBlockerItem(item: PmItem, registry: RuntimeStatusRegistry = DEFAULT_STATUS_REGISTRY): boolean {
-  // A closed/done item is never a blocker: a stale `blocked_by` dependency
-  // on a completed item must not resurface it with a 🚨 marker (e.g. when
-  // `--include-done --include-blockers` are combined).
-  return !statusIsTerminal(statusOf(item, registry), registry) && (registry.blocked_statuses.has(statusOf(item, registry)) || hasBlockedByDep(item));
-}
-
-/**
  * Render one item line, applying `--include-blockers` highlighting (a 🚨
  * prefix on blocked rows) when enabled. Otherwise identical to `itemText`.
  */
 function itemLine(item: PmItem, opts: StandupOptions, withPriority: boolean): string {
   const base = itemText(item, opts.mentionMap, withPriority, opts.statusRegistry);
-  if (opts.includeBlockers && isBlockerItem(item, opts.statusRegistry)) return `🚨 ${base}`;
+  if (opts.includeBlockers && classifyStandupItem(item, opts.statusRegistry).blocked) return `🚨 ${base}`;
   return base;
 }
 
@@ -1467,9 +1412,9 @@ function compactSectionLine(def: SectionDef, opts: StandupOptions): string {
   if (def.items.length === 0) return "";
   // Honor `--include-blockers`: prefix blocked item titles with 🚨 so the
   // marker is not lost in compact mode (README says blockers are highlighted
-  // in every format). Done items are never blockers (see isBlockerItem).
+  // in every format). Done items are never blockers (see classifyStandupItem).
   const titles = def.items
-    .map((i) => (opts.includeBlockers && isBlockerItem(i, opts.statusRegistry) ? `🚨 ${i.title}` : i.title))
+    .map((i) => (opts.includeBlockers && classifyStandupItem(i, opts.statusRegistry).blocked ? `🚨 ${i.title}` : i.title))
     .join("; ");
   return `${def.emoji} ${def.title} (${def.items.length}): ${titles}`;
 }
@@ -2591,7 +2536,8 @@ export default defineExtension({
           outputBytes: Number(readStrOption(ctx.options, "output-bytes") ?? 8192),
         };
         collectDecisionRequests([], options);
-        return collectDecisionRequests(await readSdkStandupItems(ctx), options);
+        const items = await readSdkStandupItems(ctx);
+        return collectDecisionRequests(items, { ...options, statusRegistry: await readStandupStatusRegistry(ctx.pm_root) });
       },
     });
 
