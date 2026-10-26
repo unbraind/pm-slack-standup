@@ -2,15 +2,20 @@ id: pm-slack-standup-jti0
 title: Use the pm SDK for certified standup reads and lifecycle roles
 description: "Replace the 2026-10-25 audit findings with host-bound complete reads, configured SDK lifecycle roles and SDK expected errors. Preserve certification and integrity, prove public-tracker differential parity and behavioural reverts, retain the explicitly selected synchronous CLI adapter for compatibility."
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags[3]: "gh:unbraind/pm-slack-standup#151",refactor,sdk-adoption
 created_at: "2026-10-25T18:27:41.796Z"
-updated_at: "2026-10-25T22:04:36.200Z"
+updated_at: "2026-10-26T03:19:45.221Z"
+closed_at: "2026-10-26T03:19:32.299Z"
+completed_at: "2026-10-25T22:19:19.000Z"
 author: codex-agent
+resolution: "Delivered by PR #151, merge d1279e294c3bf41694927fd1636e2a02425a9f9a, merged 2026-10-25T22:19:19Z. index.ts reads host listAllComplete with full bodies and fresh verified history; status-roles.ts classifyStandupItem centralizes SDK roles/aliases for reports, decisions and blockers. test/sdk-adoption.test.ts and test/status-roles.test.ts cover no-executable reads, expected errors, cache corruption, multiple active/default-open names, terminal decisions and the reviewing regression."
+expected_result: "Standups use certified host SDK reads, configured lifecycle roles and expected errors without losing integrity or explicit synchronous compatibility."
+actual_result: The linked SDK/role suite passes on main. Inspected all lifecycle consumers use the shared classifier; 64-registry property cases and real reviewing command/export regressions are retained. The explicitly selected synchronous CLI adapter remains supported.
 dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
   pm-slack-standup-xms9,related,"2026-10-25T18:39:42.423Z",codex-agent,"cli:update:dep",detected
-comments[12]{created_at,author,text}:
+comments[13]{created_at,author,text}:
   "2026-10-25T18:27:55.681Z",codex-agent,"Related prior SDK adoption: pm-slack-standup-xms9; certified-reader work: pm-slack-standup-ozic. Plan: host client.listAllComplete with existing certification; settings-derived lifecycle registry; SDK expected errors. Keep the public synchronous fetchAllItems(pmRoot, pmBin) standalone executable adapter for compatibility. Verify history after SDK cache priming, compare immutable public tracker copies, and record one behavioural revert per replacement."
   "2026-10-25T18:36:53.037Z",codex-agent,"Implementation: hosted standup, alias, decisions and exporter reads now use the invocation SDK client.listAllComplete({ includeBody: true }), retain readCompleteStandupItems/certifyCompleteListResult, and call the fresh SDK history verification action before rows can drive output or snapshots. The synchronous fetchAllItems(pmRoot, pmBin) API remains only as the explicit standalone executable adapter: PmClient.listAllComplete is asynchronous and cannot preserve its synchronous/executable-selection contract. No missing upstream SDK API blocks hosted adoption. SDK EXIT_CODE/createPmCliExpectedError replace local error ownership; CommandError remains a compatibility wrapper for instanceof consumers. Lifecycle buckets use readSettings/resolveRuntimeStatusRegistry/statusIsTerminal with legacy presentation aliases. Host peer and manifest floors now require 2026.10.20; development dependency pin unchanged."
   "2026-10-25T18:36:57.237Z",codex-agent,"Behavioural revert proofs: replacing only readSdkStandupItems with the previous fetchAllItems call makes the no-git/no-executable regression fail (exit 127). Restoring the original buildStandupData function and its removed status constants makes the custom-terminal regression fail: expected custom-done but got no done item. Restoring only the previous CommandError class makes the SDK expected-error discriminator assertion fail. All three experiments ran the same test/sdk-adoption.test.ts regressions via node --test --test-name-pattern and each exited nonzero; the adopted implementation passes 4/4 focused tests. Corruption-after-cache test verifies both command refusal and absence of export/snapshot files."
@@ -23,6 +28,7 @@ comments[12]{created_at,author,text}:
   "2026-10-25T21:12:49.197Z",codex-agent,"First role-closure full gate: 282/283 tests passed; status-roles.ts itself measured 100/100/100/100. The sole failing legacy assertion deliberately removed an item status and expected silent omission. Updated it to require the new explicit unregistered-status refusal mandated by the no-disappearing-items contract; no production behavior or gate threshold was weakened. The source-copy documentation test now copies the new status-roles.ts module. Corrected targeted typecheck/build:test/lint/zero-duplication checks pass; full release gates are being rerun."
   "2026-10-25T21:26:30.789Z",codex-agent,"Corrected full-suite run measured all 13 sources at 100/100/100/100. The sole failure is the pre-existing packed acceptance subprocess timeout (290 seconds), with no role/integrity regression failure. Retrying the unchanged release command with a two-CPU affinity bound, reducing available parallelism from four CPUs; no test scope, timeout, threshold or workflow changes. The corrected targeted run passes 11/11."
   "2026-10-25T22:04:34.605Z",codex-agent,"Final status-role closure verification: both unchanged npm run release:check and bun run release:check pass with bounded local parallelism, 283/283 tests each, canonical-reader 1/1 and packed acceptance 5/5 each. All 13 executable sources retain 100/100/100/100: 4075/4075 lines and statements, 139/139 functions, 1268/1268 branches. Typecheck, lint, zero duplication, docstrings, production audit, packaging, changelog and attestation pass. Corrected targeted tests pass 11/11; pinned pm test --run --progress passes 2/2 linked commands (7/7 SDK-integrity and role tests). Final-source public differential proof passes 22/22 command/export comparisons across immutable 100-item and 89-item corpora; tracker bytes unchanged. classifyStandupItem is the sole lifecycle classifier across work buckets, blocker age/markers and decision reports. Property results: 64 registries, 3840 bucket cases, 61440 section selections, 223200 classifications. Four isolated role reverts fail as documented. Combined adoption removes 105 production-source lines. No missing SDK API or new implementation blocker identified. PR 151 remains ready for updated-head CI and manual review; no merge, release or thread reply."
+  "2026-10-26T03:17:05.406Z",codex-agent,"Closure audit on main d1279e294c3bf41694927fd1636e2a02425a9f9a: merged PR #151 (d1279e294c3bf41694927fd1636e2a02425a9f9a, merged 2026-10-25T22:19:19Z). index.ts reads host listAllComplete with full bodies and fresh verified history; status-roles.ts classifyStandupItem centralizes SDK roles/aliases for reports, decisions and blockers. test/sdk-adoption.test.ts and test/status-roles.test.ts cover no-executable reads, expected errors, cache corruption, multiple active/default-open names, terminal decisions and the reviewing regression. All scoped acceptance criteria are represented by the inspected implementation and regressions. Existing behavioural revert evidence is retained; this tracker-only audit changes no runtime functions."
 files[8]{path,scope}:
   decision-requests.ts,project
   index.ts,project
@@ -32,11 +38,32 @@ files[8]{path,scope}:
   test/sdk-adoption-differential.test.ts,project
   test/sdk-adoption.test.ts,project
   test/status-roles.test.ts,project
-tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
-  node --test test/sdk-adoption.test.ts,project,codex-agent,"2026-10-25T18:37:07.802Z",local_mutation,refactor/sdk-adoption-1025
-  node --test test/status-roles.test.ts,project,codex-agent,"2026-10-25T21:02:36.991Z",local_mutation,refactor/sdk-adoption-1025
+tests[3]:
+  - command: node --test test/sdk-adoption.test.ts
+    scope: project
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-25T18:37:07.802Z"
+      source_kind: local_mutation
+      source_ref: refactor/sdk-adoption-1025
+  - command: node --test test/status-roles.test.ts
+    scope: project
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-25T21:02:36.991Z"
+      source_kind: local_mutation
+      source_ref: refactor/sdk-adoption-1025
+  - command: node --test test/sdk-adoption.test.ts test/status-roles.test.ts
+    scope: project
+    timeout_seconds: 600
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-26T03:18:00.641Z"
+      source_kind: local_mutation
+      source_ref: chore/close-delivered-1026
 docs[3]{path,scope}:
   docs/decision-requests.md,project
   docs/sdk-adoption-validation.md,project
   README.md,project
+close_reason: "Delivered by PR #151, merge d1279e294c3bf41694927fd1636e2a02425a9f9a, merged 2026-10-25T22:19:19Z. index.ts reads host listAllComplete with full bodies and fresh verified history; status-roles.ts classifyStandupItem centralizes SDK roles/aliases for reports, decisions and blockers. test/sdk-adoption.test.ts and test/status-roles.test.ts cover no-executable reads, expected errors, cache corruption, multiple active/default-open names, terminal decisions and the reviewing regression."
 body: ""
