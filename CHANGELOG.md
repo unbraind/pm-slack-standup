@@ -22,9 +22,7 @@
 ### Fixed
 
 - Propagate the docstring gate entry guard fix ([pm-slack-standup-9d6m](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-9d6m.toon))
-- Track published pm-github apply-path limitations exposed by certification review ([pm-slack-standup-bhg0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bhg0.toon))
 - Check external action pin properties without freezing Dependabot revisions ([pm-slack-standup-6wvl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-6wvl.toon))
-- Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ### Security
 
@@ -34,6 +32,10 @@
 
 - Enable GitHub CodeQL code scanning ([pm-slack-standup-52od](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-52od.toon))
 - Certify pm-slack-standup on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates ([pm-slack-standup-74w8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-74w8.toon))
+
+### Closed
+
+- Closed: Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ## 2026.10.14 - 2026-10-14
 
@@ -93,9 +95,12 @@
 
 ### Fixed
 
-- Disable cmd.exe delayed expansion on the Windows pm launch path ([pm-slack-standup-bqr8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bqr8.toon))
 - Refuse quote-breaking arguments in the Windows cmd.exe launch ([pm-slack-standup-15ap](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-15ap.toon))
 - Refuse a line break in a cmd.exe launch argument, which quoting cannot contain ([pm-slack-standup-lvgk](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-lvgk.toon))
+
+### Closed
+
+- Closed: Disable cmd.exe delayed expansion on the Windows pm launch path ([pm-slack-standup-bqr8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bqr8.toon))
 
 ## 2026.9.5 - 2026-09-05
 
@@ -117,10 +122,13 @@
 
 ### Fixed
 
-- Fix PR 56 scalar execution-order bypass ([pm-slack-standup-nafb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-nafb.toon))
 - The publish-attestation gate misses a publish routed through an unquoted shell variable ([pm-slack-standup-83u3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-83u3.toon))
 - A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-ofro](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ofro.toon))
 - Keep publish-attestation bindings within their shell scope ([pm-slack-standup-8smy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-8smy.toon))
+
+### Closed
+
+- Closed: Fix PR 56 scalar execution-order bypass ([pm-slack-standup-nafb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-nafb.toon))
 
 ## 2026.8.28 - 2026-08-28
 
@@ -131,9 +139,9 @@
 - The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-slack-standup-eeo9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-eeo9.toon))
 - Canonicalize complete standup reads on pm CLI 2026.8.21 ([pm-slack-standup-ozic](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ozic.toon))
 
-### Security
+### Closed
 
-- The identity gate deadlocks the one remediation its own failure message prescribes ([pm-slack-standup-yzns](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-yzns.toon))
+- Closed: The identity gate deadlocks the one remediation its own failure message prescribes ([pm-slack-standup-yzns](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-yzns.toon))
 
 ## 2026.8.17 - 2026-08-17
 
@@ -160,12 +168,15 @@
 
 ### Fixed
 
-- Fix release publish ordering before protected main push ([pm-slack-standup-dwjl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dwjl.toon))
 - The mandatory docstring gate could skip its own scan and still exit zero ([pm-slack-standup-cg85](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-cg85.toon))
 
 ### Other
 
 - Adopt the canonical pm-ops docstring gate ([pm-slack-standup-4hk6](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-4hk6.toon))
+
+### Closed
+
+- Closed: Fix release publish ordering before protected main push ([pm-slack-standup-dwjl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dwjl.toon))
 
 ## 2026.8.7 - 2026-08-07
 
@@ -197,14 +208,14 @@
 
 ## 2026.7.28 - 2026-07-28
 
-### Fixed
-
-- Fix the output_format service override so it declines unclaimed payloads instead of echoing the command context ([pm-slack-standup-v4tf](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-v4tf.toon))
-
 ### Other
 
 - Adopt pm-cli 2026.7.28 ([pm-slack-standup-40od](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-40od.toon))
 - Eliminate the last source any with real SDK handler context types ([pm-slack-standup-m2jv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-m2jv.toon))
+
+### Closed
+
+- Closed: Fix the output_format service override so it declines unclaimed payloads instead of echoing the command context ([pm-slack-standup-v4tf](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-v4tf.toon))
 
 ## 2026.7.27 - 2026-07-27
 
@@ -226,13 +237,13 @@
 
 ## 2026.7.23 - 2026-07-23
 
-### Fixed
-
-- Recommend pm merge reconcile (2026.7.22) over raw history-repair in Multi-agent merge safety docs ([pm-slack-standup-dkqk](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dkqk.toon))
-
 ### Other
 
 - Adopt pm field-aware merge driver for multi-agent branch-merge safety ([pm-slack-standup-0pxr](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-0pxr.toon))
+
+### Closed
+
+- Closed: Recommend pm merge reconcile (2026.7.22) over raw history-repair in Multi-agent merge safety docs ([pm-slack-standup-dkqk](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dkqk.toon))
 
 ## 2026.7.19 - 2026-07-19
 

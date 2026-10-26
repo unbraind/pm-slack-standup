@@ -1,0 +1,21 @@
+id: pm-slack-standup-jnje
+title: "Make the 2026.10.23 pm toolchain bump pass: the regenerated changelog must adopt pm-changelog's new Closed section"
+description: ""
+type: Chore
+status: closed
+priority: 1
+tags: []
+created_at: "2026-10-26T17:39:28.333Z"
+updated_at: "2026-10-26T17:39:49.351Z"
+closed_at: "2026-10-26T17:39:49.310Z"
+completed_at: "2026-10-26T17:39:49.310Z"
+claim_principal: codex
+author: codex
+comments[1]{created_at,author,text}:
+  "2026-10-26T17:39:37.363Z",codex,"Cause: pm-changelog 2026.10.23 now emits closed tracker items in a dedicated Closed section instead of their original Fixed/Security sections, so the committed CHANGELOG.md no longer matched a fresh generation and the branch's changelog:check step failed with a full-file diff (the earlier failing-check output quoting the coverage-gate fixture was the gate's own expected self-test, not a real failure).\nFix: regenerate CHANGELOG.md with the bumped pm-changelog via npm run changelog:full; no source changes were needed.\nEvidence: npm run release:check green locally under a 2-core taskset (typecheck, lint, duplication, build, docstring, coverage, accept:canonical-reader, audit:prod, pack:dry-run, accept:packed, changelog:check, verify:release-changelog-date, verify:release-publish-attestation all pass)."
+files[1]{path,scope}:
+  CHANGELOG.md,project
+tests[1]{command,scope,provenance{author,created_at,source_kind}}:
+  "npm run release:check",project,codex,"2026-10-26T17:39:40.840Z",local_mutation
+close_reason: "Regenerated CHANGELOG.md with pm-changelog 2026.10.23 (new Closed section) in the fix commit on the Dependabot branch; local release:check green"
+body: ""
