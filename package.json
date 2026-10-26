@@ -1,6 +1,6 @@
 {
   "name": "pm-slack-standup",
-  "version": "2026.10.25",
+  "version": "2026.10.26",
   "description": "Post pm context as a Slack standup message",
   "repository": {
     "type": "git",
@@ -9,7 +9,7 @@
   "bugs": {
     "url": "https://github.com/unbraind/pm-slack-standup/issues"
   },
-  "homepage": "https://github.com/unbraind/pm-slack-standup#readme",
+  "homepage": "https://pm-cli.unbrained.dev/packages/pm-slack-standup",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -54,7 +54,7 @@
     "@unbrained/pm-cli": "2026.10.20",
     "c8": "12.0.0",
     "eslint": "10.13.0",
-    "jscpd": "5.4.1",
+    "jscpd": "5.4.2",
     "pm-changelog": "2026.10.20",
     "pm-ops": "2026.10.20",
     "typescript": "7.0.2",
@@ -75,7 +75,10 @@
   "engines": {
     "node": ">=22.18.0"
   },
-  "author": "@unbraind",
+  "author": {
+    "name": "unbrained",
+    "url": "https://unbrained.dev/about"
+  },
   "pm": {
     "aliases": [
       "slack-standup"
