@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Make the 2026.10.23 pm toolchain bump pass: the regenerated changelog must adopt pm-changelog's new Closed section ([pm-slack-standup-jnje](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-jnje.toon))
+
+### Other
+
+- Stop Hound from linting generated dist/ output ([pm-slack-standup-hound-generated-dist](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-hound-generated-dist.toon))
+
 ## 2026.10.27 - 2026-10-27
 
 ### Changed
