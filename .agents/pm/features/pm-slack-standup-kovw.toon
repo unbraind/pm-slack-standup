@@ -1,0 +1,15 @@
+id: pm-slack-standup-kovw
+title: "Cursor-complete standup reporting windows: build from a certified event boundary and retain the exact next boundary"
+description: "Build a standup from a certified event boundary and retain the exact next boundary so crashes or late/backdated appends do not silently skip work between time windows. Overlap check (re-run 2026-10-27): pm history events / listMutationEvents supply cursor-resumable mutation facts; pm-observer (evidence budgets), pm-context (context-pack cursor), pm-slack (outbox resume cursors) use cursors for their own domains; this package's --since/--days/--compare date windows and snapshots select periodic views. No sibling or CLI command builds standup reporting from a retained event boundary, so this adapts the core mutation cursors to standup reporting without adding another event journal. Acceptance: (1) restart after rendering produces the same packet; (2) a late append appears once in a later admitted window; (3) missing history/cursor coverage marks the report incomplete rather than empty."
+type: Feature
+status: in_progress
+priority: 1
+tags: []
+created_at: "2026-10-27T15:38:14.702Z"
+updated_at: "2026-10-27T15:38:39.395Z"
+assignee: codex-agent
+claim_principal: codex-agent
+author: codex-agent
+docs[1]{path,scope}:
+  README.md,project
+body: ""

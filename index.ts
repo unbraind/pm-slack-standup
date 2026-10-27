@@ -9,8 +9,16 @@ import type { DecisionRequestReport } from "./decision-requests.ts";
 export * from "./decision-requests.ts";
 
 import {
+  admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents,
+  readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents,
+  standupWindowCoverageRegressions, standupWindowUnknownStreams,
+} from "./reporting-window.ts";
+import type { StandupWindowItemRow, StandupWindowPacket } from "./reporting-window.ts";
+export * from "./reporting-window.ts";
+
+import {
   certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE,
-  PmClient, readSettings, resolveRuntimeStatusRegistry,
+  listMutationEvents, PmClient, readSettings, resolveRuntimeStatusRegistry,
 } from "@unbrained/pm-cli/sdk";
 import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
 import { classifyStandupItem, DEFAULT_STATUS_REGISTRY } from "./status-roles.ts";
@@ -2541,6 +2549,146 @@ export default defineExtension({
       },
     });
 
+    // -----------------------------------------------------------------------
+    // Cursor-complete reporting windows: `pm standup window`.
+    //
+    // Builds the standup from a certified event boundary (the retained opaque
+    // mutation-event cursor plus per-stream history coverage in the
+    // `--cursor-file` state file) and retains the exact next boundary after
+    // the packet is rendered, so crashes re-produce the same packet and late
+    // or backdated appends land in the next admitted window instead of being
+    // skipped. Output is the compact TOON/JSON packet the host renders; it
+    // never posts and needs no git repository.
+    // -----------------------------------------------------------------------
+    const windowFlags: FlagDefinition[] = [
+      { long: "--cursor-file", value_name: "path", description: "State file holding the retained boundary; required, created on first admission" },
+      { long: "--no-advance", description: "Render the window packet WITHOUT retaining the next boundary (a restart reproduces the same packet)" },
+      { long: "--max-events", value_name: "n", description: "Window safety cap (1..1000000, default 10000); an over-cap window is reported incomplete and not admitted" },
+      { long: "--output", value_name: "file", description: "Write the packet JSON to this file BEFORE the boundary is admitted (durable delivery)" },
+    ];
+
+    /**
+     * Map one item to the compact packet row shape agents consume.
+     *
+     * @param item - The certified corpus item.
+     * @returns The id/title/status row for a packet section.
+     */
+    const windowRow = (item: PmItem): StandupWindowItemRow => ({ id: item.id, title: item.title, status: item.status });
+
+    const runStandupWindowCommand = async (ctx: CommandHandlerContext) => {
+      const cursorFile = readStrOption(ctx.options, "cursor-file");
+      if (cursorFile === undefined) {
+        refuseStandupWindow("window_cursor_file_missing", "no --cursor-file was supplied.");
+      }
+      const maxEvents = parseStandupWindowMaxEvents(readStrOption(ctx.options, "max-events"));
+      const noAdvance = readBoolOption(ctx.options, "no-advance");
+      const outputPath = readStrOption(ctx.options, "output");
+      const cursorFilePath = resolve(cursorFile);
+      const snapshot = readStandupWindowBoundary(cursorFilePath);
+
+      const scan = await scanStandupWindowEvents(
+        (since?: string) => listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000 }),
+        snapshot.boundary,
+        maxEvents,
+      );
+
+      const items = await readSdkStandupItems(ctx);
+      const registry = await readStandupStatusRegistry(ctx.pm_root);
+      const corpusIds = new Set(items.map((item) => item.id));
+      const regressedStreams = standupWindowCoverageRegressions(snapshot.boundary, scan);
+      const unknownStreams = standupWindowUnknownStreams(scan.windowEvents, corpusIds);
+      const incompleteReasons: string[] = [];
+      if (scan.capped) incompleteReasons.push("event_cap_exceeded");
+      if (regressedStreams.length > 0) incompleteReasons.push("history_regression");
+      if (unknownStreams.length > 0) incompleteReasons.push("unknown_event_stream");
+
+      const touchedIds = new Set(scan.windowEvents.map((event) => event.item_id));
+      const data = buildStandupData(items.filter((item) => touchedIds.has(item.id)), {
+        format: "plain",
+        includeDone: true,
+        groupBy: "status",
+        sections: [...ALL_SECTIONS],
+        mentionMap: {},
+        splitYesterday: false,
+        sectionLabels: {},
+        upNextCount: DEFAULT_UP_NEXT,
+        statusRegistry: registry,
+      }, NaN);
+      const sections = {
+        in_progress: data.wip.map(windowRow),
+        blocked: data.blocked.map(windowRow),
+        done: data.done.map(windowRow),
+        up_next: data.upNext.map(windowRow),
+      };
+
+      const shouldAdmit = !noAdvance && scan.windowEvents.length > 0 && incompleteReasons.length === 0;
+      const assemble = (packetAdmitted: boolean, reasons: readonly string[]): StandupWindowPacket =>
+        buildStandupWindowPacket({
+          boundaryBefore: snapshot.boundary === null ? null : snapshot.boundary.cursor,
+          scan,
+          sections,
+          incompleteReasons: reasons,
+          unknownStreams,
+          regressedStreams,
+          admitted: packetAdmitted,
+        });
+      const packet = assemble(shouldAdmit, incompleteReasons);
+
+      /**
+       * Write the packet file durably (best-effort directory creation, exact bytes).
+       *
+       * @param target - The resolved --output path.
+       * @param content - The packet bytes to write.
+       */
+      const writePacketFile = (target: string, content: StandupWindowPacket): void => {
+        try {
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, `${JSON.stringify(content, null, 2)}\n`, "utf8");
+        } catch (err: unknown) {
+          throw writeError(target, err);
+        }
+      };
+
+      // Durable delivery: with --output the packet is on disk BEFORE the
+      // boundary is admitted, so a crash at any point either re-produces this
+      // packet (boundary not yet admitted) or the packet is already durable —
+      // a window is never skipped.
+      if (outputPath) writePacketFile(resolve(outputPath), packet);
+
+      if (shouldAdmit && scan.lastEvent !== null) {
+        const admission = await admitStandupWindowBoundary(cursorFilePath, snapshot, {
+          cursor: scan.nextCursor,
+          last_ts: scan.lastEvent.ts,
+          last_stream_id: scan.lastEvent.stream_id,
+          last_stream_offset: scan.lastEvent.stream_offset,
+          covered_streams: scan.maxOffsets,
+          admitted_events: scan.totalEvents,
+          admitted_at: new Date().toISOString(),
+        }, { pmRoot: ctx.pm_root, owner: `standup-window:${process.pid}`, waitMs: 250 });
+        if (!admission.admitted) {
+          incompleteReasons.push("window_contended");
+          const contended = assemble(false, incompleteReasons);
+          if (outputPath) writePacketFile(resolve(outputPath), contended);
+          return contended;
+        }
+      }
+      return packet;
+    };
+
+    api.registerCommand({
+      name: "standup window",
+      description: "Build a cursor-complete standup window from the retained event boundary and admit the exact next boundary",
+      intent: "Report every mutation appended since the last admitted standup so crashes and late appends never skip work between windows",
+      examples: [
+        "pm standup window --cursor-file .standup-window.json",
+        "pm standup window --cursor-file .standup-window.json --json",
+        "pm standup window --cursor-file .standup-window.json --no-advance",
+        "pm standup window --cursor-file .standup-window.json --output window.json",
+      ],
+      flags: windowFlags,
+      run: runStandupWindowCommand,
+    });
+
     api.registerCommand({
       name: "slack-standup",
       description: "Alias for `pm standup` (same behavior and flags)",
@@ -2582,7 +2730,7 @@ export default defineExtension({
       // paths would silently escape its gate. The smoke test derives the
       // expected list from the real activation, so a newly registered command
       // path cannot be added without appearing here.
-      commands: ["standup", "slack-standup", "standup export", "standup decisions"],
+      commands: ["standup", "slack-standup", "standup export", "standup decisions", "standup window"],
       // Mirror the handler's contract without aborting here (the runtime
       // swallows throws from preflight). An empty delta is an explicit
       // pass-through that leaves the runtime's preflight decision untouched.
