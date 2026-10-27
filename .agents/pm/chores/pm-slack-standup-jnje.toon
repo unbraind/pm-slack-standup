@@ -2,21 +2,34 @@ id: pm-slack-standup-jnje
 title: "Make the 2026.10.23 pm toolchain bump pass: the regenerated changelog must adopt pm-changelog's new Closed section"
 description: ""
 type: Chore
-status: in_progress
+status: closed
 priority: 1
 tags: []
 created_at: "2026-10-26T17:39:28.333Z"
-updated_at: "2026-10-26T19:08:35.410Z"
+updated_at: "2026-10-27T11:55:18.449Z"
+closed_at: "2026-10-27T10:33:38.779Z"
+completed_at: "2026-10-27T00:49:38.000Z"
 author: codex
-comments[6]{created_at,author,text}:
+resolution: "Complete the verified toolchain bump, matching generated outputs and retained exact-head CI receipts."
+expected_result: The toolchain bump and fixture/generated-output corrections pass with tracker evidence and recorded exact-head CI.
+actual_result: Focused current-main validation passes; the merged source/output corrections were inspected. REST confirms successful original-head CI at 29e28fc54e75550853606ee14ceb48471f10816d. The merged changelog adopts the bumped generator Closed section without changing production reporting behavior.
+comments[12]{created_at,author,text}:
   "2026-10-26T17:39:37.363Z",codex,"Cause: pm-changelog 2026.10.23 now emits closed tracker items in a dedicated Closed section instead of their original Fixed/Security sections, so the committed CHANGELOG.md no longer matched a fresh generation and the branch's changelog:check step failed with a full-file diff (the earlier failing-check output quoting the coverage-gate fixture was the gate's own expected self-test, not a real failure).\nFix: regenerate CHANGELOG.md with the bumped pm-changelog via npm run changelog:full; no source changes were needed.\nEvidence: npm run release:check green locally under a 2-core taskset (typecheck, lint, duplication, build, docstring, coverage, accept:canonical-reader, audit:prod, pack:dry-run, accept:packed, changelog:check, verify:release-changelog-date, verify:release-publish-attestation all pass)."
   "2026-10-26T18:13:11.975Z",codex-agent,"Continuation: CI run 40370735202 passed tests and packed npm/Bun acceptance, then failed changelog:check because this chore was added after regeneration. Reuse and reopen this item, regenerate after tracker updates, and rerun release:check. Closure belongs to the orchestrator."
   "2026-10-26T18:37:53.744Z",codex-agent,"The linked release gate with snapshot workspace was invalid for repository-aware tests: snapshot Git inventory is absent, so identity and tracked-workflow checks fail, and packed acceptance timed out under shared load. Those are local runner conditions; CI had already passed those stages before the changelog-only failure. Run both complete launcher gates directly in the package worktree with isolated identity and a warm public package cache; keep source assertions and timeout bounds unchanged."
   "2026-10-26T18:53:57.774Z",codex-agent,"Direct source npm run release:check completed 287 tests: 285 pass, two packed acceptance subprocesses time out at the existing 290000 ms limit (observed complete durations 291375 and 292137 ms). No Git-inventory failures remain in source mode. Coverage is therefore not certified: measured 98.2 statements/lines, 99.84 branches and 99.28 functions, all below the unchanged 100 thresholds. Record shared-load/install-cost investigation in pm-slack-standup-packed-timing; do not loosen checks. Bun release gate is running independently."
   "2026-10-26T19:03:56.321Z",codex-agent,"Bun run release:check reproduced exactly the same two packed-install timeouts: 285/287 pass, no cancellations or skips, no other assertion failures. Coverage remains unaccepted at the same measured values and unchanged 100 thresholds. Run the canonical-reader, production audit and standalone packed matrix outside instrumentation as additional evidence, then push only the changelog/tracker correction and verify final CI. Keep pm-slack-standup-packed-timing open for local install-cost investigation."
   "2026-10-26T19:08:26.918Z",codex-agent,"Standalone npm run accept:packed passed all five real scenarios: npm-current and bun-current on SDK 2026.10.23, npm-minimum and bun-minimum on SDK 2026.10.20, plus npm-global-current. Every fixture inventory reconciled and rendered correctly. Canonical-reader acceptance, zero-vulnerability production audit, package dry run, changelog check, release-heading date and publish attestation also passed separately. Both complete npm/Bun gates remain recorded as failed solely on the instrumented packed matrices timing out; do not call their coverage accepted. Final change is only the regenerated changelog and tracker evidence. Release the claim for orchestrator verification; leave timing follow-up open."
-files[1]{path,scope}:
+  "2026-10-27T10:33:06.161Z",codex-agent,"Closure audit of current main: The merged Dependabot PR contains the toolchain fix, tracker receipts and generated-output changes. Current-main files were inspected; exact-head CI success is recovered in a new comment, and changelog generation/check follows closure writes. The merged changelog adopts the bumped generator Closed section without changing production reporting behavior. Delivered by PR #154, merge commit 491fd965213c39cc63b684f170d881cd51676b6a, merged_at 2026-10-27T00:49:38Z. Focused verification follows; full npm and Bun release gates are delegated to PR CI for this tracker-only change."
+  "2026-10-27T10:33:10.241Z",codex-agent,"REST-verified original-head CI: 29e28fc54e75550853606ee14ceb48471f10816d; test (22.18.0)=success https://github.com/unbraind/pm-slack-standup/actions/runs/40426133450/job/121932243636; test (26)=success https://github.com/unbraind/pm-slack-standup/actions/runs/40426133450/job/121932243487; windows-acceptance-launcher=success https://github.com/unbraind/pm-slack-standup/actions/runs/40426133450/job/121932243192. Earlier failed attempts are preserved as failures."
+  "2026-10-27T10:33:35.393Z",codex-agent,"Verified current main with `npm run typecheck` via the pinned pm linked runner: PASS. The focused command exited successfully. Focused current-main validation passes; the merged source/output corrections were inspected. REST confirms successful original-head CI at 29e28fc54e75550853606ee14ceb48471f10816d. The merged changelog adopts the bumped generator Closed section without changing production reporting behavior."
+  "2026-10-27T10:43:08.903Z",codex-agent,"Closure validation: health retains the same legacy provenance advisory as untouched main 6457f7a5115d3148218f7d63457511281d5e5e43: provenance_value_domain_invalid:claude-code:role:single_digit:13. Existing item pm-slack-standup-health-legacy-1027 owns this advisory. Strict health is not clean; the original history bytes remain unchanged. Default health additionally reports the existing global extension version skew. No history repair or dependency change is performed."
+  "2026-10-27T11:54:55.870Z",codex-agent,"Bounded CI handoff: exact closure head 4f700d15811c44992d247f8127ec0515e9118638 has pending checks at 69.2 minutes after publication. codeql (queued): https://github.com/unbraind/pm-slack-standup/actions/runs/40490910356/job/122144307509; test (22.18.0) (queued): https://github.com/unbraind/pm-slack-standup/actions/runs/40490910327/job/122144307339; test (26) (queued): https://github.com/unbraind/pm-slack-standup/actions/runs/40490910327/job/122144307328. These checks are missing evidence, not passes or approval. Focused checks and changelog validation passed; recorded baseline health advisories remain separate. Full release validation remains for the orchestrator pipeline before merging. No PR merge or release was performed."
+  "2026-10-27T11:55:18.446Z",codex-agent,"Closure validation: health retains the same legacy provenance advisory as untouched main 6457f7a5115d3148218f7d63457511281d5e5e43: provenance_value_domain_invalid:claude-code:role:single_digit:13. Existing item pm-slack-standup-health-legacy-1027 owns this advisory. Strict health is not clean; the original history bytes remain unchanged. Default health additionally reports the existing global extension version skew. No history repair or dependency change is performed."
+files[3]{path,scope}:
   CHANGELOG.md,project
+  package-lock.json,project
+  package.json,project
 tests[3]:
   - command: "npm run release:check"
     scope: project
@@ -42,4 +55,5 @@ tests[3]:
       source_kind: local_mutation
 docs[1]{path,scope}:
   CHANGELOG.md,project
+close_reason: "Delivered by merged PR #154 (491fd965213c39cc63b684f170d881cd51676b6a); current main evidence: package.json, package-lock.json, CHANGELOG.md; focused linked checks passed."
 body: ""
