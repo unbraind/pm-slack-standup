@@ -301,6 +301,19 @@ export function readStandupWindowBoundary(path: string): StandupWindowStateSnaps
 }
 
 /**
+ * The tracker lock id serializing admissions for one cursor file.
+ *
+ * Derived from the resolved state-file path so two reporters sharing a cursor
+ * file contend on the same lease even across processes.
+ *
+ * @param path - Absolute path of the `--cursor-file` state file.
+ * @returns The fs-safe lock id.
+ */
+export function standupWindowLockId(path: string): string {
+  return `standup-window-cursor-${createHash("sha256").update(path).digest("hex").slice(0, 12)}`;
+}
+
+/**
  * Admit a new boundary: compare-and-set under the tracker's lock, then atomically replace the file.
  *
  * The state file is re-read inside the lease and compared byte-for-byte with
@@ -321,7 +334,7 @@ export async function admitStandupWindowBoundary(
   boundary: StandupWindowBoundary,
   lock: { pmRoot: string; owner: string; waitMs: number }
 ): Promise<{ admitted: boolean }> {
-  const lockId = `standup-window-cursor-${createHash("sha256").update(path).digest("hex").slice(0, 12)}`;
+  const lockId = standupWindowLockId(path);
   let release: (() => Promise<void>) | undefined;
   try {
     release = await acquireLock(lock.pmRoot, lockId, 60, lock.owner, false, true, lock.waitMs);
@@ -508,7 +521,7 @@ export async function scanStandupWindowEvents(
         EXIT_CODE.GENERIC_FAILURE,
       );
     }
-    if (!page.has_more) break;
+    if (!page.has_more && windowEvents.length <= maxEvents) break;
     if (windowEvents.length >= maxEvents) {
       capped = true;
       break;
