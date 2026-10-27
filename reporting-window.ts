@@ -554,6 +554,9 @@ export function standupWindowCoverageRegressions(
  * A mutation naming a stream that the certified complete read does not carry
  * (and that is not the workspace stream) means coverage cannot be certified
  * for that work; the report is marked incomplete with the stream ids listed.
+ * A stream whose window carries a `delete` event is NOT unknown: `pm delete`
+ * removes the item while retaining its history stream, so the deletion itself
+ * explains the missing corpus row (see {@link standupWindowDeletedStreams}).
  *
  * @param windowEvents - The events of this window.
  * @param corpusIds - Every item id in the certified complete read.
@@ -563,11 +566,37 @@ export function standupWindowUnknownStreams(
   windowEvents: readonly MutationEvent[],
   corpusIds: ReadonlySet<string>
 ): string[] {
+  const deleted = new Set(standupWindowDeletedStreams(windowEvents, corpusIds));
   const unknown = new Set<string>();
   for (const event of windowEvents) {
-    if (event.item_id !== "_workspace" && !corpusIds.has(event.item_id)) unknown.add(event.item_id);
+    if (event.item_id === "_workspace" || corpusIds.has(event.item_id) || deleted.has(event.item_id)) continue;
+    unknown.add(event.item_id);
   }
   return [...unknown].sort().slice(0, 10);
+}
+
+/**
+ * Streams deleted in this window whose items the corpus can no longer carry.
+ *
+ * `pm delete` appends a `delete` history event and removes the item file, so
+ * the packet surfaces the deletion by stream id instead of silently losing
+ * the work from the report.
+ *
+ * @param windowEvents - The events of this window.
+ * @param corpusIds - Every item id in the certified complete read.
+ * @returns The deleted stream ids, sorted and capped at ten entries.
+ */
+export function standupWindowDeletedStreams(
+  windowEvents: readonly MutationEvent[],
+  corpusIds: ReadonlySet<string>
+): string[] {
+  const deleted = new Set<string>();
+  for (const event of windowEvents) {
+    if (event.type === "delete" && event.item_id !== "_workspace" && !corpusIds.has(event.item_id)) {
+      deleted.add(event.item_id);
+    }
+  }
+  return [...deleted].sort().slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -606,6 +635,8 @@ export interface StandupWindowInfo {
   incomplete_reasons: string[];
   /** Item streams named by window events but missing from the certified corpus. */
   unknown_streams?: string[];
+  /** Item streams whose deletion this window recorded (no corpus row can exist). */
+  deleted_items?: string[];
   /** History streams that shrank below the admitted boundary coverage. */
   regressed_streams?: string[];
   /** Whether this run retained the next boundary. */
@@ -636,6 +667,7 @@ export function buildStandupWindowPacket(input: {
   sections: Readonly<Record<SectionKey, readonly StandupWindowItemRow[]>>;
   incompleteReasons: readonly string[];
   unknownStreams: readonly string[];
+  deletedStreams: readonly string[];
   regressedStreams: readonly string[];
   admitted: boolean;
 }): StandupWindowPacket {
@@ -655,6 +687,7 @@ export function buildStandupWindowPacket(input: {
     admitted: input.admitted,
   };
   if (input.unknownStreams.length > 0) info.unknown_streams = [...input.unknownStreams];
+  if (input.deletedStreams.length > 0) info.deleted_items = [...input.deletedStreams];
   if (input.regressedStreams.length > 0) info.regressed_streams = [...input.regressedStreams];
   return {
     window: info,

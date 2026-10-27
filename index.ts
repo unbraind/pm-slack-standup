@@ -11,7 +11,8 @@ export * from "./decision-requests.ts";
 import {
   admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents,
   readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents,
-  standupWindowCoverageRegressions, standupWindowUnknownStreams,
+  standupWindowCoverageRegressions, standupWindowDeletedStreams,
+  standupWindowUnknownStreams,
 } from "./reporting-window.ts";
 import type { StandupWindowItemRow, StandupWindowPacket } from "./reporting-window.ts";
 export * from "./reporting-window.ts";
@@ -2597,6 +2598,7 @@ export default defineExtension({
       const corpusIds = new Set(items.map((item) => item.id));
       const regressedStreams = standupWindowCoverageRegressions(snapshot.boundary, scan);
       const unknownStreams = standupWindowUnknownStreams(scan.windowEvents, corpusIds);
+      const deletedStreams = standupWindowDeletedStreams(scan.windowEvents, corpusIds);
       const incompleteReasons: string[] = [];
       if (scan.capped) incompleteReasons.push("event_cap_exceeded");
       if (regressedStreams.length > 0) incompleteReasons.push("history_regression");
@@ -2629,6 +2631,7 @@ export default defineExtension({
           sections,
           incompleteReasons: reasons,
           unknownStreams,
+          deletedStreams,
           regressedStreams,
           admitted: packetAdmitted,
         });
