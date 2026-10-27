@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Use the pm SDK for certified standup reads and lifecycle roles ([pm-slack-standup-jti0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-jti0.toon))
+
 ## 2026.10.25 - 2026-10-25
 
 ### Added
