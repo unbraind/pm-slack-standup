@@ -1,9 +1,11 @@
+import assert from "node:assert/strict";
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { join, resolve, posix, win32 } from "node:path";
 
-import { COMPLETE_LIST_COMMAND_ARGUMENTS } from "../index.ts";
+import { COMPLETE_LIST_COMMAND_ARGUMENTS, encodeProgressEvidence } from "../index.ts";
+import type { ProgressReport } from "../index.ts";
 import { isMainInvocation } from "./main-invocation.ts";
 
 /** Package fields that define the installed-extension acceptance matrix. */
@@ -27,6 +29,8 @@ interface AcceptanceReceipt {
   readonly rendered_items: number;
   readonly stderr_bytes: number;
   readonly fixtures_present: true;
+  /** Revision-cited progress and checkpoint replay were exercised through the installed CLI. */
+  readonly progress_verified?: true;
 }
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -103,7 +107,8 @@ export function acceptanceLaunchers(platform: NodeJS.Platform, npmExecPath: stri
 export function acceptanceEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = { ...source, npm_config_userconfig: devNull, NPM_CONFIG_USERCONFIG: devNull, PM_TELEMETRY_DISABLED: "1" };
   for (const key of Object.keys(environment)) {
-    if (["npm_config_allow_scripts", "pm_path", "pm_global_path"].includes(key.toLowerCase())) {
+    if (["npm_config_allow_scripts", "pm_path", "pm_global_path", "npm_media_server"].includes(key.toLowerCase())
+      || /token|secret|password|credential|api_key/i.test(key)) {
       delete environment[key];
     }
   }
@@ -201,6 +206,25 @@ export function globalReceipt(actualVersion: string, expectedVersion: string, ex
   return { scenario: "npm-global-current", host_version: actualVersion, tracker_items: 1, rendered_items: globalRendered.length, stderr_bytes: Buffer.byteLength(exported.stderr), fixtures_present: true };
 }
 
+/** Select an installed global pm entry without using it to discover an SDK location. */
+export function globalHostEntry(prefix: string, packages: string, platform: NodeJS.Platform): string {
+  return platform === "win32" ? join(packages, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js") : join(prefix, "bin", "pm");
+}
+
+/** Exercise the new command through each installed host, retaining real native SDK/history behavior. */
+function verifyPackedProgress(invoke: (args: string[]) => SpawnSyncReturns<string>, id: string): void {
+  const initial = JSON.parse(invoke(["standup", "progress", id, "--json"]).stdout) as ProgressReport;
+  assert.deepEqual(initial.gains, [], "status-only fixtures have no verified progress");
+  const declaration = encodeProgressEvidence({ version: 1, kind: "criterion", subject: "AC1", targetRevision: "packed-v1", evidenceRevision: "receipt-v1", value: "accepted" });
+  invoke(["comment", id, declaration]);
+  const page = JSON.parse(invoke(["standup", "progress", id, "--after", initial.next, "--json"]).stdout) as ProgressReport;
+  assert.equal(page.gains.length, 1);
+  assert.equal(page.gains[0].evidenceRevision, "receipt-v1");
+  assert.ok(page.gains[0].revision.version > initial.through);
+  const replay = JSON.parse(invoke(["standup", "progress", id, "--after", page.next, "--json"]).stdout) as ProgressReport;
+  assert.deepEqual(replay.gains, []);
+}
+
 /** Pack once, exercise all real npm/Bun hosts, emit reconciled receipts, and remove fixtures. */
 export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
   const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as PackageContract;
@@ -255,12 +279,13 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["init", "--defaults", "--agent-guidance", "skip", "--prefix", "accept"]);
       const inProgressTitle = `Packed in progress ${scenario.name}`;
       const openTitle = `Packed up next ${scenario.name}`;
-      runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["create", "task", inProgressTitle, "--status", "in_progress", "--create-mode", "progressive"]);
-      runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["create", "task", openTitle, "--status", "open", "--create-mode", "progressive"]);
+      runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["create", "task", inProgressTitle, "--status", "in_progress", "--create-mode", "progressive", "--parent", "none", "--sprint", "none", "--release", "none"]);
+      runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["create", "task", openTitle, "--status", "open", "--create-mode", "progressive", "--parent", "none", "--sprint", "none", "--release", "none"]);
       runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["install", tarball, "--project"]);
       const listed = JSON.parse(runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as Record<string, unknown>;
       const exported = runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["standup", "export", "--format", "json"]);
-      receipts.push(scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]));
+      verifyPackedProgress((args) => runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, args), String((listed.items as Array<{ id: string }>)[0].id));
+      receipts.push({ ...scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]), progress_verified: true });
     }
 
     const globalScenarioRoot = join(temporaryRoot, "npm-global-current");
@@ -280,17 +305,38 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       XDG_DATA_HOME: globalDataRoot,
       npm_config_cache: join(globalScenarioRoot, "npm-cache"),
     };
-    run(npmLauncher.command, [...npmLauncher.prefix, "install", "--prefix", globalHostRoot, "--ignore-scripts", `${cliPackage}@${developmentVersion}`], globalScenarioRoot, globalEnvironment);
-    const globalHostCli = join(globalHostRoot, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+    run(npmLauncher.command, [...npmLauncher.prefix, "install", "--global", "--prefix", globalHostRoot, "--ignore-scripts", `${cliPackage}@${developmentVersion}`], globalScenarioRoot, globalEnvironment);
+    const globalHostCli = globalHostEntry(globalHostRoot, globalHostRoot, process.platform);
     const globalVersion = run(process.execPath, [globalHostCli, "--version"], globalProjectRoot, globalEnvironment).stdout.trim();
     assertHostVersion("npm-global-current", globalVersion, developmentVersion);
 
     run(process.execPath, [globalHostCli, "init", "--defaults", "--agent-guidance", "skip", "--prefix", "accept"], globalProjectRoot, globalEnvironment);
     const globalTitle = "Packed global-host fixture";
-    run(process.execPath, [globalHostCli, "create", "task", globalTitle, "--status", "open", "--create-mode", "progressive"], globalProjectRoot, globalEnvironment);
+    run(process.execPath, [globalHostCli, "create", "task", globalTitle, "--status", "open", "--create-mode", "progressive", "--parent", "none", "--sprint", "none", "--release", "none"], globalProjectRoot, globalEnvironment);
     run(process.execPath, [globalHostCli, "install", tarball, "--project"], globalProjectRoot, globalEnvironment);
     const globalExport = run(process.execPath, [globalHostCli, "standup", "export", "--format", "json"], globalProjectRoot, globalEnvironment);
-    receipts.push(globalReceipt(globalVersion, developmentVersion, globalExport));
+    const globalItems = JSON.parse(run(process.execPath, [globalHostCli, ...COMPLETE_LIST_COMMAND_ARGUMENTS], globalProjectRoot, globalEnvironment).stdout) as { items: Array<{ id: string }> };
+    verifyPackedProgress((args) => run(process.execPath, [globalHostCli, ...args], globalProjectRoot, globalEnvironment), globalItems.items[0].id);
+    receipts.push({ ...globalReceipt(globalVersion, developmentVersion, globalExport), progress_verified: true });
+
+    const bunRoot = join(temporaryRoot, "bun-global-current");
+    const bunProject = join(bunRoot, "project");
+    const bunGlobal = join(bunRoot, "global");
+    const bunBin = join(bunRoot, "bin");
+    mkdirSync(bunProject, { recursive: true });
+    const bunEnvironment = { ...globalEnvironment, PM_PATH: join(bunProject, ".agents", "pm"),
+      BUN_INSTALL_GLOBAL_DIR: bunGlobal, BUN_INSTALL_BIN: bunBin };
+    run(launchers.bun, ["add", "--global", "--ignore-scripts", `${cliPackage}@${developmentVersion}`], bunProject, bunEnvironment);
+    const bunHost = globalHostEntry(bunRoot, bunGlobal, process.platform);
+    const invokeBun = (args: string[]) => run(process.execPath, [bunHost, ...args], bunProject, bunEnvironment);
+    const bunVersion = invokeBun(["--version"]).stdout.trim();
+    invokeBun(["init", "--defaults", "--agent-guidance", "skip", "--prefix", "accept"]);
+    invokeBun(["create", "task", globalTitle, "--status", "open", "--create-mode", "progressive", "--parent", "none", "--sprint", "none", "--release", "none"]);
+    invokeBun(["install", tarball, "--project"]);
+    const bunExport = invokeBun(["standup", "export", "--format", "json"]);
+    const bunItems = JSON.parse(invokeBun(COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as { items: Array<{ id: string }> };
+    verifyPackedProgress(invokeBun, bunItems.items[0].id);
+    receipts.push({ ...globalReceipt(bunVersion, developmentVersion, bunExport), scenario: "bun-global-current", progress_verified: true });
 
     process.stdout.write(`${JSON.stringify({ ok: true, receipts })}\n`);
   } finally {

@@ -412,3 +412,9 @@ itself lists each affected stream in its output; `pm history --verify <id>` spot
 content, so `reconcile` only re-greens the hash chain (no data loss) — see the authoritative
 [pm-cli merge-safety guide](https://github.com/unbraind/pm-cli/blob/main/docs/MERGE_SAFETY.md). The
 older blunt `pm history-repair --all` remains available as a lower-level primitive.
+
+## Evidence-bearing progress deltas
+
+Run `pm standup progress ITEM --json` (or omit `--json` for TOON) to report native passing-test evidence, explicitly accepted criterion evidence and declared readiness changes separately from lifecycle/comment activity. Every gain cites its evidence and item-history revision. Retain the returned `next` token and pass `--after TOKEN` for the next window; replayed evidence is counted once even after older inputs are reintroduced. The command is read-only and works without git.
+
+See [the SDK example, strict schema, window contract and refusal remedies](docs/progress-deltas.md). The package observes recorded facts and explicit assessments; it never runs tests or grants review approval.
