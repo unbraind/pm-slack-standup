@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mutateItemWithHistoryContext, readSettings, createExtensionCommandSdk } from "@unbrained/pm-cli/sdk";
+import { mutateItemWithHistoryContext, readSettings, createExtensionCommandSdk, canonicalDocument } from "@unbrained/pm-cli/sdk";
 import type { ItemDocument, ItemMetadata, PmSettings } from "@unbrained/pm-cli/sdk";
 import { runtimeFixture, removeRuntimeFixture } from "./runtime-fixture.ts";
 import type { RuntimeFixture } from "./runtime-fixture.ts";
@@ -31,7 +31,8 @@ export async function changeProgress(runtime: RuntimeFixture, settings: PmSettin
 }
 /** Read the complete native item through the same SDK that production consumers use. */
 export async function currentProgress(runtime: RuntimeFixture, id: string): Promise<ItemMetadata> {
-  return (await runtime.client.get(id, { full: true })).item as ItemMetadata;
+  const item = (await runtime.client.get(id, { full: true })).item;
+  return canonicalDocument({ metadata: item as ItemMetadata, body: typeof item.body === "string" ? item.body : "" }).metadata;
 }
 /** Canonical finite native run summary, including its producing revision identity. */
 export function passingRun(id = "run-1", passed = 3): NonNullable<ItemMetadata["test_runs"]>[number] {

@@ -29,7 +29,7 @@ Status meaning is never inferred by this projection. It counts raw status edits 
 
 Full source gates run in CI with npm and Bun at unchanged 100/100/100/100 coverage and zero duplication thresholds. Packed acceptance exercises the progress command through project-local npm/Bun hosts, npx/bunx, an actual npm global symlink and a Bun global installation. Local checks are focused because the shared host is saturated.
 
-Focused checks: `node --test --test-concurrency=1 test/progress-deltas.test.ts test/smoke.test.ts` passed **13/13**; the new module measured **100% statements, branches, functions and lines**. The seeded real-SDK model passed **500 sequences / 1500 state mutations**, with no mismatches. Random ambient focus and per-sequence cleanup keep scope explicit and fixture storage bounded. Native item normalization comes from `canonicalDocument`, not a test-owned normalizer.
+Focused checks: `node --test --test-concurrency=1 test/progress-deltas.test.ts test/smoke.test.ts` passed **13/13**; the new module measured **100% statements, branches, functions and lines**. The seeded real-SDK model passed **500 sequences / 1500 state mutations**, with no mismatches. Random operation selection, ambient focus and per-sequence cleanup keep scope explicit and fixture storage bounded. Native item normalization comes from `canonicalDocument`, not a test-owned normalizer.
 
 Three behavioral reverts in disposable copies each failed the selected native-results regression: remove evidence deduplication, omit the target revision from evidence identity, or cite the final window revision for every gain. Restoring the implementation passed that regression. No mutated implementation remained in the package worktree.
 

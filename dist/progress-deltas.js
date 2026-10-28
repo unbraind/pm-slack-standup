@@ -93,7 +93,7 @@ function checkpoint(after, id, history) {
     catch {
         throw new ProgressRefusal("checkpoint_mismatch");
     }
-    if (!Array.isArray(value) || value.length !== 4 || value[0] !== 1 || value[1] !== id || !Number.isSafeInteger(value[2])
+    if (!Array.isArray(value) || value.length !== 4 || value[0] !== 1 || value[1] !== digest(id) || !Number.isSafeInteger(value[2])
         || value[2] < 1 || value[2] > history.length || value[3] !== hashHistoryStream(history.slice(0, value[2]))
         || Buffer.from(JSON.stringify(value)).toString("base64url") !== after)
         throw new ProgressRefusal("checkpoint_mismatch");
@@ -113,7 +113,7 @@ export function validateProgressNumbers(report) {
 /** Read a single item's verified history with a host-injected client or the package's supported SDK adapter. */
 export async function readProgressDeltas(ctx, id, rawOptions = {}) {
     const options = parseProgressOptions(rawOptions);
-    if (!text(id))
+    if (typeof id !== "string" || id.trim().length === 0)
         throw new ProgressRefusal("invalid_input");
     const client = ctx.sdk?.client ?? new PmClient({ pmRoot: ctx.pm_root, noExtensions: true });
     const result = await client.run("history", { id, options: { verify: true, compact: false, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full" } });
@@ -125,7 +125,7 @@ export async function readProgressDeltas(ctx, id, rawOptions = {}) {
     const through = Math.min(result.history.length, from + options.events);
     const report = { ok: true, id: result.id, gains: [], activity: { status: 0, comments: 0, other: 0 },
         ignored: { invalid: 0, foreign: 0, duplicate: 0, unchanged: 0 }, from, through, remaining: result.history.length - through,
-        next: Buffer.from(JSON.stringify([1, result.id, through, hashHistoryStream(result.history.slice(0, through))])).toString("base64url") };
+        next: Buffer.from(JSON.stringify([1, digest(result.id), through, hashHistoryStream(result.history.slice(0, through))])).toString("base64url") };
     let state = { metadata: {}, body: "" };
     const seen = new Set();
     const knownComments = new Set();

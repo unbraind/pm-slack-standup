@@ -46,17 +46,33 @@ test("500 seeded native-state sequences preserve relationships and reject eviden
         [["passing_tests", `run:run-${seed}`, run.passed], [normalized.kind, normalized.evidenceRevision, 1]]);
       assert.deepEqual(await readProgressDeltas(f.ctx, id, { after: base.next }), first);
       // Remove inputs, then replay older native data with whitespace/CRLF serialization changes.
-      await changeProgress(f, f.settings, id, (doc) => { doc.metadata.comments = []; doc.metadata.test_runs = []; });
+      const operation = Math.floor(random() * 4);
+      await changeProgress(f, f.settings, id, (doc) => {
+        if (operation === 0 || operation === 1) doc.metadata.comments = [];
+        if (operation === 0 || operation === 2) doc.metadata.test_runs = [];
+        if (operation === 3) doc.metadata.status = "in_progress";
+      });
       operations++;
+      const intermediate = await currentProgress(f, id);
+      const intermediateExpected = canonicalDocument({ metadata: { ...expected.metadata,
+        status: operation === 3 ? "in_progress" : expected.metadata.status,
+        comments: operation === 0 || operation === 1 ? [] : comments,
+        test_runs: operation === 0 || operation === 2 ? [] : expected.metadata.test_runs }, body }).metadata;
+      assert.equal(intermediate.status, intermediateExpected.status);
+      assert.deepEqual(intermediate.comments, intermediateExpected.comments);
+      assert.deepEqual(intermediate.test_runs, intermediateExpected.test_runs);
+      assert.deepEqual(intermediate.dependencies, expected.metadata.dependencies);
       const replayText = PROGRESS_EVIDENCE_PREFIX + JSON.stringify({ ...assessment, subject: ` ${assessment.subject} ` }, null, 2).replaceAll("\n", "\r\n");
+      const replayStatus = random() < 0.5 ? "in_progress" : "open";
       await changeProgress(f, f.settings, id, (doc) => {
         doc.metadata.comments = [{ ...comments[0], text: replayText }]; doc.metadata.test_runs = [run];
-        doc.metadata.status = random() < 0.5 ? "in_progress" : "open";
+        doc.metadata.status = replayStatus;
       });
       operations++;
       const replay = await readProgressDeltas(f.ctx, id, { after: first.next });
       assert.deepEqual(replay.gains, [], `replay seed ${seed}`);
       current = await currentProgress(f, id);
+      assert.equal(current.status, replayStatus);
       assert.deepEqual(current.dependencies, expected.metadata.dependencies);
       assert.deepEqual(current.test_runs, expected.metadata.test_runs);
       assert.equal(current.comments?.[0].text, replayText);

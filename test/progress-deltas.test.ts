@@ -130,6 +130,8 @@ test("checkpoint pagination refuses wrong items, changed prefixes and unbounded 
   try {
     const first = await f.read({ events: 1 });
     assert.equal(first.through, 1);
+    assert.ok(first.next.length <= 1024);
+    assert.equal((await readProgressDeltas(f.ctx, ` ${f.id} `)).id, f.id);
     await f.client.comments(f.id, { add: encodeProgressEvidence(evidence({ subject: "😀".repeat(120) })) });
     const full = await f.read();
     assert.ok(full.through > first.through);

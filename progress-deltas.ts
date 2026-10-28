@@ -122,7 +122,7 @@ function checkpoint(after: string, id: string, history: NonNullable<HistoryResul
   if (after === "") return 0;
   let value: unknown;
   try { value = JSON.parse(Buffer.from(after, "base64url").toString("utf8")); } catch { throw new ProgressRefusal("checkpoint_mismatch"); }
-  if (!Array.isArray(value) || value.length !== 4 || value[0] !== 1 || value[1] !== id || !Number.isSafeInteger(value[2])
+  if (!Array.isArray(value) || value.length !== 4 || value[0] !== 1 || value[1] !== digest(id) || !Number.isSafeInteger(value[2])
     || value[2] < 1 || value[2] > history.length || value[3] !== hashHistoryStream(history.slice(0, value[2] as number))
     || Buffer.from(JSON.stringify(value)).toString("base64url") !== after) throw new ProgressRefusal("checkpoint_mismatch");
   return value[2] as number;
@@ -145,7 +145,7 @@ export async function readProgressDeltas(
   ctx: Pick<CommandHandlerContext, "pm_root" | "sdk">, id: string, rawOptions: ProgressOptions = {},
 ): Promise<ProgressReport> {
   const options = parseProgressOptions(rawOptions);
-  if (!text(id)) throw new ProgressRefusal("invalid_input");
+  if (typeof id !== "string" || id.trim().length === 0) throw new ProgressRefusal("invalid_input");
   const client = ctx.sdk?.client ?? new PmClient({ pmRoot: ctx.pm_root, noExtensions: true });
   const result = await client.run("history", { id, options: { verify: true, compact: false, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full" } }) as HistoryResult;
   if (!result.history?.length || !result.verification?.ok
@@ -155,7 +155,7 @@ export async function readProgressDeltas(
   const through = Math.min(result.history.length, from + options.events);
   const report: ProgressReport = { ok: true, id: result.id, gains: [], activity: { status: 0, comments: 0, other: 0 },
     ignored: { invalid: 0, foreign: 0, duplicate: 0, unchanged: 0 }, from, through, remaining: result.history.length - through,
-    next: Buffer.from(JSON.stringify([1, result.id, through, hashHistoryStream(result.history.slice(0, through))])).toString("base64url") };
+    next: Buffer.from(JSON.stringify([1, digest(result.id), through, hashHistoryStream(result.history.slice(0, through))])).toString("base64url") };
   let state = { metadata: {} as Record<string, unknown>, body: "" };
   const seen = new Set<string>();
   const knownComments = new Set<string>();
