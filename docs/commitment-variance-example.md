@@ -11,6 +11,7 @@ import type { CommandHandlerContext } from "@unbrained/pm-cli/sdk/authoring";
 
 /** Capture the current native target revision on an existing periodic Plan. */
 export async function declareIntent(context: CommandHandlerContext): Promise<number> {
+  if (context.sdk === undefined) throw new Error("Capture intent inside a host-injected SDK command context.");
   const target = "demo-build";
   const source = "demo-plan";
   const history = await readHistorySnapshot(getHistoryPath(context.pm_root, target), target);
