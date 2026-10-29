@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import { applyHistoryPatch, hashHistoryRecord, hashHistoryStream, PmClient } from "@unbrained/pm-cli/sdk";
-import type { HistoryResult } from "@unbrained/pm-cli/sdk";
+import { applyHistoryPatch, hashHistoryRecord, hashHistoryStream } from "@unbrained/pm-cli/sdk";
+import { ProgressRefusal } from "./progress-refusals.ts";
+import { readVerifiedStandupHistory } from "./verified-history.ts";
+import type { VerifiedStandupHistory } from "./verified-history.ts";
+export { ProgressRefusal } from "./progress-refusals.ts";
 import type { CommandHandlerContext } from "@unbrained/pm-cli/sdk/authoring";
 
 /** Explicit assessments cite both the assessed target and its supporting artifact revision. */
@@ -39,30 +42,6 @@ export interface ProgressReport {
   remaining: number;
   next: string;
 }
-/** Stable remedies remain safe even when a source record contains private or malformed data. */
-const remedies = {
-  invalid_input: "Use the strict version 1 evidence schema and documented bounded options in docs/progress-deltas.md.",
-  checkpoint_mismatch: "Use this item's previous next token with its original append-only history; restart explicitly without after to replay.",
-  history_unavailable: "Read pm history for this item with --verify --full; restore complete verified history before reporting progress.",
-  invalid_output: "Retry the read and inspect the installed package version; emitted counters must be finite bounded integers.",
-  output_limit: "Increase outputBytes up to 32768 or reduce events; the checkpoint was not advanced.",
-} as const;
-/** Machine-readable refusal, shared by SDK consumers and the CLI expected-error renderer. */
-export class ProgressRefusal extends Error {
-  /** Expected CLI usage failure; no source text is interpolated. */
-  readonly exitCode = 2;
-  /** Fixed corrective action for an agent to follow. */
-  readonly remedy: string;
-  /** Stable machine-readable refusal code. */
-  readonly code: keyof typeof remedies;
-  constructor(code: keyof typeof remedies) {
-    super(`Progress refused (${code}). ${remedies[code]}`);
-    this.code = code;
-    this.name = "ProgressRefusal";
-    this.remedy = remedies[code];
-  }
-}
-
 /** Versioned comment prefix; other annotations are ordinary activity, never inferred evidence. */
 export const PROGRESS_EVIDENCE_PREFIX = "standup-progress/v1 ";
 
@@ -118,7 +97,7 @@ export function parseProgressOptions(value: unknown): ProgressOptions & { events
   return { after: after as string | undefined, events: Number(events), outputBytes: Number(outputBytes) };
 }
 /** Decode a canonical checkpoint without accepting truncated JSON, sparse tuples or unsafe counts. */
-function checkpoint(after: string, id: string, history: NonNullable<HistoryResult["history"]>): number {
+function checkpoint(after: string, id: string, history: VerifiedStandupHistory["history"]): number {
   if (after === "") return 0;
   let value: unknown;
   try { value = JSON.parse(Buffer.from(after, "base64url").toString("utf8")); } catch { throw new ProgressRefusal("checkpoint_mismatch"); }
@@ -146,10 +125,8 @@ export async function readProgressDeltas(
 ): Promise<ProgressReport> {
   const options = parseProgressOptions(rawOptions);
   if (typeof id !== "string" || id.trim().length === 0) throw new ProgressRefusal("invalid_input");
-  const client = ctx.sdk?.client ?? new PmClient({ pmRoot: ctx.pm_root, noExtensions: true });
-  const result = await client.run("history", { id, options: { verify: true, compact: false, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full" } }) as HistoryResult;
-  if (!result.history?.length || !result.verification?.ok
-    || result.version_addressing !== undefined) throw new ProgressRefusal("history_unavailable");
+  const result = await readVerifiedStandupHistory(ctx.pm_root, id);
+  if (result.compacted) throw new ProgressRefusal("history_unavailable");
   const hashes = result.history.map((entry) => hashHistoryRecord(entry));
   const from = checkpoint(options.after ?? "", result.id, result.history);
   const through = Math.min(result.history.length, from + options.events);

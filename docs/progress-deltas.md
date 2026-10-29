@@ -57,8 +57,10 @@ The comment prefix is `standup-progress/v1 ` followed by that JSON object. Only 
 | `invalid_output` | Retry and check the installed package; output counters failed finite bounded integer validation. |
 | `output_limit` | Increase the budget or reduce the event page; retain the original checkpoint. |
 
-Refusals have `code`, `remedy` and CLI `exitCode: 2`. Missing item errors come from the host SDK. Compacted history refuses conservatively because an omitted earlier observation could otherwise be counted twice. Individual invalid declarations and malformed passing-run summaries are counted in `ignored.invalid`; ordinary comments are `ignored.foreign`. Their bodies never enter the output. Preexisting records remain readable and untouched. All counts are finite safe integers; no ratio or floating threshold decision is used.
+Refusals have `code`, `remedy` and CLI `exitCode: 2`. Missing items and every native history lookup, I/O, parsing, verification or current-document mismatch return `history_unavailable`. SDK errors retain `remedy`; JSON CLI problems expose the same guidance as `required`, and plain/TOON invocations print it with the refusal. Compacted history refuses conservatively because an omitted earlier observation could otherwise be counted twice. Individual invalid declarations and malformed passing-run summaries are counted in `ignored.invalid`; ordinary comments are `ignored.foreign`. Their bodies never enter the output. Preexisting records remain readable and untouched. All counts are finite safe integers; no ratio or floating threshold decision is used.
 
 ## Without git
+
+History reads use SDK `locateItem`, `readHistorySnapshot`, `readLocatedItem` and `verifyHistoryEntries`; they never invoke the maintenance-capable `history` command. Missing streams refuse under both `auto_create` and `strict_error`, without creating a baseline or invoking write hooks. Ordinary standups, decisions, aliases and exports use this same verified reader; their existing certified list calls may rebuild native derived runtime caches, while authoritative item, configuration and history bytes remain unchanged.
 
 The report, schema producer and SDK read-back work in plain directory trackers and require no git executable. Delivery and external artifact verification remain the caller's responsibility.

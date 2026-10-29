@@ -9,6 +9,8 @@ import type { DecisionRequestReport } from "./decision-requests.ts";
 export * from "./decision-requests.ts";
 export * from "./progress-deltas.ts";
 import { readProgressDeltas } from "./progress-deltas.ts";
+import { readVerifiedStandupHistory } from "./verified-history.ts";
+import { ProgressRefusal } from "./progress-refusals.ts";
 import type { ProgressOptions } from "./progress-deltas.ts";
 
 import {
@@ -1132,17 +1134,11 @@ export async function readSdkStandupItems(ctx: Pick<CommandHandlerContext, "pm_r
   try {
     const items = readCompleteStandupItems(await client.listAllComplete({ includeBody: true }));
     for (const item of items) {
-      // The history action rereads and verifies the chain and current document; a cached event index is insufficient.
-      const history = await client.run("history", { id: item.id, options: {
-        verify: true, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full",
-      } });
-      if (!isRecord(history) || !isRecord(history.verification) || history.verification.ok !== true) {
-        throw new CommandError(`Standup history integrity verification failed for ${item.id}.`);
-      }
+      await readVerifiedStandupHistory(ctx.pm_root, item.id);
     }
     return items;
   } catch (error) {
-    if (error instanceof CommandError) throw error;
+    if (error instanceof CommandError || error instanceof ProgressRefusal) throw error;
     throw new CommandError(`pm list --all failed: ${String(error)}`);
   }
 }

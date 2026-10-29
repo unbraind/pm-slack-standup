@@ -418,3 +418,5 @@ older blunt `pm history-repair --all` remains available as a lower-level primiti
 Run `pm standup progress ITEM --json` (or omit `--json` for TOON) to report native passing-test evidence, explicitly accepted criterion evidence and declared readiness changes separately from lifecycle/comment activity. Every gain cites its evidence and item-history revision. Retain the returned `next` token and pass `--after TOKEN` for the next window; replayed evidence is counted once even after older inputs are reintroduced. The command is read-only and works without git.
 
 See [the SDK example, strict schema, window contract and refusal remedies](docs/progress-deltas.md). The package observes recorded facts and explicit assessments; it never runs tests or grants review approval.
+
+History failures are read-only: missing or malformed native history returns `history_unavailable` (exit 2 with recovery guidance), even when the tracker configures automatic history creation. Progress, ordinary standup, decisions, aliases and exports share SDK snapshot verification; reporting never creates a replacement history stream or invokes write hooks.

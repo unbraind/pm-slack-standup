@@ -7,6 +7,8 @@ import { collectDecisionRequests, isDecisionRequestItem, renderDecisionRequests 
 export * from "./decision-requests.js";
 export * from "./progress-deltas.js";
 import { readProgressDeltas } from "./progress-deltas.js";
+import { readVerifiedStandupHistory } from "./verified-history.js";
+import { ProgressRefusal } from "./progress-refusals.js";
 import { certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE, PmClient, readSettings, resolveRuntimeStatusRegistry, } from "@unbrained/pm-cli/sdk";
 import { classifyStandupItem, DEFAULT_STATUS_REGISTRY } from "./status-roles.js";
 export { classifyStandupItem, hasBlockedByDep } from "./status-roles.js";
@@ -883,18 +885,12 @@ export async function readSdkStandupItems(ctx) {
     try {
         const items = readCompleteStandupItems(await client.listAllComplete({ includeBody: true }));
         for (const item of items) {
-            // The history action rereads and verifies the chain and current document; a cached event index is insufficient.
-            const history = await client.run("history", { id: item.id, options: {
-                    verify: true, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full",
-                } });
-            if (!isRecord(history) || !isRecord(history.verification) || history.verification.ok !== true) {
-                throw new CommandError(`Standup history integrity verification failed for ${item.id}.`);
-            }
+            await readVerifiedStandupHistory(ctx.pm_root, item.id);
         }
         return items;
     }
     catch (error) {
-        if (error instanceof CommandError)
+        if (error instanceof CommandError || error instanceof ProgressRefusal)
             throw error;
         throw new CommandError(`pm list --all failed: ${String(error)}`);
     }

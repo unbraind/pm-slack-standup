@@ -1,28 +1,8 @@
 import { createHash } from "node:crypto";
-import { applyHistoryPatch, hashHistoryRecord, hashHistoryStream, PmClient } from "@unbrained/pm-cli/sdk";
-/** Stable remedies remain safe even when a source record contains private or malformed data. */
-const remedies = {
-    invalid_input: "Use the strict version 1 evidence schema and documented bounded options in docs/progress-deltas.md.",
-    checkpoint_mismatch: "Use this item's previous next token with its original append-only history; restart explicitly without after to replay.",
-    history_unavailable: "Read pm history for this item with --verify --full; restore complete verified history before reporting progress.",
-    invalid_output: "Retry the read and inspect the installed package version; emitted counters must be finite bounded integers.",
-    output_limit: "Increase outputBytes up to 32768 or reduce events; the checkpoint was not advanced.",
-};
-/** Machine-readable refusal, shared by SDK consumers and the CLI expected-error renderer. */
-export class ProgressRefusal extends Error {
-    /** Expected CLI usage failure; no source text is interpolated. */
-    exitCode = 2;
-    /** Fixed corrective action for an agent to follow. */
-    remedy;
-    /** Stable machine-readable refusal code. */
-    code;
-    constructor(code) {
-        super(`Progress refused (${code}). ${remedies[code]}`);
-        this.code = code;
-        this.name = "ProgressRefusal";
-        this.remedy = remedies[code];
-    }
-}
+import { applyHistoryPatch, hashHistoryRecord, hashHistoryStream } from "@unbrained/pm-cli/sdk";
+import { ProgressRefusal } from "./progress-refusals.js";
+import { readVerifiedStandupHistory } from "./verified-history.js";
+export { ProgressRefusal } from "./progress-refusals.js";
 /** Versioned comment prefix; other annotations are ordinary activity, never inferred evidence. */
 export const PROGRESS_EVIDENCE_PREFIX = "standup-progress/v1 ";
 /** Reject arrays and null before inspecting boundary objects. */
@@ -115,10 +95,8 @@ export async function readProgressDeltas(ctx, id, rawOptions = {}) {
     const options = parseProgressOptions(rawOptions);
     if (typeof id !== "string" || id.trim().length === 0)
         throw new ProgressRefusal("invalid_input");
-    const client = ctx.sdk?.client ?? new PmClient({ pmRoot: ctx.pm_root, noExtensions: true });
-    const result = await client.run("history", { id, options: { verify: true, compact: false, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full" } });
-    if (!result.history?.length || !result.verification?.ok
-        || result.version_addressing !== undefined)
+    const result = await readVerifiedStandupHistory(ctx.pm_root, id);
+    if (result.compacted)
         throw new ProgressRefusal("history_unavailable");
     const hashes = result.history.map((entry) => hashHistoryRecord(entry));
     const from = checkpoint(options.after ?? "", result.id, result.history);
