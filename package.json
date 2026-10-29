@@ -19,7 +19,9 @@
     "README.md",
     "CHANGELOG.md",
     "docs/decision-requests.md",
-    "docs/progress-deltas.md"
+    "docs/progress-deltas.md",
+    "docs/commitment-variance.md",
+    "docs/commitment-variance-example.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -107,12 +109,15 @@
       "docs/decision-requests.md",
       "README.md",
       "CHANGELOG.md",
-      "docs/progress-deltas.md"
+      "docs/progress-deltas.md",
+      "docs/commitment-variance.md",
+      "docs/commitment-variance-example.md"
     ],
     "examples": [
       "docs/decision-requests.md",
       "README.md",
-      "docs/progress-deltas.md"
+      "docs/progress-deltas.md",
+      "docs/commitment-variance-example.md"
     ]
   },
   "publishConfig": {

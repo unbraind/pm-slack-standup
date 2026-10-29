@@ -4,7 +4,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync, cpSync } fr
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { writeSettings, readSettings, isPmCliExpectedError } from "@unbrained/pm-cli/sdk";
-import { ProgressRefusal, readProgressDeltas, readSdkStandupItems } from "../index.ts";
+import { CommitmentRefusal, ProgressRefusal, readProgressDeltas, readSdkStandupItems } from "../index.ts";
 import { treeState } from "./tracker-state.ts";
 import { progressFixture, refused } from "./progress-fixture.ts";
 
@@ -29,14 +29,14 @@ test("every SDK and registered report refuses adversarial history without author
           () => readProgressDeltas(f.ctx, f.id), () => readProgressDeltas({ pm_root: f.pmRoot }, f.id),
           () => readSdkStandupItems(f.ctx), () => readSdkStandupItems({ pm_root: f.pmRoot }),
           ...f.harness.activation.commands.handlers.map(({ command }) => () => harness.runCommand({ command, args: [f.id], pmRoot: f.pmRoot,
-            options: { dryRun: true, format: command === "standup" || command === "slack-standup" ? "plain" : "json", output: join(f.directory, "refused.json"), historyDir: join(f.directory, "refused-snapshots") } })),
+            options: { revision: 1, dryRun: true, format: command === "standup" || command === "slack-standup" ? "plain" : "json", output: join(f.directory, "refused.json"), historyDir: join(f.directory, "refused-snapshots") } })),
           ...["json", "md"].map((format) => () => harness.runExporter({ exporter: "standup", pmRoot: f.pmRoot,
             options: { format, output: join(f.directory, "refused.json") } })),
         ];
         for (const [index, attempt] of attempts.entries()) {
           const allBytes = treeState(f.pmRoot, true);
           await assert.rejects(attempt(), (error: unknown) => {
-            assert.ok(error instanceof ProgressRefusal && isPmCliExpectedError(error), `${policy}/${name}`);
+            assert.ok((error instanceof ProgressRefusal || error instanceof CommitmentRefusal) && isPmCliExpectedError(error), `${policy}/${name}`);
             assert.equal(error.exitCode, 2);
             assert.equal(error.context.required, error.remedy);
             return refused("history_unavailable")(error);
