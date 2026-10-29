@@ -6,8 +6,8 @@ import { devNull, tmpdir } from "node:os";
 import { join, resolve, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COMPLETE_LIST_COMMAND_ARGUMENTS, encodeProgressEvidence } from "../index.ts";
-import type { ProgressReport } from "../index.ts";
+import { COMPLETE_LIST_COMMAND_ARGUMENTS, encodeProgressEvidence, encodeStandupCommitment } from "../index.ts";
+import type { CommitmentVarianceReport, ProgressReport } from "../index.ts";
 import { treeState } from "../test/tracker-state.ts";
 import { isMainInvocation } from "./main-invocation.ts";
 
@@ -34,6 +34,8 @@ interface AcceptanceReceipt {
   readonly fixtures_present: true;
   /** Revision-cited progress and checkpoint replay were exercised through the installed CLI. */
   readonly progress_verified?: true;
+  /** Selected commitment variance is exercised through this exact installed artifact. */
+  readonly variance_verified?: true;
 }
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -224,6 +226,19 @@ function verifyPackedProgress(invoke: (args: string[], expectedStatus?: number) 
   assert.equal(page.gains.length, 1);
   assert.equal(page.gains[0].evidenceRevision, "receipt-v1");
   assert.ok(page.gains[0].revision.version > initial.through);
+  invoke(["comment", id, encodeStandupCommitment({ version: 1, key: "packed", target: { id, revision: 1 } })]);
+  const sourceRevision = page.through + 1;
+  const beforeVariance = treeState(pmRoot);
+  const varianceArgs = ["standup", "variance", id, "--revision", String(sourceRevision)];
+  const variance = JSON.parse(invoke([...varianceArgs, "--json"]).stdout) as CommitmentVarianceReport;
+  assert.equal(variance.rows[0].state, "still_pending");
+  assert.equal(variance.rows[0].baseline!.version, 1);
+  assert.equal(variance.source.selected.version, sourceRevision);
+  assert.equal(variance.capture, "available");
+  assert.equal(treeState(pmRoot), beforeVariance, "packed variance reads preserve native state");
+  assert.match(invoke(varianceArgs).stdout, /still_pending/);
+  const invalidVariance = invoke([...varianceArgs, "--revision", "Infinity", "--json"], 2);
+  assert.equal((JSON.parse(invalidVariance.stderr) as { code: string }).code, "invalid_input");
   const replay = JSON.parse(invoke(["standup", "progress", id, "--after", page.next, "--json"]).stdout) as ProgressReport;
   assert.deepEqual(replay.gains, []);
   const writeRun = (mode: string, subject: string): void => {
@@ -333,7 +348,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       const listed = JSON.parse(runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as Record<string, unknown>;
       const exported = runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["standup", "export", "--format", "json"]);
       verifyPackedProgress((args, expectedStatus) => runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, args, expectedStatus), String((listed.items as Array<{ id: string }>)[0].id), scenarioEnvironment.PM_PATH!);
-      receipts.push({ ...scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]), progress_verified: true });
+      receipts.push({ ...scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]), progress_verified: true, variance_verified: true });
     }
 
     console.error("packed acceptance: npm-global-current");
@@ -366,7 +381,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     const globalExport = run(process.execPath, [globalHostCli, "standup", "export", "--format", "json"], globalProjectRoot, globalEnvironment);
     const globalItems = JSON.parse(run(process.execPath, [globalHostCli, ...COMPLETE_LIST_COMMAND_ARGUMENTS], globalProjectRoot, globalEnvironment).stdout) as { items: Array<{ id: string }> };
     verifyPackedProgress((args, expectedStatus) => run(process.execPath, [globalHostCli, ...args], globalProjectRoot, globalEnvironment, commandTimeoutMs, expectedStatus), globalItems.items[0].id, globalEnvironment.PM_PATH!);
-    receipts.push({ ...globalReceipt(globalVersion, developmentVersion, globalExport), progress_verified: true });
+    receipts.push({ ...globalReceipt(globalVersion, developmentVersion, globalExport), progress_verified: true, variance_verified: true });
 
     console.error("packed acceptance: bun-global-current");
     const bunRoot = join(temporaryRoot, "bun-global-current");
@@ -386,7 +401,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     const bunExport = invokeBun(["standup", "export", "--format", "json"]);
     const bunItems = JSON.parse(invokeBun(COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as { items: Array<{ id: string }> };
     verifyPackedProgress(invokeBun, bunItems.items[0].id, bunEnvironment.PM_PATH);
-    receipts.push({ ...globalReceipt(bunVersion, developmentVersion, bunExport), scenario: "bun-global-current", progress_verified: true });
+    receipts.push({ ...globalReceipt(bunVersion, developmentVersion, bunExport), scenario: "bun-global-current", progress_verified: true, variance_verified: true });
 
     process.stdout.write(`${JSON.stringify({ ok: true, receipts })}\n`);
   } finally {

@@ -1,0 +1,51 @@
+id: pm-slack-standup-commitment-variance
+title: Compare selected standup commitments with revision-cited outcomes and scope changes
+description: ""
+type: Feature
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-29T06:33:18.844Z"
+updated_at: "2026-10-29T07:01:53.221Z"
+author: codex-agent
+comments[6]{created_at,author,text}:
+  "2026-10-29T06:33:21.881Z",codex-agent,"Overlap rechecked against core command/source search and sibling README contracts: core owns native history, statuses and relationship reads; pm-brief owns acknowledged handoff contracts; pm-slack owns delivery acknowledgments; prior impediment acknowledgments remain separate. This feature compares explicitly selected periodic intent with linked outcome evidence and later scope changes; it assigns no work and sends no reminders. Existing progress deltas supply evidence inspection and verified history. No matching package or core issue was found by commitment variance search."
+  "2026-10-29T06:35:09.915Z",codex-agent,"Design: read-only selected source revision with per-comment standup-commitment/v1 declarations. Each declaration binds a key to a native target revision; malformed/foreign annotations are isolated. SDK replay and verified history provide baselines, full intervening scope changes (including ABA), outcome revisions and role-based lifecycle meaning. Report carries no bodies and covers up to twenty keys. No capture/write/import/sync journal is introduced; native comments remain the supported capture mechanism. Re-read source, target and settings witnesses before returning, refusing detected interleaving; a peer can still change state after its final check, and no workspace transaction isolation is claimed (core #1620)."
+  "2026-10-29T06:43:49.612Z",codex-agent,"First focused run: 5/8 passed. Three test expectations exposed SDK contracts: canonical body trimming, schema definitions stored separately from settings, and lossless TOON table JSON-column metadata. Adjusted the assertions to use SDK historical reads and decodePmTableRows; custom empty-role statuses now remain unsupported. The twenty-commitment large-body fixture measured 6561 JSON bytes. Added an SDK-backed seeded state model with older-input replays, CRLF variants, all inspected native scope fields, revision binding, random custom role registries and ambient focus."
+  "2026-10-29T06:53:21.504Z",codex-agent,"Public-data validation passed against public main 83f4e1ee5d2fde97254c6fa8044f5cc017314691: 107 certified items, 107 reports, 1048 native events, 107 missing captures, 252 foreign comments, zero declared commitments, invalid annotations or refusals, and 220/220 files unchanged (bytes, names, modes and mtimes) with git absent. The twenty explicitly missing-key control returned 20 unsupported rows in 2967 JSON bytes; this is absence evidence, not positive outcome prevalence. Lint/typecheck/docstrings and zero-duplication checks run locally; full release gates remain assigned to CI."
+  "2026-10-29T07:00:54.051Z",codex-agent,"Validation passed: focused commitment suite 10/10; both new runtime modules measured 100% statements, branches, functions and lines. The independent SDK state model passed 500 sequences with 3363 native mutations across eight generated custom registries, zero mismatches, older-input/CRLF replays and all inspected native scope fields. Four disposable changed-function reverts (scope detection, target revision binding, missing-capture uncertainty, read-witness validation) each failed an assertion; restored production code passed the three selected regressions. The package worktree was never behaviorally mutated. SDK settings metadata is used to refuse unavailable configuration instead of silently interpreting fallback defaults; legacy format warnings remain readable."
+  "2026-10-29T07:01:50.226Z",codex-agent,"Linked native test execution passed 1/1 commands and 10/10 tests. Existing tracker policy disables automatic test-result persistence; no setting was changed. CI will run the unchanged npm and Bun release gates, including the 500-sequence model and all six packed scenarios (npm/Bun current and minimum via npx/bunx plus true npm and Bun global hosts). No import/export/sync writers, native mutation journals or shared package leases are introduced. Remaining concurrency window: a peer may update a previously rechecked stream before other checks finish or after return; observed revisions remain explicit and no atomic snapshot is promised."
+files[12]{path,scope}:
+  commitment-schema.ts,project
+  commitment-variance.ts,project
+  index.ts,project
+  package.json,project
+  scripts/accept-packed.ts,project
+  test/accept-packed.test.ts,project
+  test/commitment-fixture.ts,project
+  test/commitment-model.test.ts,project
+  test/commitment-public.ts,project
+  test/commitment-variance.test.ts,project
+  test/history-readonly.test.ts,project
+  test/smoke.test.ts,project
+tests[2]:
+  - command: node --test --test-concurrency=1 test/commitment-variance.test.ts
+    scope: project
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-29T06:59:24.252Z"
+      source_kind: local_mutation
+      source_ref: feat/commitment-variance-receipts
+  - command: node --test --test-concurrency=1 test/commitment-model.test.ts
+    scope: project
+    timeout_seconds: 1800
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-29T07:01:47.052Z"
+      source_kind: local_mutation
+      source_ref: feat/commitment-variance-receipts
+docs[3]{path,scope}:
+  docs/commitment-variance-example.md,project
+  docs/commitment-variance-validation.md,project
+  docs/commitment-variance.md,project
+body: "Acceptance: explicitly select a prior standup commitment or Plan revision; keep completed, changed-scope, unsupported and still-pending commitments distinct; missing captures never imply failure; a bounded report covers twenty commitments without full source bodies. Provide typed SDK and CLI, compact JSON/TOON, actionable refusals, README/example, SDK model-based validation and public tracker measurements."

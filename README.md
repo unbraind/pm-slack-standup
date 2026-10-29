@@ -363,9 +363,24 @@ Requests with any configured terminal lifecycle role disappear; private alternat
 The SDK exports `collectDecisionRequests`, its typed contracts, and actionable
 `DecisionRequestRefusal` errors. See the [schema, CLI and SDK example](docs/decision-requests.md).
 
+## Commitment variance receipts
+
+`pm standup variance PLAN_ID --revision 4 --json` compares explicit commitments
+in that selected standup/Plan revision with linked outcomes and intervening scope
+changes. `completed`, `changed_scope`, `unsupported` and `still_pending` remain
+distinct; missing captures imply no failure. A bounded report covers twenty
+commitments using keys and native revision digests, without source bodies.
+
+Capture explicit links using `encodeStandupCommitment` and the native comments
+API; read them with the typed `readCommitmentVariance` SDK function or CLI. See
+the [contract](docs/commitment-variance.md),
+[SDK example](docs/commitment-variance-example.md), and
+[validation evidence](docs/commitment-variance-validation.md). Reporting is
+read-only and sends no Slack messages.
+
 ## Without git
 
-Standup previews, decision reports, exports and Slack posts work from a plain
+Standup previews, decision reports, commitment variance receipts, exports and Slack posts work from a plain
 initialized tracker with no Git executable. Slack posting needs a webhook and
 network access; previews and decision reports only read tracker data. Package
 release and GitHub workflows need a Git repository.
