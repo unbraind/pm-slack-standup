@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { cpSync, readdirSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -8,7 +8,7 @@ import test from "node:test";
 test("documented decision verification works in a source copy without dist", () => {
   const directory = mkdtempSync(join(tmpdir(), "standup-decision-guide-"));
   try {
-    for (const path of ["index.ts", "decision-requests.ts", "status-roles.ts", "tsconfig.json", "tsconfig.test.json", "package.json",
+    for (const path of [...readdirSync(resolve(".")).filter((entry) => entry.endsWith(".ts")), "tsconfig.json", "tsconfig.test.json", "package.json",
       "package-lock.json", "manifest.json", "README.md", "CHANGELOG.md", ".gitignore", "docs", "scripts", "test"]) {
       cpSync(resolve(path), join(directory, path), { recursive: true });
     }

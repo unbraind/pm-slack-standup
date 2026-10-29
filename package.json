@@ -18,12 +18,13 @@
     "manifest.json",
     "README.md",
     "CHANGELOG.md",
-    "docs/decision-requests.md"
+    "docs/decision-requests.md",
+    "docs/progress-deltas.md"
   ],
   "scripts": {
     "build": "tsc",
     "build:test": "tsc -p tsconfig.test.json",
-    "test": "npm run build && npm run build:test && node --test test/*.test.ts",
+    "test": "npm run build && npm run build:test && node --test --test-concurrency=2 test/*.test.ts",
     "dev": "tsc --watch",
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
@@ -105,11 +106,13 @@
     "docs": [
       "docs/decision-requests.md",
       "README.md",
-      "CHANGELOG.md"
+      "CHANGELOG.md",
+      "docs/progress-deltas.md"
     ],
     "examples": [
       "docs/decision-requests.md",
-      "README.md"
+      "README.md",
+      "docs/progress-deltas.md"
     ]
   },
   "publishConfig": {
