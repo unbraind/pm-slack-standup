@@ -107,6 +107,7 @@ export async function readProgressDeltas(ctx, id, rawOptions = {}) {
     let state = { metadata: {}, body: "" };
     const seen = new Set();
     const knownComments = new Set();
+    let previousPassingRuns = new Set();
     const readiness = new Map();
     for (let index = 0; index < through; index++) {
         const entry = result.history[index];
@@ -143,6 +144,7 @@ export async function readProgressDeltas(ctx, id, rawOptions = {}) {
             if (inWindow)
                 report.gains.push({ ...gain, revision });
         };
+        const passingRuns = new Set();
         for (const run of records(state.metadata.test_runs)) {
             if (!record(run) || run.status !== "passed")
                 continue;
@@ -152,12 +154,14 @@ export async function readProgressDeltas(ctx, id, rawOptions = {}) {
                 continue;
             }
             const key = digest(["test", run.run_id]);
-            // Existing records on unchanged item revisions are not duplicate input activity.
-            if (records(previous.test_runs).some((old) => record(old) && old.run_id === run.run_id))
+            // Only qualified evidence can suppress a correction; raw ID presence is not proof.
+            passingRuns.add(key);
+            if (previousPassingRuns.has(key))
                 continue;
             admit(key, { kind: "passing_tests", subject: run.run_id, targetRevision: `item:${result.id}:v${index + 1}`,
                 evidenceRevision: `run:${run.run_id}`, value: "passed", count: Number(run.passed) });
         }
+        previousPassingRuns = passingRuns;
         for (const comment of records(state.metadata.comments)) {
             const commentKey = digest([comment]);
             if (knownComments.has(commentKey))

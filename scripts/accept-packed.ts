@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { decodeToon } from "@unbrained/pm-cli/sdk";
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { join, resolve, posix, win32 } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { COMPLETE_LIST_COMMAND_ARGUMENTS, encodeProgressEvidence } from "../index.ts";
 import type { ProgressReport } from "../index.ts";
@@ -224,6 +226,25 @@ function verifyPackedProgress(invoke: (args: string[], expectedStatus?: number) 
   assert.ok(page.gains[0].revision.version > initial.through);
   const replay = JSON.parse(invoke(["standup", "progress", id, "--after", page.next, "--json"]).stdout) as ProgressReport;
   assert.deepEqual(replay.gains, []);
+  const writeRun = (mode: string, subject: string): void => {
+    run(process.execPath, [fileURLToPath(new URL("../test/progress-native-writer.ts", import.meta.url)), pmRoot, id, mode, subject], resolve("."));
+  };
+  for (const mode of ["failed", "malformed"]) {
+    writeRun(mode, mode);
+    const baseline = JSON.parse(invoke(["standup", "progress", id, "--json"]).stdout) as ProgressReport;
+    assert.deepEqual(baseline.gains.filter((gain) => gain.subject === `packed-corrected-${mode}`), []);
+    writeRun("passed", mode);
+    const corrected = JSON.parse(invoke(["standup", "progress", id, "--after", baseline.next, "--json"]).stdout) as ProgressReport;
+    assert.equal(corrected.gains.length, 1);
+    assert.equal(corrected.gains[0].revision.version, corrected.through);
+    assert.equal(corrected.gains[0].targetRevision, `item:${id}:v${corrected.through}`);
+    assert.deepEqual(decodeToon(invoke(["standup", "progress", id, "--after", baseline.next]).stdout), corrected);
+    writeRun("empty", mode); writeRun("passed", mode);
+    const replay = JSON.parse(invoke(["standup", "progress", id, "--after", corrected.next, "--json"]).stdout) as ProgressReport;
+    assert.deepEqual(replay.gains, []);
+    const historical = JSON.parse(invoke(["standup", "progress", id, "--after", baseline.next, "--json"]).stdout) as ProgressReport;
+    assert.deepEqual(historical.gains, corrected.gains, "packed consumers preserve first-passing provenance");
+  }
   invoke(["config", "project", "set", "history-missing-stream-policy", "--policy", "auto_create"]);
   const path = join(pmRoot, "history", `${id}.jsonl`);
   const original = readFileSync(path, "utf8");

@@ -29,7 +29,18 @@ test("500 seeded native-state sequences preserve relationships and reject eviden
       const dependencies = [{ id: f.id, kind: "relates_to" as const }];
       const run = passingRun(`run-${seed}`, 1 + Math.floor(random() * 20));
       const expected = canonicalDocument({ metadata: { ...native, dependencies, test_runs: [run] }, body });
-      const base = await readProgressDeltas(f.ctx, id);
+      const initial = await readProgressDeltas(f.ctx, id);
+      // A native run identity exists before it becomes usable passing evidence.
+      const rejectedRun = { ...run, ...[
+        { status: "failed" as const }, { status: "canceled" as const }, { passed: 0 },
+        { passed: 1000001 }, { failed: 1 }, { skipped: 1 },
+      ][Math.floor(random() * 6)] };
+      await changeProgress(f, f.settings, id, (doc) => { doc.metadata.test_runs = [rejectedRun]; });
+      operations++;
+      assert.deepEqual((await currentProgress(f, id)).test_runs,
+        canonicalDocument({ metadata: { ...native, test_runs: [rejectedRun] }, body: "" }).metadata.test_runs);
+      const base = await readProgressDeltas(f.ctx, id, { after: initial.next });
+      assert.deepEqual(base.gains, [], `unqualified seed ${seed}`);
       const comments = [{ author: "model", created_at: "2026-10-25T00:00:00.000Z", text: encoded }];
       await changeProgress(f, f.settings, id, (doc) => {
         doc.body = body; doc.metadata.dependencies = dependencies;
@@ -44,6 +55,7 @@ test("500 seeded native-state sequences preserve relationships and reject eviden
       const first = await readProgressDeltas(f.ctx, id, { after: base.next });
       assert.deepEqual(first.gains.map((gain) => [gain.kind, gain.evidenceRevision, gain.count]),
         [["passing_tests", `run:run-${seed}`, run.passed], [normalized.kind, normalized.evidenceRevision, 1]]);
+      assert.equal(first.gains[0].revision.version, first.through, `first qualifying revision seed ${seed}`);
       assert.deepEqual(await readProgressDeltas(f.ctx, id, { after: base.next }), first);
       // Remove inputs, then replay older native data with whitespace/CRLF serialization changes.
       const operation = Math.floor(random() * 4);
@@ -85,7 +97,7 @@ test("500 seeded native-state sequences preserve relationships and reject eviden
       await f.client.delete(id);
       if (seed % 100 === 0) console.log(`progress-model: ${seed}/500 sequences checked`);
     }
-    assert.equal(operations, 1500);
-    console.log("progress-model: 500 sequences, 1500 native mutations, SDK read-back after replay, zero mismatches");
+    assert.equal(operations, 2000);
+    console.log("progress-model: 500 sequences, 2000 native mutations, SDK read-back after replay, zero mismatches");
   } finally { await f.close(); }
 });

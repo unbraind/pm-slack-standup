@@ -420,3 +420,5 @@ Run `pm standup progress ITEM --json` (or omit `--json` for TOON) to report nati
 See [the SDK example, strict schema, window contract and refusal remedies](docs/progress-deltas.md). The package observes recorded facts and explicit assessments; it never runs tests or grants review approval.
 
 History failures are read-only: missing or malformed native history returns `history_unavailable` (exit 2 with recovery guidance), even when the tracker configures automatic history creation. Progress, ordinary standup, decisions, aliases and exports share SDK snapshot verification; reporting never creates a replacement history stream or invokes write hooks.
+
+Correcting an existing failed or malformed run reports one gain at its first valid passing revision. Later removal, readdition or replay preserves that original attribution and produces no second gain.
