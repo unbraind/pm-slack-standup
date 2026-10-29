@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026.10.29 - 2026-10-29
+
+### Added
+
+- Compare selected standup commitments with revision-cited outcomes and scope changes ([pm-slack-standup-commitment-variance](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-commitment-variance.toon))
+- Report progress gains with evidence revisions across standup windows ([pm-slack-standup-progress-evidence](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-progress-evidence.toon))
+
 ## 2026.10.28 - 2026-10-28
 
 ### Added

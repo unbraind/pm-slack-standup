@@ -2,13 +2,16 @@ id: pm-slack-standup-progress-evidence
 title: Report progress gains with evidence revisions across standup windows
 description: "Deliver a read-only typed SDK and compact CLI projection of passing test facts, explicitly accepted criterion evidence and declared readiness changes. Reuse SDK verified history and canonical item reads; preserve lifecycle activity as separate counts."
 type: Feature
-status: in_progress
+status: closed
 priority: 2
-tags: []
+tags[1]: "gh:unbraind/pm-slack-standup#164"
 created_at: "2026-10-28T23:07:24.361Z"
-updated_at: "2026-10-29T03:46:56.729Z"
+updated_at: "2026-10-29T18:36:51.668Z"
+closed_at: "2026-10-29T18:36:50.355Z"
+completed_at: "2026-10-29T18:36:50.355Z"
 author: codex-agent
 acceptance_criteria: A status-only edit never appears as verified progress; Each reported gain names its evidence revision; The same evidence is not counted twice across reporting windows
+release: 2026.10.29
 comments[20]{created_at,author,text}:
   "2026-10-28T23:07:32.517Z",codex-agent,"Overlap recheck: standup lifecycle sections and compare snapshots count statuses; core PmClient.listAllComplete, history verification/replay and native linked tests supply facts; pm-review reviewCoverage supplies reviewed/gap attention, explicitly not acceptance. pm-evidence supplies source freshness. None delivers periodic evidence gains deduplicated against verified item history. Implement a read-only projection with caller-held revision checkpoints, native passing tests, and strict explicit accepted/readiness declarations; never infer acceptance from reviewed or status. No tracker writes, imports, sync, journaled apply, shared checkpoints or background delivery are added."
   "2026-10-28T23:21:16.762Z",codex-agent,"Focused evidence and no-git CLI checks pass: status/comment-only windows have zero gains; original revision citations, deterministic retries, deduplicated older runs and normalized declaration replays are covered. Public validation at source head 5c10bafbca1b9d0399a562cf8d4ac503ab345d99: read-only non-git copy, git absent from PATH, 106 items, 1008 history events, 106 pages, 258 status activity events, 222 comment activity events, 235 foreign annotations, zero gains/refusals/replay gains; all 218 source files byte-unchanged. Zero recorded passing runs or explicit acceptance/readiness declarations is reported honestly, with no inference from green prose. Full npm/Bun gates will run in CI at unchanged coverage and duplication thresholds."
@@ -76,4 +79,5 @@ tests[4]:
 docs[2]{path,scope}:
   docs/progress-deltas-validation.md,project
   docs/progress-deltas.md,project
+close_reason: Delivered by merged PR 164; verified successful CI; prepared-release note recovery authorized.
 body: ""
