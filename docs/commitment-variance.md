@@ -49,6 +49,14 @@ explicitly requested missing keys return individual `unsupported/missing_capture
 rows. Each malformed annotation is skipped independently; valid neighbors survive,
 and ignored foreign/invalid counts are returned.
 
+Retained history is not evidence that current native storage exists. The shared
+reader checks the current item through the SDK. If its file disappears while
+history still materializes an item, the target is unsupported; disappearance
+before that stream's final recheck yields `source_changed`. A retained stream
+whose SDK replay ends in a genuine deleted state remains readable as historical
+evidence, while its target is unsupported. No deletion record or replacement
+item is manufactured by a report.
+
 Scope is the SDK-normalized body, title, type, parent, sprint, release,
 dependencies, blocked_by, and deadline. Any intervening difference counts, even
 if later reverted. Source scope changes use names such as `source.body`. Status,

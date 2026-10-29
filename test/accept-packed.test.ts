@@ -197,7 +197,7 @@ for (const direct of [false, true]) test(`packed acceptance completes npm/Bun ma
       cwd: root, encoding: "utf8", env: environment, timeout: 290_000, maxBuffer: 16 * 1024 * 1024,
     });
     assert.equal(result.status, 0, result.stderr || result.error?.message || "packed acceptance did not exit successfully");
-    const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string; progress_verified: boolean; variance_verified: boolean }[] };
+    const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string; progress_verified: boolean; variance_verified: boolean; materialization_verified: boolean }[] };
     assert.equal(receipt.ok, true);
     assert.deepEqual(receipt.receipts.map((entry) => entry.scenario), ["npm-current", "bun-current", "npm-minimum", "bun-minimum", "npm-global-current", "bun-global-current"]);
     const versions = acceptanceVersions(JSON.parse(readFileSync(join(root, "package.json"), "utf8")));
@@ -205,6 +205,7 @@ for (const direct of [false, true]) test(`packed acceptance completes npm/Bun ma
       assert.equal(entry.fixtures_present, true);
       assert.equal(entry.progress_verified, true);
       assert.equal(entry.variance_verified, true);
+      assert.equal(entry.materialization_verified, true);
       assert.equal(entry.rendered_items, entry.tracker_items);
       assert.equal(entry.tracker_items, entry.scenario.includes("global") ? 1 : 2);
       assert.equal(entry.host_version, entry.scenario.endsWith("minimum") ? versions.minimumVersion : versions.developmentVersion);

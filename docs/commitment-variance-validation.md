@@ -75,3 +75,43 @@ Measured local checks:
 Settings reads use SDK `readSettingsWithMetadata`: fallback warnings indicating
 unavailable configuration refuse safely, while the legacy format warning remains
 compatible. This avoids interpreting default status roles after a failed read.
+
+## Round 1: native availability and retained materialization
+
+General rule: historical materialization cannot certify current availability.
+The class audit located a single shared boundary, `readVerifiedStandupHistory`,
+used by variance, progress, ordinary standups, decisions and exports. It formerly
+verified retained history without a current document when the item file was
+absent. A completed target with an unexplained missing file could therefore still
+be reported as completed, and a history-only recheck could miss its disappearance.
+
+The shared reader now requires either a readable native item that matches its
+history or SDK replay proving a genuine deleted state. An unexplained missing
+file refuses shared reads; variance exposes unsupported target evidence or
+`source_changed` when disappearance interleaves with inspection. Historical
+native deletion reads retain their supported behavior. The implementation uses
+SDK location, current-document parsing, history verification and replay; it adds
+no filesystem repair or maintenance path.
+
+`test/materialization.test.ts` discovers all registered commands and checks SDK,
+installed JSON/TOON, and Markdown/JSON export paths. It injects source and target
+removal at every cooperative read boundary on a non-git tracker, preserves all
+native history bytes, checks restoration and native deletion, and verifies that
+missing outcomes are never rendered as live items. Together with the unchanged
+read-only/history suite, the focused run passed **6/6**. Reverting only the shared
+reader in a disposable copy caused **2/2 assertion failures**; restoring the fix
+passed **2/2**, without mutating the package worktree implementation.
+
+Each packed npm/Bun current, minimum and global consumer additionally creates an
+explicit revision-bound source, observes a completed target, removes only that
+target's native file, checks unsupported JSON/TOON and progress refusal, restores
+the bytes, and checks legitimate native deletion history. Its receipt includes
+`materialization_verified: true` only after these checks finish. Existing timeout,
+coverage and duplication thresholds remain unchanged.
+
+The public read-only probe was repeated at merged main
+`6e898423bae6c6e71d0f4c474344e53a1dd55693`: **107 items/reports, 1,048 events,
+107 missing captures, 252 foreign annotations, zero invalid annotations or
+refusals, and 220/220 unchanged files**. The twenty-missing-key control remains
+**20 unsupported rows / 2,967 JSON bytes**. Main supplied the pinned toolchain
+update; no package-specific dependency bump was introduced for this fix.

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { decodeToon } from "@unbrained/pm-cli/sdk";
+import { decodeToon, getHistoryPath, getItemPath } from "@unbrained/pm-cli/sdk";
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
@@ -36,6 +36,8 @@ interface AcceptanceReceipt {
   readonly progress_verified?: true;
   /** Selected commitment variance is exercised through this exact installed artifact. */
   readonly variance_verified?: true;
+  /** Orphaned live storage and native deletion were distinguished through the installed host. */
+  readonly materialization_verified?: true;
 }
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -216,6 +218,42 @@ export function globalHostEntry(prefix: string, packages: string, platform: Node
   return platform === "win32" ? join(packages, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js") : join(prefix, "bin", "pm");
 }
 
+/** Prove current availability independently of retained completion history in every packed consumer. */
+function verifyPackedMaterialization(invoke: (args: string[], expectedStatus?: number) => SpawnSyncReturns<string>, target: string, pmRoot: string): void {
+  const source = `${target}-availability`;
+  invoke(["create", "task", "Availability source", "--id", source, "--create-mode", "progressive",
+    "--parent", "none", "--sprint", "none", "--release", "none", "--assignee", "none"]);
+  const path = getItemPath(pmRoot, "Task", target);
+  let original = readFileSync(path);
+  try {
+    invoke(["comment", source, encodeStandupCommitment({ version: 1, key: "outcome", target: { id: target, revision: 1 } })]);
+    const capture = JSON.parse(invoke(["standup", "progress", source, "--json"]).stdout) as ProgressReport;
+    const command = ["standup", "variance", source, "--revision", String(capture.through)];
+    invoke(["close", target, "Recorded availability control"]);
+    const completed = JSON.parse(invoke([...command, "--json"]).stdout) as CommitmentVarianceReport;
+    assert.equal(completed.rows[0].state, "completed");
+    original = readFileSync(path);
+    const history = readFileSync(getHistoryPath(pmRoot, target));
+    rmSync(path);
+    const before = treeState(pmRoot);
+    for (const json of [false, true]) {
+      const output = invoke([...command, ...(json ? ["--json"] : [])]).stdout;
+      const report = (json ? JSON.parse(output) : decodeToon(output)) as CommitmentVarianceReport;
+      assert.equal(report.rows[0].state, "unsupported");
+      assert.equal(report.counts.completed, 0);
+      const refusal = invoke(["standup", "progress", target, ...(json ? ["--json"] : [])], 2);
+      assert.match(refusal.stderr, /history_unavailable/);
+    }
+    assert.equal(treeState(pmRoot), before);
+    assert.deepEqual(readFileSync(getHistoryPath(pmRoot, target)), history);
+    writeFileSync(path, original);
+    // A genuine native deletion remains readable as historical evidence.
+    invoke(["delete", source]);
+    const archived = JSON.parse(invoke(["standup", "progress", source, "--json"]).stdout) as ProgressReport;
+    assert.equal(archived.id, source);
+  } finally { writeFileSync(path, original); }
+}
+
 /** Exercise the new command through each installed host, retaining real native SDK/history behavior. */
 function verifyPackedProgress(invoke: (args: string[], expectedStatus?: number) => SpawnSyncReturns<string>, id: string, pmRoot: string): void {
   const initial = JSON.parse(invoke(["standup", "progress", id, "--json"]).stdout) as ProgressReport;
@@ -284,6 +322,7 @@ function verifyPackedProgress(invoke: (args: string[], expectedStatus?: number) 
       writeFileSync(path, original);
     }
   } finally { writeFileSync(path, original); }
+  verifyPackedMaterialization(invoke, id, pmRoot);
 }
 
 /** Pack once, exercise all real npm/Bun hosts, emit reconciled receipts, and remove fixtures. */
@@ -348,7 +387,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       const listed = JSON.parse(runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as Record<string, unknown>;
       const exported = runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["standup", "export", "--format", "json"]);
       verifyPackedProgress((args, expectedStatus) => runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, args, expectedStatus), String((listed.items as Array<{ id: string }>)[0].id), scenarioEnvironment.PM_PATH!);
-      receipts.push({ ...scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]), progress_verified: true, variance_verified: true });
+      receipts.push({ ...scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]), progress_verified: true, variance_verified: true, materialization_verified: true });
     }
 
     console.error("packed acceptance: npm-global-current");
@@ -381,7 +420,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     const globalExport = run(process.execPath, [globalHostCli, "standup", "export", "--format", "json"], globalProjectRoot, globalEnvironment);
     const globalItems = JSON.parse(run(process.execPath, [globalHostCli, ...COMPLETE_LIST_COMMAND_ARGUMENTS], globalProjectRoot, globalEnvironment).stdout) as { items: Array<{ id: string }> };
     verifyPackedProgress((args, expectedStatus) => run(process.execPath, [globalHostCli, ...args], globalProjectRoot, globalEnvironment, commandTimeoutMs, expectedStatus), globalItems.items[0].id, globalEnvironment.PM_PATH!);
-    receipts.push({ ...globalReceipt(globalVersion, developmentVersion, globalExport), progress_verified: true, variance_verified: true });
+    receipts.push({ ...globalReceipt(globalVersion, developmentVersion, globalExport), progress_verified: true, variance_verified: true, materialization_verified: true });
 
     console.error("packed acceptance: bun-global-current");
     const bunRoot = join(temporaryRoot, "bun-global-current");
@@ -401,7 +440,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     const bunExport = invokeBun(["standup", "export", "--format", "json"]);
     const bunItems = JSON.parse(invokeBun(COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as { items: Array<{ id: string }> };
     verifyPackedProgress(invokeBun, bunItems.items[0].id, bunEnvironment.PM_PATH);
-    receipts.push({ ...globalReceipt(bunVersion, developmentVersion, bunExport), scenario: "bun-global-current", progress_verified: true, variance_verified: true });
+    receipts.push({ ...globalReceipt(bunVersion, developmentVersion, bunExport), scenario: "bun-global-current", progress_verified: true, variance_verified: true, materialization_verified: true });
 
     process.stdout.write(`${JSON.stringify({ ok: true, receipts })}\n`);
   } finally {

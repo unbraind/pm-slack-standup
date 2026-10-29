@@ -2,7 +2,7 @@ import { PmCliError } from "@unbrained/pm-cli/sdk";
 
 const remedies = {
   invalid_input: "Use the version 1 commitment schema, a positive source revision, and at most twenty distinct keys; see docs/commitment-variance.md.",
-  history_unavailable: "Recover the selected source history separately using read-only SDK verification before retrying; no failure is inferred.",
+  history_unavailable: "Inspect current source storage and retained history using read-only SDK verification; recover missing data separately before retrying; no failure is inferred.",
   revision_unavailable: "Select an existing, uncompacted source revision; obtain its number through the native history API.",
   selection_limit: "Select at most twenty keys explicitly, or select a smaller source capture.",
   source_changed: "Retry the complete read against the same explicit source revision; a source, target or status registry changed during inspection.",
