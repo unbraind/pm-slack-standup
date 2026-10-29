@@ -2,12 +2,15 @@ id: pm-slack-standup-commitment-variance
 title: Compare selected standup commitments with revision-cited outcomes and scope changes
 description: ""
 type: Feature
-status: in_progress
+status: closed
 priority: 2
-tags: []
+tags[1]: "gh:unbraind/pm-slack-standup#166"
 created_at: "2026-10-29T06:33:18.844Z"
-updated_at: "2026-10-29T09:25:12.420Z"
+updated_at: "2026-10-29T18:48:07.939Z"
+closed_at: "2026-10-29T18:48:07.277Z"
+completed_at: "2026-10-29T18:48:07.277Z"
 author: codex-agent
+release: 2026.10.29
 comments[14]{created_at,author,text}:
   "2026-10-29T06:33:21.881Z",codex-agent,"Overlap rechecked against core command/source search and sibling README contracts: core owns native history, statuses and relationship reads; pm-brief owns acknowledged handoff contracts; pm-slack owns delivery acknowledgments; prior impediment acknowledgments remain separate. This feature compares explicitly selected periodic intent with linked outcome evidence and later scope changes; it assigns no work and sends no reminders. Existing progress deltas supply evidence inspection and verified history. No matching package or core issue was found by commitment variance search."
   "2026-10-29T06:35:09.915Z",codex-agent,"Design: read-only selected source revision with per-comment standup-commitment/v1 declarations. Each declaration binds a key to a native target revision; malformed/foreign annotations are isolated. SDK replay and verified history provide baselines, full intervening scope changes (including ABA), outcome revisions and role-based lifecycle meaning. Report carries no bodies and covers up to twenty keys. No capture/write/import/sync journal is introduced; native comments remain the supported capture mechanism. Re-read source, target and settings witnesses before returning, refusing detected interleaving; a peer can still change state after its final check, and no workspace transaction isolation is claimed (core #1620)."
@@ -67,4 +70,5 @@ docs[3]{path,scope}:
   docs/commitment-variance-example.md,project
   docs/commitment-variance-validation.md,project
   docs/commitment-variance.md,project
+close_reason: Delivered by merged PR 166 with successful CI; authorized prepared-release notes recovery.
 body: "Acceptance: explicitly select a prior standup commitment or Plan revision; keep completed, changed-scope, unsupported and still-pending commitments distinct; missing captures never imply failure; a bounded report covers twenty commitments without full source bodies. Provide typed SDK and CLI, compact JSON/TOON, actionable refusals, README/example, SDK model-based validation and public tracker measurements."
