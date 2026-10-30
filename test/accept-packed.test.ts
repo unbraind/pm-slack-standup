@@ -12,6 +12,7 @@ import {
   acceptanceVersions,
   acceptPacked,
   globalReceipt,
+  globalHostEntry,
   packedTarball,
   run,
   scenarioReceipt,
@@ -21,6 +22,11 @@ const root = resolve(import.meta.dirname, "..");
 const scenario = { name: "npm-current", manager: "npm", hostVersion: "2026.10.4" } as const;
 const listed = { items: [{ title: "Doing" }, { title: "Next" }], count: 2, total: 2 };
 const sections = { doing: [{ title: "Doing" }], next: [{ title: "Next" }] };
+
+test("global host launch entries cover real symlinks and Windows package entries", () => {
+  assert.equal(globalHostEntry("prefix", "packages", "linux"), join("prefix", "bin", "pm"));
+  assert.equal(globalHostEntry("prefix", "packages", "win32"), join("packages", "node_modules", "@unbrained", "pm-cli", "dist", "cli.js"));
+});
 
 test("packed host contract rejects every missing or nonexact version input", () => {
   const contract = { devDependencies: { "@unbrained/pm-cli": "2026.10.4" }, peerDependencies: { "@unbrained/pm-cli": ">= 2026.8.20" } };
@@ -93,9 +99,11 @@ test("Windows npm PATH lookup launches real JavaScript entries when npm_execpath
 });
 
 test("packed environment strips case-insensitive tracker and script overrides without mutation", () => {
-  const input = { PM_PATH: "/private", pm_GLOBAL_path: "/global", npm_CONFIG_allow_scripts: "all", NODE_V8_COVERAGE: "/coverage", PATH: "/tools", npm_config_userconfig: "/private/npmrc" };
+  const input = { PM_PATH: "/private", pm_GLOBAL_path: "/global", npm_CONFIG_allow_scripts: "all", NPM_TOKEN: "synthetic", NPM_MEDIA_SERVER: "synthetic", NODE_V8_COVERAGE: "/coverage", PATH: "/tools", npm_config_userconfig: "/private/npmrc" };
   const clean = acceptanceEnvironment(input);
   assert.equal(clean.PM_PATH, undefined);
+  assert.equal(clean.NPM_TOKEN, undefined);
+  assert.equal(clean.NPM_MEDIA_SERVER, undefined);
   assert.equal(clean.pm_GLOBAL_path, undefined);
   assert.equal(clean.npm_CONFIG_allow_scripts, undefined);
   assert.equal(clean.npm_config_userconfig, devNull);
@@ -189,14 +197,18 @@ for (const direct of [false, true]) test(`packed acceptance completes npm/Bun ma
       cwd: root, encoding: "utf8", env: environment, timeout: 290_000, maxBuffer: 16 * 1024 * 1024,
     });
     assert.equal(result.status, 0, result.stderr || result.error?.message || "packed acceptance did not exit successfully");
-    const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string }[] };
+    const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string; progress_verified: boolean; variance_verified: boolean; materialization_verified: boolean; window_verified: boolean }[] };
     assert.equal(receipt.ok, true);
-    assert.deepEqual(receipt.receipts.map((entry) => entry.scenario), ["npm-current", "bun-current", "npm-minimum", "bun-minimum", "npm-global-current"]);
+    assert.deepEqual(receipt.receipts.map((entry) => entry.scenario), ["npm-current", "bun-current", "npm-minimum", "bun-minimum", "npm-global-current", "bun-global-current"]);
     const versions = acceptanceVersions(JSON.parse(readFileSync(join(root, "package.json"), "utf8")));
     for (const entry of receipt.receipts) {
       assert.equal(entry.fixtures_present, true);
+      assert.equal(entry.progress_verified, true);
+      assert.equal(entry.variance_verified, true);
+      assert.equal(entry.materialization_verified, true);
+      assert.equal(entry.window_verified, true);
       assert.equal(entry.rendered_items, entry.tracker_items);
-      assert.equal(entry.tracker_items, entry.scenario === "npm-global-current" ? 1 : 2);
+      assert.equal(entry.tracker_items, entry.scenario.includes("global") ? 1 : 2);
       assert.equal(entry.host_version, entry.scenario.endsWith("minimum") ? versions.minimumVersion : versions.developmentVersion);
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }

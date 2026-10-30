@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import {
-  acquireLock, appendHistoryEntry, createHistoryEntry, getHistoryPath,
+  acquireLock, appendHistoryEntry, createHistoryEntry, emptyImportedDocument, getHistoryPath,
   isPmCliExpectedError, locateItem, readLocatedItem,
 } from "@unbrained/pm-cli/sdk";
 import type { ItemDocument, MutationEvent, MutationEventPage, PmCliExpectedError } from "@unbrained/pm-cli/sdk";
@@ -33,7 +33,7 @@ function eventAt(streamId: string, version: number, ts: string, type = "update")
 /** One synthetic SDK page for scan-level tests. */
 function page(events: MutationEvent[], hasMore: boolean, nextCursor?: string): MutationEventPage {
   return {
-    events, count: events.length, has_more: hasMore, cursor_mode: "batch",
+    events, count: events.length, has_more: hasMore, cursor_mode: "batch", integrity: "verified",
     ...(nextCursor === undefined ? {} : { next_cursor: nextCursor }),
     source: "authoritative_history",
   };
@@ -562,7 +562,7 @@ test("an event naming an unknown stream marks the report incomplete without admi
       metadata: { id: "ghost-9", title: "Ghost", description: "", type: "Task", status: "open", priority: 2, tags: [], created_at: "2026-10-27T00:00:00.000Z", updated_at: "2026-10-27T00:00:00.000Z", author: "window-fixture" },
       body: "",
     };
-    const entry = createHistoryEntry({ nowIso: "2026-10-27T09:00:00.000Z", author: "window-fixture", op: "update", before: ghostDoc, after: ghostDoc, message: "orphan stream event" });
+    const entry = createHistoryEntry({ nowIso: "2026-10-27T09:00:00.000Z", author: "window-fixture", op: "create", before: emptyImportedDocument(), after: ghostDoc, message: "orphan stream event" });
     await appendHistoryEntry(getHistoryPath(fixture.pmRoot, "ghost-9"), entry);
     const window = await runWindow(fixture, fixture.directory);
     assert.equal(window.window.events, 1);

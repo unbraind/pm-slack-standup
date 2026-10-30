@@ -417,10 +417,26 @@ Typed refusals (`window_cursor_file_missing`, `window_state_unreadable`,
 scan, membership, certification and packet helpers, and the
 `STANDUP_WINDOW_REFUSAL_REMEDIES` table.
 
+## Commitment variance receipts
+
+`pm standup variance PLAN_ID --revision 4 --json` compares explicit commitments
+in that selected standup/Plan revision with linked outcomes and intervening scope
+changes. `completed`, `changed_scope`, `unsupported` and `still_pending` remain
+distinct; missing captures imply no failure. A bounded report covers twenty
+commitments using keys and native revision digests, without source bodies.
+
+Capture explicit links using `encodeStandupCommitment` and the native comments
+API; read them with the typed `readCommitmentVariance` SDK function or CLI. See
+the [contract](docs/commitment-variance.md),
+[SDK example](docs/commitment-variance-example.md), and
+[validation evidence](docs/commitment-variance-validation.md). Reporting is
+read-only and sends no Slack messages.
+
 ## Without git
 
-Standup previews, decision reports, window packets, exports and Slack posts work
-from a plain initialized tracker with no Git executable. Slack posting needs a webhook and
+Standup previews, decision reports, commitment variance receipts, window packets, exports and Slack posts work from a plain
+initialized tracker with no Git executable. Slack posting needs a webhook and
+
 network access; previews and decision reports only read tracker data. Package
 release and GitHub workflows need a Git repository.
 
@@ -466,3 +482,13 @@ itself lists each affected stream in its output; `pm history --verify <id>` spot
 content, so `reconcile` only re-greens the hash chain (no data loss) — see the authoritative
 [pm-cli merge-safety guide](https://github.com/unbraind/pm-cli/blob/main/docs/MERGE_SAFETY.md). The
 older blunt `pm history-repair --all` remains available as a lower-level primitive.
+
+## Evidence-bearing progress deltas
+
+Run `pm standup progress ITEM --json` (or omit `--json` for TOON) to report native passing-test evidence, explicitly accepted criterion evidence and declared readiness changes separately from lifecycle/comment activity. Every gain cites its evidence and item-history revision. Retain the returned `next` token and pass `--after TOKEN` for the next window; replayed evidence is counted once even after older inputs are reintroduced. The command is read-only and works without git.
+
+See [the SDK example, strict schema, window contract and refusal remedies](docs/progress-deltas.md). The package observes recorded facts and explicit assessments; it never runs tests or grants review approval.
+
+History failures are read-only: missing or malformed native history returns `history_unavailable` (exit 2 with recovery guidance), even when the tracker configures automatic history creation. Progress, ordinary standup, decisions, aliases and exports share SDK snapshot verification; reporting never creates a replacement history stream or invokes write hooks.
+
+Correcting an existing failed or malformed run reports one gain at its first valid passing revision. Later removal, readdition or replay preserves that original attribution and produces no second gain.

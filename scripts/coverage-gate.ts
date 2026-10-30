@@ -93,7 +93,7 @@ export function runGate(root: string): number {
     const environment: NodeJS.ProcessEnv = { ...process.env, TZ: "UTC" };
     delete environment.NODE_TEST_CONTEXT;
     execFileSync(process.execPath, [c8, "--config", settings, process.execPath,
-      "--test", "--test-reporter=spec", ...config.tests], {
+      "--test", "--test-concurrency=2", "--test-reporter=spec", ...config.tests], {
       cwd: canonicalRoot, stdio: "inherit",
       env: environment,
     });

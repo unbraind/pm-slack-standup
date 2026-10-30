@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## 2026.10.30 - 2026-10-30
+
+### Fixed
+
+- Restore generated notes for prepared 2026.10.29 ([pm-slack-standup-release-notes-1029](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-release-notes-1029.toon))
+
+## 2026.10.29 - 2026-10-29
+
+### Added
+
+- Compare selected standup commitments with revision-cited outcomes and scope changes ([pm-slack-standup-commitment-variance](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-commitment-variance.toon))
+- Report progress gains with evidence revisions across standup windows ([pm-slack-standup-progress-evidence](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-progress-evidence.toon))
+
+## 2026.10.28 - 2026-10-28
 
 ### Added
 
@@ -15,6 +28,12 @@
 ### Changed
 
 - Use the pm SDK for certified standup reads and lifecycle roles ([pm-slack-standup-jti0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-jti0.toon))
+
+## 2026.10.26 - 2026-10-26
+
+### Other
+
+- Point the npm homepage at the package catalog and link the author ([pm-slack-standup-vpn3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-vpn3.toon))
 
 ## 2026.10.25 - 2026-10-25
 

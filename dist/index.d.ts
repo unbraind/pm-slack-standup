@@ -1,5 +1,7 @@
 import type { DecisionRequestReport } from "./decision-requests.ts";
 export * from "./decision-requests.ts";
+export * from "./progress-deltas.ts";
+export * from "./commitment-variance.ts";
 export * from "./reporting-window.ts";
 import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
 export { classifyStandupItem, hasBlockedByDep } from "./status-roles.ts";

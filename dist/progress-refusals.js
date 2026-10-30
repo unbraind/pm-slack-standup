@@ -1,0 +1,24 @@
+import { PmCliError } from "@unbrained/pm-cli/sdk";
+/** Stable remedies remain safe even when a source record contains private or malformed data. */
+const remedies = {
+    invalid_input: "Use the strict version 1 evidence schema and documented bounded options in docs/progress-deltas.md.",
+    checkpoint_mismatch: "Use this item's previous next token with its original append-only history; restart explicitly without after to replay.",
+    history_unavailable: "Inspect current item storage and retained history with read-only SDK snapshot/verification APIs; recover missing data separately before retrying.",
+    invalid_output: "Retry the read and inspect the installed package version; emitted counters must be finite bounded integers.",
+    output_limit: "Increase outputBytes up to 32768 or reduce events; the checkpoint was not advanced.",
+};
+/** Machine-readable refusal, shared by SDK consumers and the CLI expected-error renderer. */
+export class ProgressRefusal extends PmCliError {
+    /** Expected CLI usage failure; no source text is interpolated. */
+    exitCode = 2;
+    /** Fixed corrective action for an agent to follow. */
+    remedy;
+    /** Stable machine-readable refusal code. */
+    code;
+    constructor(code) {
+        super(`Progress refused (${code}). ${remedies[code]}`, 2, { code, required: remedies[code] });
+        this.code = code;
+        this.remedy = remedies[code];
+    }
+}
+//# sourceMappingURL=progress-refusals.js.map

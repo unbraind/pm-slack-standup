@@ -5,6 +5,12 @@ import { basename, resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { collectDecisionRequests, isDecisionRequestItem, renderDecisionRequests } from "./decision-requests.js";
 export * from "./decision-requests.js";
+export * from "./progress-deltas.js";
+export * from "./commitment-variance.js";
+import { commitmentCliNumber, readCommitmentVariance } from "./commitment-variance.js";
+import { readProgressDeltas } from "./progress-deltas.js";
+import { readVerifiedStandupHistory } from "./verified-history.js";
+import { ProgressRefusal } from "./progress-refusals.js";
 import { admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents, readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents, standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowUnknownStreams, } from "./reporting-window.js";
 export * from "./reporting-window.js";
 import { certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE, listMutationEvents, PmClient, readSettings, resolveRuntimeStatusRegistry, } from "@unbrained/pm-cli/sdk";
@@ -883,18 +889,12 @@ export async function readSdkStandupItems(ctx) {
     try {
         const items = readCompleteStandupItems(await client.listAllComplete({ includeBody: true }));
         for (const item of items) {
-            // The history action rereads and verifies the chain and current document; a cached event index is insufficient.
-            const history = await client.run("history", { id: item.id, options: {
-                    verify: true, outputBudget: "unbounded", outputLimit: "unbounded", outputInclude: "full",
-                } });
-            if (!isRecord(history) || !isRecord(history.verification) || history.verification.ok !== true) {
-                throw new CommandError(`Standup history integrity verification failed for ${item.id}.`);
-            }
+            await readVerifiedStandupHistory(ctx.pm_root, item.id);
         }
         return items;
     }
     catch (error) {
-        if (error instanceof CommandError)
+        if (error instanceof CommandError || error instanceof ProgressRefusal)
             throw error;
         throw new CommandError(`pm list --all failed: ${String(error)}`);
     }
@@ -1894,7 +1894,7 @@ function sharedPresentationFlags() {
 }
 export default defineExtension({
     name: "pm-slack-standup",
-    version: "2026.10.27",
+    version: "2026.10.30",
     activate(api) {
         // Each host activation owns its capability decision, including old hosts
         // activated after a modern host in the same process.
@@ -2088,6 +2088,46 @@ export default defineExtension({
             run: runStandupCommand,
         });
         api.registerCommand({
+            name: "standup progress",
+            description: "Report revision-cited evidence gains separately from activity",
+            intent: "Read recorded tests, explicit criterion acceptance and readiness evidence without running tests or assigning approval",
+            arguments: [{ name: "item", required: true, description: "Tracker item id" }],
+            examples: ["pm standup progress item-id --json", "pm standup progress item-id --after TOKEN --events 20"],
+            flags: [
+                { long: "--after", value_name: "token", description: "Previous next token for this item; omit to replay from birth" },
+                { long: "--events", value_name: "count", description: "History events per page (1..500, default 100)" },
+                { long: "--output-bytes", value_name: "bytes", description: "JSON projection budget (1024..32768, default 8192)" },
+            ],
+            /** Acquire the host SDK only after validating bounded command inputs. */
+            async run(ctx) {
+                return readProgressDeltas(ctx, String(ctx.args[0] ?? ""), {
+                    after: ctx.options.after,
+                    events: ctx.options.events,
+                    outputBytes: ctx.options.outputBytes ?? ctx.options["output-bytes"],
+                });
+            },
+        });
+        api.registerCommand({
+            name: "standup variance",
+            description: "Compare selected prior commitments with linked outcomes and scope changes",
+            intent: "Read bounded revision-cited commitment receipts without inferring failure from missing captures",
+            arguments: [{ name: "source", required: true, description: "Plan or standup item carrying explicit commitment comments" }],
+            examples: ["pm standup variance plan-id --revision 3 --json", "pm standup variance plan-id --revision 3 --keys build,docs"],
+            flags: [
+                { long: "--revision", value_name: "version", description: "Required explicit source history version" },
+                { long: "--keys", value_name: "list", description: "Up to twenty comma-separated commitment keys; absent captures remain unsupported" },
+                { long: "--output-bytes", value_name: "bytes", description: "JSON projection budget (1024..32768, default 16384)" },
+            ],
+            /** Adapt CLI spellings before the shared schema validates the entire boundary. */
+            async run(ctx) {
+                return readCommitmentVariance(ctx, {
+                    source: { id: ctx.args[0], revision: commitmentCliNumber(ctx.options.revision) },
+                    keys: typeof ctx.options.keys === "string" ? ctx.options.keys.split(",") : ctx.options.keys,
+                    outputBytes: commitmentCliNumber(ctx.options.outputBytes ?? ctx.options["output-bytes"]),
+                });
+            },
+        });
+        api.registerCommand({
             name: "standup decisions",
             description: "Read declared public decision requests as compact TOON or JSON",
             intent: "Present active human or agent requests with public alternatives, deadlines and acknowledgment links without posting or writing",
@@ -2141,8 +2181,8 @@ export default defineExtension({
             const outputPath = readStrOption(ctx.options, "output");
             const cursorFilePath = resolve(cursorFile);
             const snapshot = readStandupWindowBoundary(cursorFilePath);
-            const scan = await scanStandupWindowEvents((since) => listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000 }), snapshot.boundary, maxEvents);
             const items = await readSdkStandupItems(ctx);
+            const scan = await scanStandupWindowEvents((since) => listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000, verify: true }), snapshot.boundary, maxEvents);
             const registry = await readStandupStatusRegistry(ctx.pm_root);
             const corpusIds = new Set(items.map((item) => item.id));
             const regressedStreams = standupWindowCoverageRegressions(snapshot.boundary, scan);
@@ -2279,7 +2319,7 @@ export default defineExtension({
             // paths would silently escape its gate. The smoke test derives the
             // expected list from the real activation, so a newly registered command
             // path cannot be added without appearing here.
-            commands: ["standup", "slack-standup", "standup export", "standup decisions", "standup window"],
+            commands: ["standup", "slack-standup", "standup export", "standup decisions", "standup progress", "standup variance", "standup window"],
             // Mirror the handler's contract without aborting here (the runtime
             // swallows throws from preflight). An empty delta is an explicit
             // pass-through that leaves the runtime's preflight decision untouched.
