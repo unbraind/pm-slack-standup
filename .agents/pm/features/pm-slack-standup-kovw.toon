@@ -6,10 +6,12 @@ status: in_progress
 priority: 1
 tags: []
 created_at: "2026-10-27T15:38:14.702Z"
-updated_at: "2026-10-27T15:38:39.395Z"
+updated_at: "2026-10-30T23:52:22.479Z"
 assignee: codex-agent
 claim_principal: codex-agent
 author: codex-agent
+comments[1]{created_at,author,text}:
+  "2026-10-30T23:52:22.479Z",codex-agent,"Resumed delivery: reviewed retained README and generated window artifacts; rejected only temporary-fixture merge attributes. Next merge current main, preserve append-only tracker history, prove all three acceptance criteria with behavioral reverts, validate a public tracker copy, and run npm/Bun release gates with two workers."
 docs[1]{path,scope}:
   README.md,project
 body: ""

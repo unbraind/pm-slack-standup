@@ -363,10 +363,64 @@ Requests with any configured terminal lifecycle role disappear; private alternat
 The SDK exports `collectDecisionRequests`, its typed contracts, and actionable
 `DecisionRequestRefusal` errors. See the [schema, CLI and SDK example](docs/decision-requests.md).
 
+## Cursor-complete reporting windows
+
+`pm standup window` builds a standup from a **certified event boundary** instead
+of a wall-clock date window, and retains the **exact next boundary** after the
+packet is rendered — so crashes and late or backdated appends never silently
+skip work between reports:
+
+- The boundary lives in a small JSON state file you own (`--cursor-file`,
+  required). It stores the opaque `pm history events` cursor of the last
+  admitted event plus the highest admitted offset of every history stream, so
+  the next report sees both forward appends and events appended after the
+  boundary with older timestamps. No second event journal is created; all
+  event reads go through the pm SDK mutation-event reader.
+- The output is a compact TOON packet (JSON with `--json`) sized for agents:
+  per-window event counts (including `late_events`, `workspace_events`),
+  `touched_items`, sorted `ops`, the bucketed `sections` rows, and the
+  `boundary_before` / `boundary_next` chain. A consumer can detect a missing
+  report because each packet's `boundary_before` must equal the previous
+  packet's `boundary_next`.
+- Restart after rendering reproduces the same packet: the boundary is only
+  retained after the packet is built, so a crash in between simply re-renders
+  the window. `--no-advance` renders the packet without retaining anything,
+  and `--output <file>` writes the packet to disk BEFORE the boundary is
+  admitted for durable delivery.
+- A window that cannot be certified is reported `incomplete` with typed
+  reasons (`event_cap_exceeded` from `--max-events`, `history_regression` when
+  the journal shrank below admitted coverage, `unknown_event_stream` for
+  events without a corpus item, `window_contended` when a concurrent reporter
+  admitted first) and is never admitted, so nothing is skipped silently.
+  `pm delete` removes the item but keeps its history stream, so deletion events
+  are surfaced as `deleted_items` instead of failing certification.
+
+```bash
+# First report: one window covering the whole journal
+pm standup window --cursor-file .standup-window.json
+
+# Agent-readable JSON, delivered durably before the boundary is admitted
+pm standup window --cursor-file .standup-window.json --json --output window.json
+
+# Preview without admitting (a restart re-renders the same packet)
+pm standup window --cursor-file .standup-window.json --no-advance
+
+# Resume the raw event stream yourself from the retained boundary
+pm history events --since "$(jq -r .window.boundary_next window.json)"
+```
+
+Typed refusals (`window_cursor_file_missing`, `window_state_unreadable`,
+`window_state_version_unsupported`, `window_state_invalid_shape`,
+`window_max_events_invalid`, `window_state_write_failed`,
+`window_page_cursor_missing`) carry an operator remedy each; the SDK exports
+`standupWindowRefusalMessage`, the boundary state reader/writer, the journal
+scan, membership, certification and packet helpers, and the
+`STANDUP_WINDOW_REFUSAL_REMEDIES` table.
+
 ## Without git
 
-Standup previews, decision reports, exports and Slack posts work from a plain
-initialized tracker with no Git executable. Slack posting needs a webhook and
+Standup previews, decision reports, window packets, exports and Slack posts work
+from a plain initialized tracker with no Git executable. Slack posting needs a webhook and
 network access; previews and decision reports only read tracker data. Package
 release and GitHub workflows need a Git repository.
 
