@@ -36,7 +36,7 @@ older-input replay, CRLF/whitespace/unicode values, relationships, status change
 custom lifecycle roles, deletion, backdated events, previews, and crash replay.
 The measured run uses 521 operations and 27 windows, partitioning 458 SDK
 events without omissions or duplicates. The window module independently measures
-100% lines, statements, branches and functions across 35 focused window tests, plus the seeded model test.
+100% lines, statements, branches and functions across 36 focused window tests, plus the seeded model test.
 
 Public-data validation is reproducible with:
 
@@ -81,7 +81,9 @@ release gates correctly failed their unchanged 100% thresholds. Follow-up:
 [pm-slack-standup-packed-timing](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-packed-timing.toon).
 
 Fresh `node scripts/accept-packed.ts` and `bun scripts/accept-packed.ts` each
-passed all six installed-host scenarios on the final implementation. Their
+passed all six installed-host scenarios for source commit `415328b`
+(historical: the later window changes are covered by fresh CI on the reviewed
+head). Their
 129,382-byte tarballs were byte-identical, contained 45 entries and all four
 window module artifacts, and declared host floor 2026.10.27. The
 [artifact receipt](evidence/reporting-window-artifact.json) records the SHA-256

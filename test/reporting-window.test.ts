@@ -334,12 +334,27 @@ test("the scan stops at the window cap and reports it, and refuses cursorless co
   };
   const capped = await scanStandupWindowEvents(readPage, boundary, 2);
   assert.equal(capped.capped, true);
-  assert.equal(capped.windowEvents.length, 2);
-  assert.equal(capped.pages, 2);
+  assert.equal(capped.windowEvents.length, 3);
+  assert.equal(capped.pages, 3);
   await assert.rejects(
     scanStandupWindowEvents(async () => page([eventAt("item-9", 1, "2026-10-27T13:00:00.000Z")], true), null, DEFAULT_STANDUP_WINDOW_MAX_EVENTS),
     (error: unknown) => isWindowRefusal(error, "window_page_cursor_missing") && error.exitCode === 1,
   );
+});
+
+test("a non-final page that reaches exactly the cap keeps scanning covered pages and is not capped", async () => {
+  const boundary = boundaryAt("2026-10-27T12:00:00.000Z", "item-1", 2, { "item-1": 2 });
+  const readPage = async (since?: string): Promise<MutationEventPage> => {
+    if (since === undefined) return page([eventAt("item-2", 1, "2026-10-27T13:00:00.000Z"), eventAt("item-2", 2, "2026-10-27T14:00:00.000Z")], true, "cursor-1");
+    // Only events the boundary already covers follow, so the window holds exactly the cap.
+    if (since === "cursor-1") return page([eventAt("item-1", 1, "2026-10-27T10:00:00.000Z"), eventAt("item-1", 3, "2026-10-27T11:00:00.000Z")], false, "cursor-2");
+    throw new Error("unexpected page cursor");
+  };
+  const scan = await scanStandupWindowEvents(readPage, boundary, 2);
+  assert.equal(scan.capped, false);
+  assert.equal(scan.windowEvents.length, 2);
+  assert.equal(scan.pages, 2);
+  assert.equal(scan.nextCursor, "cursor-2");
 });
 
 // ---------------------------------------------------------------------------

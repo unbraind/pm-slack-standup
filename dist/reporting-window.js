@@ -390,12 +390,13 @@ export async function scanStandupWindowEvents(readPage, boundary, maxEvents) {
             && (typeof page.next_cursor !== "string" || page.next_cursor.length === 0 || page.next_cursor === since)) {
             refuseStandupWindow("window_page_cursor_missing", `page ${pages} did not provide a progressing resumption cursor.`, EXIT_CODE.GENERIC_FAILURE);
         }
-        if (!page.has_more && windowEvents.length <= maxEvents)
-            break;
-        if (windowEvents.length >= maxEvents) {
+        // Exactly maxEvents is within the cap on every page; later pages may hold only already-covered events.
+        if (windowEvents.length > maxEvents) {
             capped = true;
             break;
         }
+        if (!page.has_more)
+            break;
         since = page.next_cursor;
     }
     return {

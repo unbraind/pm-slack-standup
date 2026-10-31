@@ -548,11 +548,12 @@ export async function scanStandupWindowEvents(
         EXIT_CODE.GENERIC_FAILURE,
       );
     }
-    if (!page.has_more && windowEvents.length <= maxEvents) break;
-    if (windowEvents.length >= maxEvents) {
+    // Exactly maxEvents is within the cap on every page; later pages may hold only already-covered events.
+    if (windowEvents.length > maxEvents) {
       capped = true;
       break;
     }
+    if (!page.has_more) break;
     since = page.next_cursor;
   }
   return {

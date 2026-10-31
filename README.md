@@ -376,6 +376,9 @@ skip work between reports:
   the next report sees both forward appends and events appended after the
   boundary with older timestamps. No second event journal is created; all
   event reads go through the pm SDK mutation-event reader.
+- Use one cursor file per consumer. Admitting a boundary records that its
+  packet was delivered; two independent consumers sharing one file would let
+  one consumer's admission skip events the other has not read yet.
 - The output is a compact TOON packet (JSON with `--json`) sized for agents:
   per-window event counts (including `late_events`, `workspace_events`),
   `touched_items`, sorted `ops`, the bucketed `sections` rows, and the
@@ -418,6 +421,10 @@ pm standup window --cursor-file .standup-window.json --no-advance
 pm history events --since "$(jq -r .window.boundary_next window.json)"
 ```
 
+The raw `pm history events --since` cursor is timestamp-ordered: an append
+backdated before it is not returned. It is not a cursor-complete replacement
+for `standup window`, which also tracks per-stream offsets.
+
 Typed refusals (`window_cursor_file_missing`, `window_state_unreadable`,
 `window_state_version_unsupported`, `window_state_invalid_shape`,
 `window_max_events_invalid`, `window_state_write_failed`,
@@ -425,7 +432,7 @@ Typed refusals (`window_cursor_file_missing`, `window_state_unreadable`,
 `standupWindowRefusalMessage`, the boundary state reader/writer, the journal
 scan, membership, certification and packet helpers, and the
 `STANDUP_WINDOW_REFUSAL_REMEDIES` table. See the
-[validation evidence](docs/reporting-window-validation.md).
+[validation evidence](https://github.com/unbraind/pm-slack-standup/blob/main/docs/reporting-window-validation.md).
 
 ## Commitment variance receipts
 
@@ -439,7 +446,7 @@ Capture explicit links using `encodeStandupCommitment` and the native comments
 API; read them with the typed `readCommitmentVariance` SDK function or CLI. See
 the [contract](docs/commitment-variance.md),
 [SDK example](docs/commitment-variance-example.md), and
-[validation evidence](docs/commitment-variance-validation.md). Reporting is
+[validation evidence](https://github.com/unbraind/pm-slack-standup/blob/main/docs/commitment-variance-validation.md). Reporting is
 read-only and sends no Slack messages.
 
 ## Without git
