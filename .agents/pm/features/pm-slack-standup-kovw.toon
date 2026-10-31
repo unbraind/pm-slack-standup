@@ -2,12 +2,17 @@ id: pm-slack-standup-kovw
 title: "Cursor-complete standup reporting windows: build from a certified event boundary and retain the exact next boundary"
 description: "Build a standup from a certified event boundary and retain the exact next boundary so crashes or late/backdated appends do not silently skip work between time windows. Overlap check (re-run 2026-10-27): pm history events / listMutationEvents supply cursor-resumable mutation facts; pm-observer (evidence budgets), pm-context (context-pack cursor), pm-slack (outbox resume cursors) use cursors for their own domains; this package's --since/--days/--compare date windows and snapshots select periodic views. No sibling or CLI command builds standup reporting from a retained event boundary, so this adapts the core mutation cursors to standup reporting without adding another event journal. Acceptance: (1) restart after rendering produces the same packet; (2) a late append appears once in a later admitted window; (3) missing history/cursor coverage marks the report incomplete rather than empty."
 type: Feature
-status: in_progress
+status: closed
 priority: 1
 tags[1]: "gh:unbraind/pm-slack-standup#175"
 created_at: "2026-10-27T15:38:14.702Z"
-updated_at: "2026-10-31T10:24:00.590Z"
+updated_at: "2026-10-31T12:39:47.398Z"
+closed_at: "2026-10-31T12:39:46.546Z"
+completed_at: "2026-10-31T12:22:20.000Z"
 author: codex-agent
+resolution: "Delivered by PR #175 (f27dfbc): Preserve standup changes across restarts and late appends"
+expected_result: "Cursor-complete standup reporting windows: build from a certified event boundary and retain the exact next boundary"
+actual_result: "PR #175 merged at 2026-10-31T12:22:20Z as f27dfbc; required CI passed on the merged head."
 comments[23]{created_at,author,text}:
   "2026-10-30T23:52:22.479Z",codex-agent,"Resumed delivery: reviewed retained README and generated window artifacts; rejected only temporary-fixture merge attributes. Next merge current main, preserve append-only tracker history, prove all three acceptance criteria with behavioral reverts, validate a public tracker copy, and run npm/Bun release gates with two workers."
   "2026-10-30T23:55:06.544Z",codex-agent,"Merged current main source and toolchain (SDK 2026.10.27), retaining all new progress/variance commands. Window reads request native event-chain verification. Public-data read-only validation at main 57cc37a: 109 items, 1099 mutation events, 110 streams, 2 pages, 224 authoritative files unchanged; 14663-byte JSON packet, identical restart, complete preview. Added reproducible validation entry and six-host packed window acceptance."
@@ -52,4 +57,5 @@ docs[3]{path,scope}:
   docs/evidence/reporting-window-artifact.json,project
   docs/reporting-window-validation.md,project
   README.md,project
+close_reason: "Delivered by PR #175 (f27dfbc): Preserve standup changes across restarts and late appends"
 body: ""
