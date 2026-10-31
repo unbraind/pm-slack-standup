@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Cursor-complete standup reporting windows: build from a certified event boundary and retain the exact next boundary ([pm-slack-standup-kovw](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-kovw.toon))
+
 ## 2026.10.30 - 2026-10-30
 
 ### Fixed
