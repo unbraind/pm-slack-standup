@@ -443,7 +443,8 @@ initialized tracker with no Git executable. Slack posting needs a webhook and
 network access; previews and decision reports only read tracker data. Package
 release and GitHub workflows need a Git repository.
 
-The supported host floor is pm CLI 2026.10.20. Configured status aliases and
+The supported host floor is pm CLI 2026.10.27. Window delivery uses its
+generation-fenced lease API so expired reporters cannot publish over a peer. Configured status aliases and
 terminal roles are authoritative; canceled items with old blocker links now stay
 out of the Blocked section. Invalid history now refuses a report even after SDK
 caches were primed. Legacy display aliases such as `doing`, `on_hold`, and `done`

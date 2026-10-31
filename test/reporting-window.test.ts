@@ -171,6 +171,7 @@ test("admission writes the exact next boundary when the state is unchanged", asy
     assert.equal(after.boundary?.last_stream_id, "item-1");
     assert.equal(after.bytes, serializeStandupWindowBoundary(boundary));
     assert.equal(basename(statePath), "window.json");
+    assert.equal(standupWindowLockId(statePath), standupWindowLockId(`${directory}/./window.json`));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -668,6 +669,24 @@ test("durable delivery writes the packet before admitting and reports contention
   } finally {
     await removeRuntimeFixture(fixture);
   }
+});
+
+test("empty and preview reporters preserve peer output while the cursor lease is held", async () => {
+  const fixture = await runtimeFixture();
+  const output = join(fixture.directory, "shared-packet.json");
+  try {
+    await runWindow(fixture, fixture.directory, { output });
+    const delivered = readFileSync(output, "utf8");
+    const release = await acquireLock(fixture.pmRoot, standupWindowLockId(join(fixture.directory, "window-state.json")), 60, "peer", false, true, 0);
+    try {
+      for (const options of [{}, { "no-advance": true }]) {
+        const packet = await runWindow(fixture, fixture.directory, { output, ...options });
+        assert.equal(packet.window.incomplete, true);
+        assert.deepEqual(packet.window.incomplete_reasons, ["window_contended"]);
+        assert.equal(readFileSync(output, "utf8"), delivered);
+      }
+    } finally { await release(); }
+  } finally { await removeRuntimeFixture(fixture); }
 });
 
 test("delivery failure retains the old boundary and crash replay preserves the delivered packet", async () => {

@@ -20,7 +20,7 @@ import {
   admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents,
   readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents,
   standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowHasCursorCoverage,
-  standupWindowUnknownStreams,
+  standupWindowUnknownStreams, withStandupWindowBoundaryLock,
 } from "./reporting-window.ts";
 import type { StandupWindowItemRow, StandupWindowPacket } from "./reporting-window.ts";
 export * from "./reporting-window.ts";
@@ -2709,7 +2709,10 @@ export default defineExtension({
       // packet (boundary not yet admitted) or the packet is already durable —
       // a window is never skipped.
       const deliver = outputPath === undefined ? undefined : () => writePacketFile(resolve(outputPath), packet);
-      if (!shouldAdmit && deliver) await deliver();
+      const lock = { pmRoot: ctx.pm_root, owner: `standup-window:${process.pid}`, waitMs: 250 };
+      if (!shouldAdmit && deliver && !await withStandupWindowBoundaryLock(cursorFilePath, snapshot, lock, deliver)) {
+        return assemble(false, [...incompleteReasons, "window_contended"]);
+      }
 
       if (shouldAdmit && scan.lastEvent !== null) {
         const admission = await admitStandupWindowBoundary(cursorFilePath, snapshot, {
@@ -2720,7 +2723,7 @@ export default defineExtension({
           covered_streams: scan.maxOffsets,
           admitted_events: scan.totalEvents,
           admitted_at: new Date().toISOString(),
-        }, { pmRoot: ctx.pm_root, owner: `standup-window:${process.pid}`, waitMs: 250 }, deliver);
+        }, lock, deliver);
         if (!admission.admitted) {
           incompleteReasons.push("window_contended");
           const contended = assemble(false, incompleteReasons);

@@ -153,6 +153,19 @@ export declare function admitStandupWindowBoundary(path: string, snapshot: Stand
 }, deliver?: () => Promise<void>): Promise<{
     admitted: boolean;
 }>;
+/**
+ * Deliver only while the retained boundary still matches, including previews and empty windows.
+ * @param path - The resolved cursor file path.
+ * @param snapshot - Boundary observed before rendering.
+ * @param lock - Tracker lease identity and bounded wait.
+ * @param deliver - Output action to execute under the lease after revalidation.
+ * @returns True when delivery ran; false when a peer owns or advanced the boundary.
+ */
+export declare function withStandupWindowBoundaryLock(path: string, snapshot: StandupWindowStateSnapshot, lock: {
+    pmRoot: string;
+    owner: string;
+    waitMs: number;
+}, deliver: () => Promise<void>): Promise<boolean>;
 /** Canonical journal position of one event, the same ordering the SDK cursors use. */
 export interface StandupWindowEventPosition {
     /** Mutation timestamp. */

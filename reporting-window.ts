@@ -24,10 +24,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
-  acquireLock, createPmCliExpectedError, EXIT_CODE, isPmCliExpectedError,
+  acquireLockLease, createPmCliExpectedError, EXIT_CODE, isPmCliExpectedError,
   writeFileAtomic,
 } from "@unbrained/pm-cli/sdk";
-import type { MutationEvent, MutationEventPage } from "@unbrained/pm-cli/sdk";
+import type { LockLease, MutationEvent, MutationEventPage } from "@unbrained/pm-cli/sdk";
 import type { SectionKey } from "./index.ts";
 
 // ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ export function readStandupWindowBoundary(path: string): StandupWindowStateSnaps
  * @returns The fs-safe lock id.
  */
 export function standupWindowLockId(path: string): string {
-  return `standup-window-cursor-${createHash("sha256").update(path).digest("hex").slice(0, 12)}`;
+  return `standup-window-cursor-${createHash("sha256").update(resolve(path)).digest("hex").slice(0, 12)}`;
 }
 
 /**
@@ -338,29 +338,50 @@ export async function admitStandupWindowBoundary(
   lock: { pmRoot: string; owner: string; waitMs: number },
   deliver?: () => Promise<void>
 ): Promise<{ admitted: boolean }> {
-  const lockId = standupWindowLockId(path);
-  let release: (() => Promise<void>) | undefined;
-  try {
-    release = await acquireLock(lock.pmRoot, lockId, 60, lock.owner, false, true, lock.waitMs);
-  } catch (error) {
-    if (isPmCliExpectedError(error) && (error as { code?: unknown }).code === "lock_conflict") {
-      return { admitted: false };
-    }
-    throw error;
-  }
-  try {
-    const current = readStandupWindowBoundary(path);
-    if (current.bytes !== snapshot.bytes) return { admitted: false };
+  const admitted = await withStandupWindowBoundaryLock(path, snapshot, lock, async () => {
     if (deliver) await deliver();
     try {
       await writeFileAtomic(path, serializeStandupWindowBoundary(boundary));
     } catch (error: unknown) {
-      const reason = String(error);
-      refuseStandupWindow("window_state_write_failed", `writing the state file at ${path} failed: ${reason}`, EXIT_CODE.GENERIC_FAILURE);
+      refuseStandupWindow("window_state_write_failed", `writing the state file at ${path} failed: ${String(error)}`, EXIT_CODE.GENERIC_FAILURE);
     }
-    return { admitted: true };
+  });
+  return { admitted };
+}
+
+/**
+ * Deliver only while the retained boundary still matches, including previews and empty windows.
+ * @param path - The resolved cursor file path.
+ * @param snapshot - Boundary observed before rendering.
+ * @param lock - Tracker lease identity and bounded wait.
+ * @param deliver - Output action to execute under the lease after revalidation.
+ * @returns True when delivery ran; false when a peer owns or advanced the boundary.
+ */
+export async function withStandupWindowBoundaryLock(
+  path: string,
+  snapshot: StandupWindowStateSnapshot,
+  lock: { pmRoot: string; owner: string; waitMs: number },
+  deliver: () => Promise<void>
+): Promise<boolean> {
+  const lockId = standupWindowLockId(path);
+  let lease: LockLease;
+  try {
+    lease = await acquireLockLease(lock.pmRoot, lockId, 60, lock.owner, false, true, lock.waitMs);
+  } catch (error) {
+    if (isPmCliExpectedError(error) && (error as { code?: unknown }).code === "lock_conflict") {
+      return false;
+    }
+    throw error;
+  }
+  try {
+    return await lease.fence(async () => {
+      const current = readStandupWindowBoundary(path);
+      if (current.bytes !== snapshot.bytes) return false;
+      await deliver();
+      return true;
+    });
   } finally {
-    await release();
+    await lease.release();
   }
 }
 
