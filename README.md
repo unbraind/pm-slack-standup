@@ -396,6 +396,13 @@ skip work between reports:
   admitted first) and is never admitted, so nothing is skipped silently.
   `pm delete` removes the item but keeps its history stream, so deletion events
   are surfaced as `deleted_items` instead of failing certification.
+- Sections list every touched item they apply to: `up_next` is not capped at
+  the daily top three. Touched items that no section shows, such as canceled
+  items or declared decision requests, are named in `unsectioned_items`.
+- Each run reads and verifies the whole mutation journal, starting from its
+  first page, because coverage and regression checks need every stream. The
+  scan therefore grows linearly with journal size; `--max-events` bounds only
+  the events reported in the window.
 
 ```bash
 # Preview: one window covering the whole journal
@@ -439,7 +446,6 @@ read-only and sends no Slack messages.
 
 Standup previews, decision reports, commitment variance receipts, window packets, exports and Slack posts work from a plain
 initialized tracker with no Git executable. Slack posting needs a webhook and
-
 network access; previews and decision reports only read tracker data. Package
 release and GitHub workflows need a Git repository.
 

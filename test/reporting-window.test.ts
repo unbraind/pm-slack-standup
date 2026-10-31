@@ -217,7 +217,10 @@ test("admission reports a peer that holds the lease, and rethrows hard lock fail
   }
 });
 
-test("admission refuses with a typed code when the atomic write fails", async () => {
+/** Root writes through a 0o500 directory, so permission-based failures cannot be provoked. */
+const cannotEnforceModes = typeof process.getuid === "function" && process.getuid() === 0;
+
+test("admission refuses with a typed code when the atomic write fails", { skip: cannotEnforceModes }, async () => {
   const directory = mkdtempSync(join(tmpdir(), "standup-window-write-"));
   const stateDirectory = join(directory, "state");
   try {
@@ -429,7 +432,7 @@ test("the packet maps the scan and sections into a deterministic compact shape",
   };
   const packet = buildStandupWindowPacket({
     boundaryBefore: "prior", scan, sections,
-    incompleteReasons: [], unknownStreams: ["ghost-1"], deletedStreams: ["deleted-1"], regressedStreams: [], admitted: true,
+    incompleteReasons: [], unknownStreams: ["ghost-1"], deletedStreams: ["deleted-1"], unsectionedStreams: ["canceled-1"], regressedStreams: [], admitted: true,
   });
   assert.deepEqual(packet, {
     window: {
@@ -444,19 +447,21 @@ test("the packet maps the scan and sections into a deterministic compact shape",
       incomplete_reasons: [],
       unknown_streams: ["ghost-1"],
       deleted_items: ["deleted-1"],
+      unsectioned_items: ["canceled-1"],
       admitted: true,
     },
     sections,
   });
   const incomplete = buildStandupWindowPacket({
     boundaryBefore: null, scan, sections,
-    incompleteReasons: ["event_cap_exceeded"], unknownStreams: [], deletedStreams: [], regressedStreams: ["gone"], admitted: false,
+    incompleteReasons: ["event_cap_exceeded"], unknownStreams: [], deletedStreams: [], unsectionedStreams: [], regressedStreams: ["gone"], admitted: false,
   });
   assert.equal(incomplete.window.incomplete, true);
   assert.deepEqual(incomplete.window.incomplete_reasons, ["event_cap_exceeded"]);
   assert.deepEqual(incomplete.window.regressed_streams, ["gone"]);
   assert.equal("unknown_streams" in incomplete.window, false);
   assert.equal("deleted_items" in incomplete.window, false);
+  assert.equal("unsectioned_items" in incomplete.window, false);
 });
 
 // ---------------------------------------------------------------------------
@@ -568,6 +573,23 @@ test("a late backdated append appears exactly once in the next admitted window",
     const again = await runWindow(fixture, fixture.directory);
     assert.equal(again.window.events, 0, "the late append must appear exactly once");
     assert.equal(again.window.admitted, false);
+  } finally {
+    await removeRuntimeFixture(fixture);
+  }
+});
+
+test("a window lists every touched open item and names touched items no section shows", async () => {
+  const fixture = await runtimeFixture();
+  try {
+    await runWindow(fixture, fixture.directory);
+    const open: string[] = [];
+    for (let index = 0; index < 5; index += 1) open.push((await fixture.client.create({ title: `Open window work ${index}`, type: "Task", priority: index })).item.id);
+    const canceled = (await fixture.client.create({ title: "Dropped window work", type: "Task", status: "canceled" })).item.id;
+    const window = await runWindow(fixture, fixture.directory);
+    assert.deepEqual(window.sections.up_next.map((row) => row.id), open, "every touched open item is listed, in priority order");
+    assert.deepEqual(window.window.unsectioned_items, [canceled]);
+    assert.equal(window.window.touched_items, 6);
+    assert.equal(window.window.admitted, true);
   } finally {
     await removeRuntimeFixture(fixture);
   }
@@ -689,7 +711,7 @@ test("empty and preview reporters preserve peer output while the cursor lease is
   } finally { await removeRuntimeFixture(fixture); }
 });
 
-test("delivery failure retains the old boundary and crash replay preserves the delivered packet", async () => {
+test("delivery failure retains the old boundary and crash replay preserves the delivered packet", { skip: cannotEnforceModes }, async () => {
   const fixture = await runtimeFixture();
   const stateDirectory = join(fixture.directory, "state");
   mkdirSync(stateDirectory);

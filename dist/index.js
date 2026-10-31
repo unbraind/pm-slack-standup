@@ -2213,7 +2213,8 @@ export default defineExtension({
                 mentionMap: {},
                 splitYesterday: false,
                 sectionLabels: {},
-                upNextCount: DEFAULT_UP_NEXT,
+                // A window lists every touched open item; the daily top-N cap would drop work silently.
+                upNextCount: Infinity,
                 statusRegistry: registry,
             }, NaN);
             const sections = {
@@ -2222,6 +2223,9 @@ export default defineExtension({
                 done: data.done.map(windowRow),
                 up_next: data.upNext.map(windowRow),
             };
+            // Every touched corpus item is a section row or is named here (canceled items, declared requests).
+            const listed = new Set(Object.values(sections).flatMap((rows) => rows.map((row) => row.id)));
+            const unsectionedStreams = [...touchedIds].filter((id) => corpusIds.has(id) && !listed.has(id)).sort();
             const shouldAdmit = !noAdvance && scan.windowEvents.length > 0 && incompleteReasons.length === 0;
             const assemble = (packetAdmitted, reasons) => buildStandupWindowPacket({
                 boundaryBefore: snapshot.boundary === null ? null : snapshot.boundary.cursor,
@@ -2230,6 +2234,7 @@ export default defineExtension({
                 incompleteReasons: reasons,
                 unknownStreams,
                 deletedStreams,
+                unsectionedStreams,
                 regressedStreams,
                 admitted: packetAdmitted,
             });

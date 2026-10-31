@@ -56,8 +56,9 @@ read-only. The source checkout is never modified. Measurements:
 | Streams | 110 |
 | SDK pages at limit 1,000 | 2 |
 | Copied authoritative files, all unchanged | 224 |
-| Compact JSON packet bytes | 14,663 |
-| Section rows: active / blocked / done / up next | 0 / 0 / 102 / 3 |
+| Compact JSON packet bytes | 15,036 |
+| Section rows: active / blocked / done / up next | 0 / 0 / 102 / 5 |
+| Touched items named in `unsectioned_items` (both canceled) | 2 |
 | Incomplete reasons | 0 |
 | Restart packet equality | exact |
 

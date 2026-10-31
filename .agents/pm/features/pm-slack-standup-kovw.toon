@@ -6,9 +6,9 @@ status: in_progress
 priority: 1
 tags[1]: "gh:unbraind/pm-slack-standup#175"
 created_at: "2026-10-27T15:38:14.702Z"
-updated_at: "2026-10-31T02:33:15.140Z"
+updated_at: "2026-10-31T03:11:57.907Z"
 author: codex-agent
-comments[15]{created_at,author,text}:
+comments[16]{created_at,author,text}:
   "2026-10-30T23:52:22.479Z",codex-agent,"Resumed delivery: reviewed retained README and generated window artifacts; rejected only temporary-fixture merge attributes. Next merge current main, preserve append-only tracker history, prove all three acceptance criteria with behavioral reverts, validate a public tracker copy, and run npm/Bun release gates with two workers."
   "2026-10-30T23:55:06.544Z",codex-agent,"Merged current main source and toolchain (SDK 2026.10.27), retaining all new progress/variance commands. Window reads request native event-chain verification. Public-data read-only validation at main 57cc37a: 109 items, 1099 mutation events, 110 streams, 2 pages, 224 authoritative files unchanged; 14663-byte JSON packet, identical restart, complete preview. Added reproducible validation entry and six-host packed window acceptance."
   "2026-10-30T23:58:21.627Z",codex-agent,"Verified four behavioral mutants in a disposable copy: advancing during preview breaks restart equality; timestamp-only membership drops the late event; disabling history regression certification reports lost streams complete; bypassing cursor coverage certification reports a damaged boundary complete. Each selected mutant exits 1; restored implementation passes all four selected regressions. Also fixed cursorless terminal pages, certification of more than ten deleted streams, and packet output contention. Stdout-only calls now preview because host rendering occurs after handler return; admission requires atomic file delivery under the cursor lease."
@@ -24,6 +24,7 @@ comments[15]{created_at,author,text}:
   "2026-10-31T02:09:55.487Z",codex-agent,"Final-head Node 22 CI completed 349/350 tests: the inherited npm launcher packed matrix exceeded 290000 ms; the unset-launcher matrix passed. This is now a CI gate failure, so implementation work is reclaimed to reduce redundant install/coverage overhead while preserving every assertion, six installation scenarios, worker limit, timeout and coverage threshold. No review threads are being changed."
   "2026-10-31T02:18:45.989Z",codex-agent,"CI timing remediation changes only the acceptance driver and its environment contract test; shipped runtime files and the recorded tarball are unchanged. Focused driver tests pass 12/12; lint, types, zero-duplication and docstrings pass (140 documented declarations across the same 19 authored source files). Both claims are temporarily reclaimed while the failure is fixed; a fresh pushed head will receive complete CI verification."
   "2026-10-31T02:33:12.185Z",codex-agent,"CI timing fix verification: linked tests passed 35/35 window/model cases plus 12/12 driver contracts. Behavioral revert forwarding the canonical V8 counter directory into consumers fails; restored selection passes 1/1. Types, lint, duplication and docstrings pass; shipped runtime files, package metadata and tarball contents are unchanged. Claims are released before the replacement-head push; fresh CI remains required."
+  "2026-10-31T03:11:56.600Z",codex,"CodeRabbit round on 348fb0d, fixed by hand: (1) window sections no longer cap up_next at three; every touched open item is listed, and touched corpus items no section shows (canceled, declared requests) are named in window.unsectioned_items. New command test fails on revert (0/1). Pinned public replay at 57cc37a now accounts for all 109 touched items: 102 done + 5 up next + 2 canceled unsectioned; packet 15,036 bytes; restart identical; 224 files unchanged. (2) reporting-window-public.ts is pinned to the documented commit, with STANDUP_PUBLIC_COMMIT override. (3) The two chmod-based failure tests skip when running as root. (4) README documents that every run scans the full journal and fixes the split paragraph. reporting-window suites 36/36; typecheck, lint, docstring (140), duplication 0%, changelog:check pass."
 files[11]{path,scope}:
   index.ts,project
   manifest.json,project
@@ -36,9 +37,10 @@ files[11]{path,scope}:
   test/reporting-window-property.test.ts,project
   test/reporting-window-public.ts,project
   test/reporting-window.test.ts,project
-tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+tests[3]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test --test-concurrency=2 test/reporting-window.test.ts test/reporting-window-property.test.ts,project,codex-agent,"2026-10-30T23:58:20.734Z",local_mutation,feat/cursor-complete-reporting-windows
   node --test --test-concurrency=1 --test-name-pattern='global host launch|packed host contract|packed launch configuration|Windows npm|packed environment|installed consumers|packed tarball selection|packed subprocess runner|scenario receipts|global receipt|a real pack failure' test/accept-packed.test.ts,project,codex-agent,"2026-10-31T02:18:41.498Z",local_mutation,feat/cursor-complete-reporting-windows
+  node --test test/reporting-window.test.ts test/reporting-window-property.test.ts,project,codex,"2026-10-31T03:11:57.863Z",local_mutation,feat/cursor-complete-reporting-windows
 docs[3]{path,scope}:
   docs/evidence/reporting-window-artifact.json,project
   docs/reporting-window-validation.md,project

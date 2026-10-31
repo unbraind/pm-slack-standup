@@ -513,6 +513,8 @@ export function buildStandupWindowPacket(input) {
         info.unknown_streams = [...input.unknownStreams];
     if (input.deletedStreams.length > 0)
         info.deleted_items = [...input.deletedStreams];
+    if (input.unsectionedStreams.length > 0)
+        info.unsectioned_items = [...input.unsectionedStreams];
     if (input.regressedStreams.length > 0)
         info.regressed_streams = [...input.regressedStreams];
     return {

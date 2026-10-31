@@ -26,7 +26,8 @@ function records(root: string): Map<string, string> {
 }
 
 const directory = mkdtempSync(join(tmpdir(), "standup-public-"));
-const head = execFileSync("git", ["rev-parse", "origin/main"], { encoding: "utf8" }).trim();
+// Pinned to the commit docs/reporting-window-validation.md measures; override to measure another.
+const head = process.env.STANDUP_PUBLIC_COMMIT ?? "57cc37afb12b9334778d8a2c529ce8b8c4763d89";
 const archive = execFileSync("git", ["archive", head, ".agents/pm"], { maxBuffer: 32 * 1024 * 1024 });
 execFileSync("tar", ["-x", "-C", directory], { input: archive });
 const pmRoot = join(directory, ".agents", "pm");

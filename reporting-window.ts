@@ -689,6 +689,8 @@ export interface StandupWindowInfo {
   unknown_streams?: string[];
   /** Item streams whose deletion this window recorded (no corpus row can exist). */
   deleted_items?: string[];
+  /** Touched corpus items that no section lists, such as canceled items or declared decision requests. */
+  unsectioned_items?: string[];
   /** History streams that shrank below the admitted boundary coverage. */
   regressed_streams?: string[];
   /** Whether this run retained the next boundary. */
@@ -720,6 +722,7 @@ export function buildStandupWindowPacket(input: {
   incompleteReasons: readonly string[];
   unknownStreams: readonly string[];
   deletedStreams: readonly string[];
+  unsectionedStreams: readonly string[];
   regressedStreams: readonly string[];
   admitted: boolean;
 }): StandupWindowPacket {
@@ -740,6 +743,7 @@ export function buildStandupWindowPacket(input: {
   };
   if (input.unknownStreams.length > 0) info.unknown_streams = [...input.unknownStreams];
   if (input.deletedStreams.length > 0) info.deleted_items = [...input.deletedStreams];
+  if (input.unsectionedStreams.length > 0) info.unsectioned_items = [...input.unsectionedStreams];
   if (input.regressedStreams.length > 0) info.regressed_streams = [...input.regressedStreams];
   return {
     window: info,
