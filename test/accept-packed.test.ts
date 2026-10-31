@@ -118,10 +118,25 @@ test("installed consumers cannot write into the canonical driver counter directo
   const source = { NODE_V8_COVERAGE: "canonical-counters", PATH: "tool-path", NPM_TOKEN: "synthetic-token" };
   const consumer = installedHostEnvironment(source);
   assert.equal(source.NODE_V8_COVERAGE, "canonical-counters", "the acceptance driver stays instrumented");
-  assert.equal(consumer.NODE_V8_COVERAGE, undefined, "installed copies are outside the canonical source inventory");
+  assert.equal(consumer.NODE_V8_COVERAGE, "", "installed copies are outside the canonical source inventory");
   assert.equal(consumer.PATH, source.PATH);
   assert.equal(consumer.NPM_TOKEN, undefined);
   assert.equal(acceptanceEnvironment(source).NODE_V8_COVERAGE, "canonical-counters", "source helper subprocesses retain profiling");
+});
+
+test("installed host children never inherit the parent's counter directory", () => {
+  // Node copies the parent's NODE_V8_COVERAGE into a child env that lacks the key, so only an own empty value blocks it.
+  const previous = process.env.NODE_V8_COVERAGE;
+  const counters = mkdtempSync(join(tmpdir(), "standup-parent-counters-"));
+  process.env.NODE_V8_COVERAGE = counters;
+  try {
+    const child = spawnSync(process.execPath, ["-p", "JSON.stringify(process.env.NODE_V8_COVERAGE ?? null)"], { env: installedHostEnvironment(process.env), encoding: "utf8" });
+    assert.equal(child.status, 0, child.stderr);
+    assert.equal(child.stdout.trim(), JSON.stringify(""));
+  } finally {
+    if (previous === undefined) delete process.env.NODE_V8_COVERAGE; else process.env.NODE_V8_COVERAGE = previous;
+    rmSync(counters, { recursive: true, force: true });
+  }
 });
 
 test("packed tarball selection requires exactly one artifact and ignores other filenames", () => {

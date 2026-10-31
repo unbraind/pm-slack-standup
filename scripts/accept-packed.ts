@@ -128,11 +128,12 @@ export function acceptanceEnvironment(source: NodeJS.ProcessEnv): NodeJS.Process
  * Keep the canonical acceptance driver profiled without collecting unrelated installed-host counters.
  * Installed copies live outside the source inventory; their behavioral assertions still run unchanged.
  * @param source - Inherited settings to isolate without changing the parent process.
- * @returns Credential-free consumer settings without the parent's V8 counter destination.
+ * @returns Credential-free consumer settings whose empty V8 counter destination disables collection.
  */
 export function installedHostEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const environment = acceptanceEnvironment(source);
-  delete environment.NODE_V8_COVERAGE;
+  // An own empty value: Node's child_process copies the parent's NODE_V8_COVERAGE into an env that lacks the key.
+  environment.NODE_V8_COVERAGE = "";
   return environment;
 }
 
