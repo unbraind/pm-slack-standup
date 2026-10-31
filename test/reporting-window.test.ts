@@ -14,6 +14,7 @@ import {
   parseStandupWindowBoundaryState, parseStandupWindowMaxEvents, readStandupWindowBoundary,
   scanStandupWindowEvents, serializeStandupWindowBoundary, standupWindowCoverageRegressions,
   standupWindowDeletedStreams, standupWindowHasCursorCoverage, standupWindowLockId, standupWindowRefusalMessage,
+  standupWindowScanIncompleteReasons,
   standupWindowUnknownStreams, STANDUP_WINDOW_REFUSAL_REMEDIES, STANDUP_WINDOW_STATE_VERSION,
 } from "../index.ts";
 import type { StandupWindowPacket, StandupWindowBoundary } from "../index.ts";
@@ -419,6 +420,20 @@ test("coverage regressions report streams that shrank below the admitted boundar
   assert.deepEqual(standupWindowCoverageRegressions(null, scan), []);
   const intact = boundaryAt("2026-10-27T12:00:00.000Z", "item-1", 2, { "item-1": 1 });
   assert.deepEqual(standupWindowCoverageRegressions(intact, scan), []);
+});
+
+test("an uncapped scan that missed a stream offset is incomplete, while a capped scan reports no gap", async () => {
+  // item-1 offsets 0 and 2 were read; offset 1 sorted before an already-read page and was missed.
+  const events = [eventAt("item-1", 1, "2026-10-27T13:00:00.000Z"), eventAt("item-2", 1, "2026-10-27T13:30:00.000Z"), eventAt("item-1", 3, "2026-10-27T14:00:00.000Z")];
+  const gap = await scanStandupWindowEvents(async () => page(events, false, "cursor-1"), null, DEFAULT_STANDUP_WINDOW_MAX_EVENTS);
+  assert.deepEqual(gap.gapStreams, ["item-1"]);
+  assert.deepEqual(standupWindowScanIncompleteReasons(gap), ["stream_offset_gap"]);
+  const capped = await scanStandupWindowEvents(async () => page(events, false, "cursor-1"), null, 1);
+  assert.deepEqual(capped.gapStreams, []);
+  assert.deepEqual(standupWindowScanIncompleteReasons(capped), ["event_cap_exceeded"]);
+  const contiguous = await scanStandupWindowEvents(async () => page([eventAt("item-1", 1, "2026-10-27T13:00:00.000Z"), eventAt("item-1", 2, "2026-10-27T14:00:00.000Z")], false, "cursor-1"), null, DEFAULT_STANDUP_WINDOW_MAX_EVENTS);
+  assert.deepEqual(contiguous.gapStreams, []);
+  assert.deepEqual(standupWindowScanIncompleteReasons(contiguous), []);
 });
 
 test("a capped scan reports no regressions for streams on pages it never read", async () => {

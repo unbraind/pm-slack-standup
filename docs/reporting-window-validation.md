@@ -38,7 +38,7 @@ older-input replay, CRLF/whitespace/unicode values, relationships, status change
 custom lifecycle roles, deletion, backdated events, previews, and crash replay.
 The measured run uses 521 operations and 27 windows, partitioning 458 SDK
 events without omissions or duplicates. The window module independently measures
-100% lines, statements, branches and functions across 37 focused window tests, plus the seeded model test.
+100% lines, statements, branches and functions across 38 focused window tests, plus the seeded model test.
 
 Public-data validation is reproducible with:
 

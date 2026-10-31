@@ -11,7 +11,7 @@ import { commitmentCliNumber, readCommitmentVariance } from "./commitment-varian
 import { readProgressDeltas } from "./progress-deltas.js";
 import { readVerifiedStandupHistory } from "./verified-history.js";
 import { ProgressRefusal } from "./progress-refusals.js";
-import { admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents, readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents, standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowHasCursorCoverage, standupWindowUnknownStreams, withStandupWindowBoundaryLock, } from "./reporting-window.js";
+import { admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents, readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents, standupWindowScanIncompleteReasons, standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowHasCursorCoverage, standupWindowUnknownStreams, withStandupWindowBoundaryLock, } from "./reporting-window.js";
 export * from "./reporting-window.js";
 import { certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE, listMutationEvents, PmClient, readSettings, resolveRuntimeStatusRegistry, writeFileAtomic, } from "@unbrained/pm-cli/sdk";
 import { classifyStandupItem, DEFAULT_STATUS_REGISTRY } from "./status-roles.js";
@@ -2196,8 +2196,7 @@ export default defineExtension({
             const unknownStreams = standupWindowUnknownStreams(scan.windowEvents, corpusIds);
             const deletedStreams = standupWindowDeletedStreams(scan.windowEvents, corpusIds);
             const incompleteReasons = [];
-            if (scan.capped)
-                incompleteReasons.push("event_cap_exceeded");
+            incompleteReasons.push(...standupWindowScanIncompleteReasons(scan));
             if (!standupWindowHasCursorCoverage(snapshot.boundary))
                 incompleteReasons.push("cursor_coverage_missing");
             if (regressedStreams.length > 0)

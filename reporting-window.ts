@@ -478,6 +478,8 @@ export interface StandupWindowEventScan {
   totalEvents: number;
   /** Highest zero-based offset seen per stream across the whole scan. */
   maxOffsets: ReadonlyMap<string, number>;
+  /** Streams whose offsets were not all read by an uncapped scan, sorted; empty when capped. */
+  gapStreams: string[];
   /** Position of the last event seen, or null when the journal is empty. */
   lastEvent: StandupWindowEventPosition | null;
   /** Opaque SDK cursor resuming strictly after the last event seen. */
@@ -510,6 +512,7 @@ export async function scanStandupWindowEvents(
 ): Promise<StandupWindowEventScan> {
   const windowEvents: MutationEvent[] = [];
   const maxOffsets = new Map<string, number>();
+  const seenCounts = new Map<string, number>();
   let lateEvents = 0;
   let workspaceEvents = 0;
   let totalEvents = 0;
@@ -532,6 +535,7 @@ export async function scanStandupWindowEvents(
       totalEvents += 1;
       const covered = maxOffsets.get(event.item_id) ?? -1;
       if (position.stream_offset > covered) maxOffsets.set(event.item_id, position.stream_offset);
+      seenCounts.set(event.item_id, (seenCounts.get(event.item_id) ?? 0) + 1);
       lastEvent = position;
       if (eventInStandupWindow(position, boundary)) {
         windowEvents.push(event);
@@ -556,10 +560,27 @@ export async function scanStandupWindowEvents(
     if (!page.has_more) break;
     since = page.next_cursor;
   }
+  // A backdated append can sort before a page already read; a later offset then proves nothing about it.
+  const gapStreams = capped ? [] : [...maxOffsets]
+    .filter(([streamId, maxOffset]) => seenCounts.get(streamId) !== maxOffset + 1)
+    .map(([streamId]) => streamId)
+    .sort();
   return {
     windowEvents, lateEvents, workspaceEvents, totalEvents,
-    maxOffsets, lastEvent, nextCursor, capped, source, pages,
+    maxOffsets, gapStreams, lastEvent, nextCursor, capped, source, pages,
   };
+}
+
+/**
+ * Incomplete reasons a scan establishes by itself, before boundary certification.
+ * @param scan - The partitioned journal scan.
+ * @returns `event_cap_exceeded` and `stream_offset_gap`, in that order, when they apply.
+ */
+export function standupWindowScanIncompleteReasons(scan: StandupWindowEventScan): string[] {
+  const reasons: string[] = [];
+  if (scan.capped) reasons.push("event_cap_exceeded");
+  if (scan.gapStreams.length > 0) reasons.push("stream_offset_gap");
+  return reasons;
 }
 
 // ---------------------------------------------------------------------------

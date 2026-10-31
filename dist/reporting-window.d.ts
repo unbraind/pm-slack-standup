@@ -222,6 +222,8 @@ export interface StandupWindowEventScan {
     totalEvents: number;
     /** Highest zero-based offset seen per stream across the whole scan. */
     maxOffsets: ReadonlyMap<string, number>;
+    /** Streams whose offsets were not all read by an uncapped scan, sorted; empty when capped. */
+    gapStreams: string[];
     /** Position of the last event seen, or null when the journal is empty. */
     lastEvent: StandupWindowEventPosition | null;
     /** Opaque SDK cursor resuming strictly after the last event seen. */
@@ -247,6 +249,12 @@ export interface StandupWindowEventScan {
  * @returns The partitioned scan result.
  */
 export declare function scanStandupWindowEvents(readPage: StandupWindowPageReader, boundary: StandupWindowBoundary | null, maxEvents: number): Promise<StandupWindowEventScan>;
+/**
+ * Incomplete reasons a scan establishes by itself, before boundary certification.
+ * @param scan - The partitioned journal scan.
+ * @returns `event_cap_exceeded` and `stream_offset_gap`, in that order, when they apply.
+ */
+export declare function standupWindowScanIncompleteReasons(scan: StandupWindowEventScan): string[];
 /**
  * Verify retained cursor coverage accounts for every admitted event and its last position.
  * @param boundary - Retained boundary, or null before the first admission.

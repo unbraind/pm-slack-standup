@@ -353,6 +353,7 @@ export function eventInStandupWindow(event, boundary) {
 export async function scanStandupWindowEvents(readPage, boundary, maxEvents) {
     const windowEvents = [];
     const maxOffsets = new Map();
+    const seenCounts = new Map();
     let lateEvents = 0;
     let workspaceEvents = 0;
     let totalEvents = 0;
@@ -376,6 +377,7 @@ export async function scanStandupWindowEvents(readPage, boundary, maxEvents) {
             const covered = maxOffsets.get(event.item_id) ?? -1;
             if (position.stream_offset > covered)
                 maxOffsets.set(event.item_id, position.stream_offset);
+            seenCounts.set(event.item_id, (seenCounts.get(event.item_id) ?? 0) + 1);
             lastEvent = position;
             if (eventInStandupWindow(position, boundary)) {
                 windowEvents.push(event);
@@ -399,10 +401,28 @@ export async function scanStandupWindowEvents(readPage, boundary, maxEvents) {
             break;
         since = page.next_cursor;
     }
+    // A backdated append can sort before a page already read; a later offset then proves nothing about it.
+    const gapStreams = capped ? [] : [...maxOffsets]
+        .filter(([streamId, maxOffset]) => seenCounts.get(streamId) !== maxOffset + 1)
+        .map(([streamId]) => streamId)
+        .sort();
     return {
         windowEvents, lateEvents, workspaceEvents, totalEvents,
-        maxOffsets, lastEvent, nextCursor, capped, source, pages,
+        maxOffsets, gapStreams, lastEvent, nextCursor, capped, source, pages,
     };
+}
+/**
+ * Incomplete reasons a scan establishes by itself, before boundary certification.
+ * @param scan - The partitioned journal scan.
+ * @returns `event_cap_exceeded` and `stream_offset_gap`, in that order, when they apply.
+ */
+export function standupWindowScanIncompleteReasons(scan) {
+    const reasons = [];
+    if (scan.capped)
+        reasons.push("event_cap_exceeded");
+    if (scan.gapStreams.length > 0)
+        reasons.push("stream_offset_gap");
+    return reasons;
 }
 // ---------------------------------------------------------------------------
 // Coverage certification

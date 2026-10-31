@@ -18,7 +18,7 @@ import type { ProgressOptions } from "./progress-deltas.ts";
 
 import {
   admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents,
-  readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents,
+  readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents, standupWindowScanIncompleteReasons,
   standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowHasCursorCoverage,
   standupWindowUnknownStreams, withStandupWindowBoundaryLock,
 } from "./reporting-window.ts";
@@ -2651,7 +2651,7 @@ export default defineExtension({
       const unknownStreams = standupWindowUnknownStreams(scan.windowEvents, corpusIds);
       const deletedStreams = standupWindowDeletedStreams(scan.windowEvents, corpusIds);
       const incompleteReasons: string[] = [];
-      if (scan.capped) incompleteReasons.push("event_cap_exceeded");
+      incompleteReasons.push(...standupWindowScanIncompleteReasons(scan));
       if (!standupWindowHasCursorCoverage(snapshot.boundary)) incompleteReasons.push("cursor_coverage_missing");
       if (regressedStreams.length > 0) incompleteReasons.push("history_regression");
       if (unknownStreams.length > 0) incompleteReasons.push("unknown_event_stream");

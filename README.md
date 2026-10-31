@@ -376,9 +376,12 @@ skip work between reports:
   the next report sees both forward appends and events appended after the
   boundary with older timestamps. No second event journal is created; all
   event reads go through the pm SDK mutation-event reader.
-- Use one cursor file per consumer. Admitting a boundary records that its
-  packet was delivered; two independent consumers sharing one file would let
-  one consumer's admission skip events the other has not read yet.
+- Use one cursor file and one output file per consumer. Admitting a boundary
+  records that its packet was delivered; two independent consumers sharing a
+  cursor file would let one consumer's admission skip events the other has not
+  read yet. The delivery lease is keyed by the cursor file, so consumers with
+  separate cursors that share an output file can overwrite each other's packet
+  unless something outside pm serializes them.
 - The output is a compact TOON packet (JSON with `--json`) sized for agents:
   per-window event counts (including `late_events`, `workspace_events`),
   `touched_items`, sorted `ops`, the bucketed `sections` rows, and the
@@ -389,10 +392,13 @@ skip work between reports:
   while the tracker is unchanged. `--no-advance` also previews when output is
   supplied. Admission requires `--output <file>`: packet delivery and the
   boundary comparison share one lease, and the packet is atomically written
-  BEFORE the boundary is admitted. A losing reporter preserves the winner's
-  output. Consume each delivered file before requesting the next report.
+  BEFORE the boundary is admitted. A losing reporter sharing the same cursor
+  file preserves the winner's output. Consume each delivered file before
+  requesting the next report.
 - A window that cannot be certified is reported `incomplete` with typed
-  reasons (`event_cap_exceeded` from `--max-events`, `history_regression` when
+  reasons (`event_cap_exceeded` from `--max-events`, `stream_offset_gap` when
+  an append sorted before a page already read so a stream's offsets were not
+  all seen (the next run re-reads the whole journal), `history_regression` when
   the journal shrank below admitted coverage, `cursor_coverage_missing` when
   retained offsets no longer account for every admitted event, `unknown_event_stream` for
   events without a corpus item, `window_contended` when a concurrent reporter
