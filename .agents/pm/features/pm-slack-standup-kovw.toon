@@ -4,13 +4,11 @@ description: "Build a standup from a certified event boundary and retain the exa
 type: Feature
 status: in_progress
 priority: 1
-tags: []
+tags[1]: "gh:unbraind/pm-slack-standup#175"
 created_at: "2026-10-27T15:38:14.702Z"
-updated_at: "2026-10-31T01:48:43.335Z"
-assignee: codex-agent
-claim_principal: codex-agent
+updated_at: "2026-10-31T01:52:15.923Z"
 author: codex-agent
-comments[11]{created_at,author,text}:
+comments[12]{created_at,author,text}:
   "2026-10-30T23:52:22.479Z",codex-agent,"Resumed delivery: reviewed retained README and generated window artifacts; rejected only temporary-fixture merge attributes. Next merge current main, preserve append-only tracker history, prove all three acceptance criteria with behavioral reverts, validate a public tracker copy, and run npm/Bun release gates with two workers."
   "2026-10-30T23:55:06.544Z",codex-agent,"Merged current main source and toolchain (SDK 2026.10.27), retaining all new progress/variance commands. Window reads request native event-chain verification. Public-data read-only validation at main 57cc37a: 109 items, 1099 mutation events, 110 streams, 2 pages, 224 authoritative files unchanged; 14663-byte JSON packet, identical restart, complete preview. Added reproducible validation entry and six-host packed window acceptance."
   "2026-10-30T23:58:21.627Z",codex-agent,"Verified four behavioral mutants in a disposable copy: advancing during preview breaks restart equality; timestamp-only membership drops the late event; disabling history regression certification reports lost streams complete; bypassing cursor coverage certification reports a damaged boundary complete. Each selected mutant exits 1; restored implementation passes all four selected regressions. Also fixed cursorless terminal pages, certification of more than ten deleted streams, and packet output contention. Stdout-only calls now preview because host rendering occurs after handler return; admission requires atomic file delivery under the cursor lease."
@@ -22,6 +20,7 @@ comments[11]{created_at,author,text}:
   "2026-10-31T01:23:30.243Z",codex-agent,"Complete isolated Bun release check matches npm: 348/350 tests passed, with only both 290000 ms instrumented packed-matrix timeouts. All runtime modules measured 100% in every dimension; overall authored-source coverage remains 96.17% lines/statements, 99.88% branches and 97.59% functions because acceptance-script runs were interrupted. Both gates correctly fail unchanged thresholds. Final-source standalone Node and Bun fresh-pack matrices are running next; exact-head CI remains required."
   "2026-10-31T01:48:41.064Z",codex-agent,"Final-source behavioral revert receipts (disposable non-git copies): runStandupWindowCommand with preview protection disabled fails restart packet equality (exit 1); eventInStandupWindow with offset fallback disabled fails the exactly-once late-append regression (exit 1); standupWindowCoverageRegressions returning no regressions fails missing-history incompleteness (exit 1); standupWindowHasCursorCoverage always returning true fails damaged-cursor incompleteness (exit 1); empty/preview output outside the shared lease fails preservation of peer output (exit 1). Restored implementation passes all five selected cases (exit 0). Full source includes 35 focused window/model cases; the seeded model partitions 458 SDK events across 27 windows after 521 operations."
   "2026-10-31T01:48:42.211Z",codex-agent,"Final-source fresh-pack acceptance passed 6/6 scenarios under Node and 6/6 under Bun. Both tarballs are identical: SHA-256 c3d3fd0cde498bfa1e7372a6f5620c82b899e64b7d6445c75d48e430000721d3, 129382 bytes, 45 entries, all four window artifacts, host floor 2026.10.27. Five installed-CLI probes passed (cap, three invalid limits, explicit file-output preview). Canonical-reader 1/1, production audit 0 vulnerabilities, pack inventory, changelog, release-date and publish-attestation checks passed. Public tracker final validation reproduced 109 items, 1099 events, 110 streams, 2 pages, 14663 compact JSON bytes and 224 unchanged authoritative files. Complete local npm/Bun checks each remain 348/350 with the two unchanged 290-second timing failures; exact-head CI is pending."
+  "2026-10-31T01:52:11.201Z",codex-agent,"Ready-for-review PR: https://github.com/unbraind/pm-slack-standup/pull/175 . Acceptance/revert table, final public-data numbers, local gate counts, host-floor rationale and immutable artifact receipt are in the PR and linked validation docs. All tracker writes are being completed before the final evidence push and exact-head CI verification. The local instrumented timing issue remains open; neither full local release gate is claimed passed. Claim is released for orchestrator verification; item remains in progress and is not closed."
 files[10]{path,scope}:
   index.ts,project
   manifest.json,project
