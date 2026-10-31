@@ -6,10 +6,9 @@ import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
-import { listAllComplete } from "@unbrained/pm-cli/sdk";
+import { listAllComplete, listMutationEvents } from "@unbrained/pm-cli/sdk";
 import extension, { scanStandupWindowEvents } from "../index.ts";
 import type { StandupWindowPacket } from "../index.ts";
-import { listMutationEvents } from "@unbrained/pm-cli/sdk";
 
 /** Hash every copied authoritative file and make it read-only. */
 function records(root: string): Map<string, string> {

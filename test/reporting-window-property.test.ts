@@ -7,6 +7,7 @@ import {
   appendHistoryEntry, createHistoryEntry, getHistoryPath, isPmCliExpectedError,
   listMutationEvents, locateItem, readLocatedItem,
 } from "@unbrained/pm-cli/sdk";
+import type { StandupWindowPacket } from "../index.ts";
 import type { MutationEvent } from "@unbrained/pm-cli/sdk";
 import { runtimeCommand, runtimeFixture, removeRuntimeFixture } from "./runtime-fixture.ts";
 import type { RuntimeFixture } from "./runtime-fixture.ts";
@@ -66,15 +67,7 @@ const CUSTOM_STATUSES = [
 const DEFAULT_STATUSES = ["open", "in_progress", "blocked"];
 
 /** One window packet result as produced by the registered command. */
-interface WindowPacket {
-  window: {
-    boundary_before: string | null; boundary_next: string | null; events: number;
-    late_events: number; workspace_events: number; touched_items: number; ops: string[];
-    incomplete: boolean; incomplete_reasons: string[]; admitted: boolean;
-    unknown_streams?: string[]; deleted_items?: string[]; regressed_streams?: string[];
-  };
-  sections: Record<string, Array<{ id: string; title: string; status: string }>>;
-}
+type WindowPacket = StandupWindowPacket;
 
 /**
  * Read the whole journal through the SDK, paging to the end.
@@ -132,6 +125,13 @@ class WindowModel {
       this.seen.add(key);
       this.pending.push(event);
     }
+  }
+
+  /** Restore the reference pending tail while replaying a crash boundary. */
+  restorePending(events: readonly MutationEvent[], backdated: number, cursor: string | null): void {
+    this.pending = [...events];
+    this.pendingBackdated = backdated;
+    this.lastBoundaryNext = cursor;
   }
 
   /** The distinct non-workspace streams among the pending events. */
@@ -276,7 +276,7 @@ test("seeded model-based property: windows partition the journal with no skips o
     const buildWindow = async (options: Record<string, unknown> = {}): Promise<WindowPacket> => {
       const events = await readAllEvents(fixture.pmRoot);
       model.refresh(events);
-      const packet = await runtimeCommand(fixture, "standup window", { "cursor-file": cursorFile, ...options }) as unknown as WindowPacket;
+      const packet = await runtimeCommand(fixture, "standup window", { "cursor-file": cursorFile, output: join(fixture.directory, "property-packet.json"), ...options }) as unknown as WindowPacket;
       windows += 1;
       const touched = model.pendingTouchedStreams();
       const corpus = new Map((await fixture.client.listAllComplete({ includeBody: false })).items.map(
@@ -346,16 +346,12 @@ test("seeded model-based property: windows partition the journal with no skips o
           assert.equal(first.window.admitted, pendingBefore.length > 0, "admission follows a non-empty window");
           if (first.window.admitted) model.admit(first, await readAllEvents(fixture.pmRoot));
           writeFileSync(cursorFile, priorBytes, "utf8");
-          model.pending = [...pendingBefore];
-          model.pendingBackdated = backdatedBefore;
-          model.lastBoundaryNext = priorBoundaryNext;
+          model.restorePending(pendingBefore, backdatedBefore, priorBoundaryNext);
           const replayed = await buildWindow();
           assert.deepEqual(replayed, first, "replaying from the pre-admission boundary must reproduce the packet");
           // The replay admitted the same coverage again; the model keeps the
           // single admission and the chain continues from the first packet.
-          model.pending = [];
-          model.pendingBackdated = 0;
-          model.lastBoundaryNext = first.window.boundary_next;
+          model.restorePending([], 0, first.window.boundary_next);
           await assertRetainedCoverage();
         } else {
           const packet = await buildWindow();

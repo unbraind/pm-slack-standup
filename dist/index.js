@@ -11,9 +11,9 @@ import { commitmentCliNumber, readCommitmentVariance } from "./commitment-varian
 import { readProgressDeltas } from "./progress-deltas.js";
 import { readVerifiedStandupHistory } from "./verified-history.js";
 import { ProgressRefusal } from "./progress-refusals.js";
-import { admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents, readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents, standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowUnknownStreams, } from "./reporting-window.js";
+import { admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents, readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents, standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowHasCursorCoverage, standupWindowUnknownStreams, } from "./reporting-window.js";
 export * from "./reporting-window.js";
-import { certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE, listMutationEvents, PmClient, readSettings, resolveRuntimeStatusRegistry, } from "@unbrained/pm-cli/sdk";
+import { certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE, listMutationEvents, PmClient, readSettings, resolveRuntimeStatusRegistry, writeFileAtomic, } from "@unbrained/pm-cli/sdk";
 import { classifyStandupItem, DEFAULT_STATUS_REGISTRY } from "./status-roles.js";
 export { classifyStandupItem, hasBlockedByDep } from "./status-roles.js";
 /**
@@ -2162,7 +2162,7 @@ export default defineExtension({
             { long: "--cursor-file", value_name: "path", description: "State file holding the retained boundary; required, created on first admission" },
             { long: "--no-advance", description: "Render the window packet WITHOUT retaining the next boundary (a restart reproduces the same packet)" },
             { long: "--max-events", value_name: "n", description: "Window safety cap (1..1000000, default 10000); an over-cap window is reported incomplete and not admitted" },
-            { long: "--output", value_name: "file", description: "Write the packet JSON to this file BEFORE the boundary is admitted (durable delivery)" },
+            { long: "--output", value_name: "file", description: "Atomically write the packet JSON before admitting the boundary; without output the command previews" },
         ];
         /**
          * Map one item to the compact packet row shape agents consume.
@@ -2176,10 +2176,17 @@ export default defineExtension({
             if (cursorFile === undefined) {
                 refuseStandupWindow("window_cursor_file_missing", "no --cursor-file was supplied.");
             }
-            const maxEvents = parseStandupWindowMaxEvents(readStrOption(ctx.options, "max-events"));
-            const noAdvance = readBoolOption(ctx.options, "no-advance");
+            const rawMaxEvents = Object.hasOwn(ctx.options, "max-events") ? ctx.options["max-events"] : ctx.options.maxEvents;
+            if (rawMaxEvents !== undefined && typeof rawMaxEvents !== "string") {
+                refuseStandupWindow("window_max_events_invalid", "--max-events must be an integer string.");
+            }
+            const maxEvents = parseStandupWindowMaxEvents(rawMaxEvents);
             const outputPath = readStrOption(ctx.options, "output");
+            const noAdvance = readBoolOption(ctx.options, "no-advance") || outputPath === undefined;
             const cursorFilePath = resolve(cursorFile);
+            if (outputPath !== undefined && resolve(outputPath) === cursorFilePath) {
+                refuseStandupWindow("window_output_conflict", "packet output would overwrite the retained boundary.");
+            }
             const snapshot = readStandupWindowBoundary(cursorFilePath);
             const items = await readSdkStandupItems(ctx);
             const scan = await scanStandupWindowEvents((since) => listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000, verify: true }), snapshot.boundary, maxEvents);
@@ -2191,6 +2198,8 @@ export default defineExtension({
             const incompleteReasons = [];
             if (scan.capped)
                 incompleteReasons.push("event_cap_exceeded");
+            if (!standupWindowHasCursorCoverage(snapshot.boundary))
+                incompleteReasons.push("cursor_coverage_missing");
             if (regressedStreams.length > 0)
                 incompleteReasons.push("history_regression");
             if (unknownStreams.length > 0)
@@ -2231,10 +2240,10 @@ export default defineExtension({
              * @param target - The resolved --output path.
              * @param content - The packet bytes to write.
              */
-            const writePacketFile = (target, content) => {
+            const writePacketFile = async (target, content) => {
                 try {
                     mkdirSync(dirname(target), { recursive: true });
-                    writeFileSync(target, `${JSON.stringify(content, null, 2)}\n`, "utf8");
+                    await writeFileAtomic(target, `${JSON.stringify(content, null, 2)}\n`);
                 }
                 catch (err) {
                     throw writeError(target, err);
@@ -2244,8 +2253,9 @@ export default defineExtension({
             // boundary is admitted, so a crash at any point either re-produces this
             // packet (boundary not yet admitted) or the packet is already durable —
             // a window is never skipped.
-            if (outputPath)
-                writePacketFile(resolve(outputPath), packet);
+            const deliver = outputPath === undefined ? undefined : () => writePacketFile(resolve(outputPath), packet);
+            if (!shouldAdmit && deliver)
+                await deliver();
             if (shouldAdmit && scan.lastEvent !== null) {
                 const admission = await admitStandupWindowBoundary(cursorFilePath, snapshot, {
                     cursor: scan.nextCursor,
@@ -2255,12 +2265,10 @@ export default defineExtension({
                     covered_streams: scan.maxOffsets,
                     admitted_events: scan.totalEvents,
                     admitted_at: new Date().toISOString(),
-                }, { pmRoot: ctx.pm_root, owner: `standup-window:${process.pid}`, waitMs: 250 });
+                }, { pmRoot: ctx.pm_root, owner: `standup-window:${process.pid}`, waitMs: 250 }, deliver);
                 if (!admission.admitted) {
                     incompleteReasons.push("window_contended");
                     const contended = assemble(false, incompleteReasons);
-                    if (outputPath)
-                        writePacketFile(resolve(outputPath), contended);
                     return contended;
                 }
             }

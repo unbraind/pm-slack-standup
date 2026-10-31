@@ -13,10 +13,10 @@ import {
   DEFAULT_STANDUP_WINDOW_MAX_EVENTS, eventAfterBoundary, eventInStandupWindow,
   parseStandupWindowBoundaryState, parseStandupWindowMaxEvents, readStandupWindowBoundary,
   scanStandupWindowEvents, serializeStandupWindowBoundary, standupWindowCoverageRegressions,
-  standupWindowDeletedStreams, standupWindowLockId, standupWindowRefusalMessage,
+  standupWindowDeletedStreams, standupWindowHasCursorCoverage, standupWindowLockId, standupWindowRefusalMessage,
   standupWindowUnknownStreams, STANDUP_WINDOW_REFUSAL_REMEDIES, STANDUP_WINDOW_STATE_VERSION,
 } from "../index.ts";
-import type { StandupWindowBoundary } from "../index.ts";
+import type { StandupWindowPacket, StandupWindowBoundary } from "../index.ts";
 import { runtimeFixture, removeRuntimeFixture, runtimeCommand } from "./runtime-fixture.ts";
 import type { RuntimeFixture } from "./runtime-fixture.ts";
 
@@ -64,9 +64,8 @@ test("the state version is pinned and the max-events default is bounded", () => 
   assert.equal(STANDUP_WINDOW_STATE_VERSION, 1);
   assert.equal(DEFAULT_STANDUP_WINDOW_MAX_EVENTS, 10000);
   assert.equal(parseStandupWindowMaxEvents(undefined), DEFAULT_STANDUP_WINDOW_MAX_EVENTS);
-  assert.equal(parseStandupWindowMaxEvents("  "), DEFAULT_STANDUP_WINDOW_MAX_EVENTS);
   assert.equal(parseStandupWindowMaxEvents("500"), 500);
-  for (const bad of ["0", "-3", "1.5", "1000001", "junk", "NaN", "Infinity"]) {
+  for (const bad of ["", "  ", "0", "-3", "1.5", "1000001", "junk", "NaN", "Infinity"]) {
     assert.throws(() => parseStandupWindowMaxEvents(bad), (error: unknown) =>
       isWindowRefusal(error, "window_max_events_invalid") && error.exitCode === 2, bad);
   }
@@ -337,6 +336,52 @@ test("the scan stops at the window cap and reports it, and refuses cursorless co
 // Coverage certification and packet assembly
 // ---------------------------------------------------------------------------
 
+test("missing final-page or non-progressing cursor coverage refuses certification", async () => {
+  for (const cursor of [undefined, ""]) {
+    for (const hasMore of [false, true]) {
+      await assert.rejects(scanStandupWindowEvents(async () => page([eventAt("item", 1, "2026-10-27T00:00:00Z")], hasMore, cursor), null, 100),
+        (error: unknown) => isWindowRefusal(error, "window_page_cursor_missing"));
+    }
+  }
+  await assert.rejects(scanStandupWindowEvents(async () => page([], true), null, 100),
+    (error: unknown) => isWindowRefusal(error, "window_page_cursor_missing"));
+  await assert.rejects(scanStandupWindowEvents(async () => page([], true, "same-cursor"), null, 100),
+    (error: unknown) => isWindowRefusal(error, "window_page_cursor_missing"));
+});
+
+test("deletion certification considers every stream before bounding display receipts", () => {
+  const events = Array.from({ length: 15 }, (_, index) => eventAt(`deleted-${index}`, 2, "2026-10-27T00:00:00Z", "delete"));
+  assert.deepEqual(standupWindowUnknownStreams(events, new Set()), []);
+  assert.equal(standupWindowDeletedStreams(events, new Set()).length, 10);
+});
+
+test("cursor coverage must account for the admitted event count and last position", () => {
+  const boundary = boundaryAt("2026-10-27T00:00:00Z", "item", 0, { item: 0 });
+  assert.equal(standupWindowHasCursorCoverage(null), true);
+  assert.equal(standupWindowHasCursorCoverage(boundary), true);
+  for (const change of [
+    { cursor: null }, { admitted_events: 2 }, { last_stream_id: "missing" }, { last_stream_offset: 1 },
+    { covered_streams: new Map([["item", Number.MAX_SAFE_INTEGER]]) },
+  ]) assert.equal(standupWindowHasCursorCoverage({ ...boundary, ...change }), false);
+});
+
+test("lost cursor coverage is incomplete and never advanced", async () => {
+  const fixture = await runtimeFixture();
+  try {
+    await runWindow(fixture, fixture.directory);
+    const statePath = join(fixture.directory, "window-state.json");
+    const snapshot = readStandupWindowBoundary(statePath);
+    assert.ok(snapshot.boundary);
+    const damaged = { ...snapshot.boundary, covered_streams: new Map<string, number>() };
+    writeFileSync(statePath, serializeStandupWindowBoundary(damaged));
+    const packet = await runWindow(fixture, fixture.directory);
+    assert.equal(packet.window.incomplete, true);
+    assert.deepEqual(packet.window.incomplete_reasons, ["cursor_coverage_missing"]);
+    assert.equal(packet.window.admitted, false);
+    assert.equal(readStandupWindowBoundary(statePath).bytes, serializeStandupWindowBoundary(damaged));
+  } finally { await removeRuntimeFixture(fixture); }
+});
+
 test("coverage regressions report streams that shrank below the admitted boundary", async () => {
   const boundary = boundaryAt("2026-10-27T12:00:00.000Z", "item-1", 2, { "item-1": 2, "gone": 5 });
   const scan = await scanStandupWindowEvents(async () => page([eventAt("item-1", 3, "2026-10-27T11:00:00.000Z")], false, "c"), boundary, DEFAULT_STANDUP_WINDOW_MAX_EVENTS);
@@ -412,15 +457,7 @@ test("the packet maps the scan and sections into a deterministic compact shape",
 // ---------------------------------------------------------------------------
 
 /** The window command result asserted as a packet. */
-type WindowResult = {
-  window: {
-    boundary_before: string | null; boundary_next: string | null; events: number;
-    late_events: number; workspace_events: number; touched_items: number; ops: string[];
-    incomplete: boolean; incomplete_reasons: string[]; admitted: boolean;
-    unknown_streams?: string[]; deleted_items?: string[]; regressed_streams?: string[];
-  };
-  sections: Record<string, Array<{ id: string; title: string; status: string }>>;
-};
+type WindowResult = StandupWindowPacket;
 
 /** Run the real registered window command with a cursor file inside a disposable directory. */
 async function runWindow(
@@ -430,8 +467,9 @@ async function runWindow(
 ): Promise<WindowResult> {
   return runtimeCommand(fixture, "standup window", {
     "cursor-file": join(directory, "window-state.json"),
+    output: join(directory, "delivered-packet.json"),
     ...options,
-  }) as Promise<WindowResult>;
+  }) as unknown as Promise<WindowResult>;
 }
 
 test("the first window covers the whole journal and admits the exact next boundary", async () => {
@@ -471,6 +509,10 @@ test("the first window covers the whole journal and admits the exact next bounda
 test("a restart reproduces the same packet until the boundary is admitted", async () => {
   const fixture = await runtimeFixture();
   try {
+    const stdoutA = await runWindow(fixture, fixture.directory, { output: undefined });
+    const stdoutB = await runWindow(fixture, fixture.directory, { output: undefined });
+    assert.deepEqual(stdoutA, stdoutB, "stdout rendering cannot advance before the host emits it");
+    assert.equal(stdoutA.window.admitted, false);
     const previewA = await runWindow(fixture, fixture.directory, { "no-advance": true });
     const previewB = await runWindow(fixture, fixture.directory, { "no-advance": true });
     assert.deepEqual(previewB, previewA);
@@ -488,7 +530,8 @@ test("a restart reproduces the same packet until the boundary is admitted", asyn
     const windowWithNewWork = await runWindow(fixture, fixture.directory);
     assert.equal(windowWithNewWork.window.events, 1);
     writeFileSync(replayCopy, priorBytes, "utf8");
-    const replayed = await runtimeCommand(fixture, "standup window", { "cursor-file": replayCopy }) as WindowResult;
+    const replayed = await runtimeCommand(fixture, "standup window", { "cursor-file": replayCopy, output: join(fixture.directory, "replayed-packet.json") }) as unknown as WindowResult;
+    assert.deepEqual(replayed, windowWithNewWork, "the entire replayed packet is identical");
     assert.equal(replayed.window.events, 1);
     assert.equal(replayed.window.boundary_before, windowWithNewWork.window.boundary_before);
     assert.equal(replayed.window.boundary_next, windowWithNewWork.window.boundary_next);
@@ -596,7 +639,7 @@ test("durable delivery writes the packet before admitting and reports contention
   try {
     const outputPath = join(fixture.directory, "window-packet.json");
     const first = await runWindow(fixture, fixture.directory, { output: outputPath });
-    const written = JSON.parse(readFileSync(outputPath, "utf8")) as WindowResult;
+    const written = JSON.parse(readFileSync(outputPath, "utf8")) as unknown as WindowResult;
     assert.deepEqual(written, first);
     // A peer holds the admission lease for this cursor file across the whole
     // run: the packet is complete, but admission must report the peer honestly
@@ -610,8 +653,8 @@ test("durable delivery writes the packet before admitting and reports contention
       assert.deepEqual(contended.window.incomplete_reasons, ["window_contended"]);
       assert.equal(contended.window.admitted, false);
       assert.equal(contended.window.events, 1);
-      const rewritten = JSON.parse(readFileSync(outputPath, "utf8")) as WindowResult;
-      assert.deepEqual(rewritten, contended);
+      const rewritten = JSON.parse(readFileSync(outputPath, "utf8")) as unknown as WindowResult;
+      assert.deepEqual(rewritten, written, "a contending reporter cannot overwrite the admitted packet");
     } finally {
       await release();
     }
@@ -621,29 +664,89 @@ test("durable delivery writes the packet before admitting and reports contention
   }
 });
 
+test("delivery failure retains the old boundary and crash replay preserves the delivered packet", async () => {
+  const fixture = await runtimeFixture();
+  const stateDirectory = join(fixture.directory, "state");
+  mkdirSync(stateDirectory);
+  const statePath = join(stateDirectory, "cursor.json");
+  const output = join(fixture.directory, "crash-packet.json");
+  try {
+    chmodSync(stateDirectory, 0o500);
+    try {
+      await assert.rejects(runWindow(fixture, fixture.directory, { "cursor-file": statePath, output }),
+        (error: unknown) => isWindowRefusal(error, "window_state_write_failed"));
+      assert.equal(existsSync(statePath), false);
+    } finally { chmodSync(stateDirectory, 0o700); }
+    const delivered = JSON.parse(readFileSync(output, "utf8"));
+    const recovered = await runWindow(fixture, fixture.directory, { "cursor-file": statePath, output });
+    assert.deepEqual(recovered, delivered, "restart after delivery but before admission reproduces every packet field");
+    const blocker = join(fixture.directory, "not-a-directory");
+    writeFileSync(blocker, "blocking output parent");
+    const before = readStandupWindowBoundary(statePath).bytes;
+    await fixture.client.create({ title: "Work after recovery", type: "Task" });
+    await assert.rejects(runWindow(fixture, fixture.directory, { "cursor-file": statePath, output: join(blocker, "packet.json") }), /could not write/);
+    assert.equal(readStandupWindowBoundary(statePath).bytes, before);
+    await assert.rejects(runWindow(fixture, fixture.directory, { "no-advance": true, output: join(blocker, "preview.json") }), /could not write/);
+  } finally {
+    chmodSync(stateDirectory, 0o700);
+    await removeRuntimeFixture(fixture);
+  }
+});
+
+test("a peer at the delivery boundary cannot admit or release the owning reporter lease", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "standup-window-interleave-"));
+  const path = join(directory, "cursor.json");
+  const snapshot = { boundary: null, bytes: "" };
+  const boundary = boundaryAt("2026-10-27T00:00:00Z", "item", 0, { item: 0 });
+  const lock = { pmRoot: directory, owner: "reporter", waitMs: 0 };
+  try {
+    const result = await admitStandupWindowBoundary(path, snapshot, boundary, lock, async () => {
+      assert.equal(existsSync(path), false, "delivery precedes boundary retention");
+      for (let step = 0; step < 2; step += 1) {
+        const peer = await admitStandupWindowBoundary(path, snapshot, boundary, { ...lock, owner: "peer" });
+        assert.equal(peer.admitted, false);
+      }
+    });
+    assert.equal(result.admitted, true);
+    const fresh = readStandupWindowBoundary(path);
+    await assert.rejects(admitStandupWindowBoundary(path, fresh, boundary, lock, async () => { throw new Error("delivery interrupted"); }), /delivery interrupted/);
+    assert.equal(readStandupWindowBoundary(path).bytes, fresh.bytes);
+    assert.equal((await admitStandupWindowBoundary(path, fresh, boundary, lock)).admitted, true, "failure releases the owner's lease last");
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test("the command refuses typed input errors and needs no git executable", async () => {
   const fixture = await runtimeFixture();
-  const savedPath = process.env.PATH;
-  const savedCeiling = process.env.GIT_CEILING_DIRECTORIES;
+  const originalEnvironment = { PATH: process.env.PATH, GIT_CEILING_DIRECTORIES: process.env.GIT_CEILING_DIRECTORIES };
   try {
     process.env.PATH = fixture.directory;
     process.env.GIT_CEILING_DIRECTORIES = dirname(fixture.directory);
     await assert.rejects(runtimeCommand(fixture, "standup window", {}), (error: unknown) =>
       isWindowRefusal(error, "window_cursor_file_missing") && error.exitCode === 2);
+    const collision = join(fixture.directory, "collision.json");
+    await assert.rejects(runWindow(fixture, fixture.directory, { "cursor-file": collision, output: collision }),
+      (error: unknown) => isWindowRefusal(error, "window_output_conflict"));
+    assert.equal(existsSync(collision), false);
     const statePath = join(fixture.directory, "broken-state.json");
     writeFileSync(statePath, "{oops", "utf8");
     await assert.rejects(runtimeCommand(fixture, "standup window", { "cursor-file": statePath }), (error: unknown) =>
       isWindowRefusal(error, "window_state_unreadable"));
     await assert.rejects(runtimeCommand(fixture, "standup window", { "cursor-file": join(fixture.directory, "ok.json"), "max-events": "0" }), (error: unknown) =>
       isWindowRefusal(error, "window_max_events_invalid"));
+    for (const raw of ["", "  ", null, 2, []]) {
+      await assert.rejects(runWindow(fixture, fixture.directory, { maxEvents: raw }),
+        (error: unknown) => isWindowRefusal(error, "window_max_events_invalid"));
+    }
     // With git unreachable the window still renders, admits, and re-renders empty.
     const first = await runWindow(fixture, fixture.directory);
     assert.equal(first.window.admitted, true);
     const second = await runWindow(fixture, fixture.directory);
     assert.equal(second.window.events, 0);
   } finally {
-    if (savedPath === undefined) delete process.env.PATH; else process.env.PATH = savedPath;
-    if (savedCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = savedCeiling;
+    for (const key of ["PATH", "GIT_CEILING_DIRECTORIES"] as const) {
+      const value = originalEnvironment[key];
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
     await removeRuntimeFixture(fixture);
   }
 });

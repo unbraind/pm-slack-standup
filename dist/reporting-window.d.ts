@@ -24,6 +24,8 @@ import type { SectionKey } from "./index.ts";
 export type StandupWindowRefusalCode = 
 /** `--cursor-file` was not supplied. */
 "window_cursor_file_missing"
+/** Output and state must be distinct paths. */
+ | "window_output_conflict"
 /** `--max-events` is not a positive bounded integer. */
  | "window_max_events_invalid"
 /** The state file exists but is not readable UTF-8 JSON object content. */
@@ -140,6 +142,7 @@ export declare function standupWindowLockId(path: string): string;
  * @param snapshot - The state as this window read it at start.
  * @param boundary - The exact next boundary to retain.
  * @param lock - Tracker root used for the admission lease, plus its wait budget.
+ * @param deliver - Optional packet delivery executed under the lease before retaining coverage.
  * @returns Whether the boundary was retained; a concurrent admission is
  *          reported as `{ admitted: false }`, never thrown.
  */
@@ -147,7 +150,7 @@ export declare function admitStandupWindowBoundary(path: string, snapshot: Stand
     pmRoot: string;
     owner: string;
     waitMs: number;
-}): Promise<{
+}, deliver?: () => Promise<void>): Promise<{
     admitted: boolean;
 }>;
 /** Canonical journal position of one event, the same ordering the SDK cursors use. */
@@ -231,6 +234,12 @@ export interface StandupWindowEventScan {
  * @returns The partitioned scan result.
  */
 export declare function scanStandupWindowEvents(readPage: StandupWindowPageReader, boundary: StandupWindowBoundary | null, maxEvents: number): Promise<StandupWindowEventScan>;
+/**
+ * Verify retained cursor coverage accounts for every admitted event and its last position.
+ * @param boundary - Retained boundary, or null before the first admission.
+ * @returns Whether coverage is complete enough to certify another window.
+ */
+export declare function standupWindowHasCursorCoverage(boundary: StandupWindowBoundary | null): boolean;
 /**
  * Streams whose history shrank below the admitted coverage.
  *

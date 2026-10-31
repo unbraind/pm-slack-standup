@@ -382,21 +382,23 @@ skip work between reports:
   `boundary_before` / `boundary_next` chain. A consumer can detect a missing
   report because each packet's `boundary_before` must equal the previous
   packet's `boundary_next`.
-- Restart after rendering reproduces the same packet: the boundary is only
-  retained after the packet is built, so a crash in between simply re-renders
-  the window. `--no-advance` renders the packet without retaining anything,
-  and `--output <file>` writes the packet to disk BEFORE the boundary is
-  admitted for durable delivery.
+- Stdout-only rendering is a preview: restart reproduces the same packet
+  while the tracker is unchanged. `--no-advance` also previews when output is
+  supplied. Admission requires `--output <file>`: packet delivery and the
+  boundary comparison share one lease, and the packet is atomically written
+  BEFORE the boundary is admitted. A losing reporter preserves the winner's
+  output. Consume each delivered file before requesting the next report.
 - A window that cannot be certified is reported `incomplete` with typed
   reasons (`event_cap_exceeded` from `--max-events`, `history_regression` when
-  the journal shrank below admitted coverage, `unknown_event_stream` for
+  the journal shrank below admitted coverage, `cursor_coverage_missing` when
+  retained offsets no longer account for every admitted event, `unknown_event_stream` for
   events without a corpus item, `window_contended` when a concurrent reporter
   admitted first) and is never admitted, so nothing is skipped silently.
   `pm delete` removes the item but keeps its history stream, so deletion events
   are surfaced as `deleted_items` instead of failing certification.
 
 ```bash
-# First report: one window covering the whole journal
+# Preview: one window covering the whole journal
 pm standup window --cursor-file .standup-window.json
 
 # Agent-readable JSON, delivered durably before the boundary is admitted
@@ -412,10 +414,11 @@ pm history events --since "$(jq -r .window.boundary_next window.json)"
 Typed refusals (`window_cursor_file_missing`, `window_state_unreadable`,
 `window_state_version_unsupported`, `window_state_invalid_shape`,
 `window_max_events_invalid`, `window_state_write_failed`,
-`window_page_cursor_missing`) carry an operator remedy each; the SDK exports
+`window_page_cursor_missing`, `window_output_conflict`) carry an operator remedy each; the SDK exports
 `standupWindowRefusalMessage`, the boundary state reader/writer, the journal
 scan, membership, certification and packet helpers, and the
-`STANDUP_WINDOW_REFUSAL_REMEDIES` table.
+`STANDUP_WINDOW_REFUSAL_REMEDIES` table. See the
+[validation evidence](docs/reporting-window-validation.md).
 
 ## Commitment variance receipts
 

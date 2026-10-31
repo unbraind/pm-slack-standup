@@ -38,6 +38,8 @@ import type { SectionKey } from "./index.ts";
 export type StandupWindowRefusalCode =
   /** `--cursor-file` was not supplied. */
   | "window_cursor_file_missing"
+  /** Output and state must be distinct paths. */
+  | "window_output_conflict"
   /** `--max-events` is not a positive bounded integer. */
   | "window_max_events_invalid"
   /** The state file exists but is not readable UTF-8 JSON object content. */
@@ -53,6 +55,7 @@ export type StandupWindowRefusalCode =
 
 /** Operator remedies, keyed by {@link StandupWindowRefusalCode}. */
 export const STANDUP_WINDOW_REFUSAL_REMEDIES: Readonly<Record<StandupWindowRefusalCode, string>> = {
+  window_output_conflict: "Choose an --output path different from --cursor-file.",
   window_cursor_file_missing:
     "Pass --cursor-file <path> naming where the retained boundary is stored.",
   window_max_events_invalid:
@@ -325,6 +328,7 @@ export function standupWindowLockId(path: string): string {
  * @param snapshot - The state as this window read it at start.
  * @param boundary - The exact next boundary to retain.
  * @param lock - Tracker root used for the admission lease, plus its wait budget.
+ * @param deliver - Optional packet delivery executed under the lease before retaining coverage.
  * @returns Whether the boundary was retained; a concurrent admission is
  *          reported as `{ admitted: false }`, never thrown.
  */
@@ -332,7 +336,8 @@ export async function admitStandupWindowBoundary(
   path: string,
   snapshot: StandupWindowStateSnapshot,
   boundary: StandupWindowBoundary,
-  lock: { pmRoot: string; owner: string; waitMs: number }
+  lock: { pmRoot: string; owner: string; waitMs: number },
+  deliver?: () => Promise<void>
 ): Promise<{ admitted: boolean }> {
   const lockId = standupWindowLockId(path);
   let release: (() => Promise<void>) | undefined;
@@ -347,6 +352,7 @@ export async function admitStandupWindowBoundary(
   try {
     const current = readStandupWindowBoundary(path);
     if (current.bytes !== snapshot.bytes) return { admitted: false };
+    if (deliver) await deliver();
     try {
       await writeFileAtomic(path, serializeStandupWindowBoundary(boundary));
     } catch (error: unknown) {
@@ -514,10 +520,11 @@ export async function scanStandupWindowEvents(
       }
     }
     nextCursor = page.next_cursor ?? nextCursor;
-    if (page.events.length > 0 && page.has_more && typeof page.next_cursor !== "string") {
+    if ((page.events.length > 0 || page.has_more)
+      && (typeof page.next_cursor !== "string" || page.next_cursor.length === 0 || page.next_cursor === since)) {
       refuseStandupWindow(
         "window_page_cursor_missing",
-        `page ${pages} reported more events but no resumption cursor.`,
+        `page ${pages} did not provide a progressing resumption cursor.`,
         EXIT_CODE.GENERIC_FAILURE,
       );
     }
@@ -537,6 +544,18 @@ export async function scanStandupWindowEvents(
 // ---------------------------------------------------------------------------
 // Coverage certification
 // ---------------------------------------------------------------------------
+
+/**
+ * Verify retained cursor coverage accounts for every admitted event and its last position.
+ * @param boundary - Retained boundary, or null before the first admission.
+ * @returns Whether coverage is complete enough to certify another window.
+ */
+export function standupWindowHasCursorCoverage(boundary: StandupWindowBoundary | null): boolean {
+  if (boundary === null) return true;
+  const count = [...boundary.covered_streams.values()].reduce((total, offset) => total + offset + 1, 0);
+  return boundary.cursor !== null && Number.isSafeInteger(count) && count === boundary.admitted_events
+    && (boundary.covered_streams.get(boundary.last_stream_id) ?? -1) >= boundary.last_stream_offset;
+}
 
 /**
  * Streams whose history shrank below the admitted coverage.
@@ -579,7 +598,7 @@ export function standupWindowUnknownStreams(
   windowEvents: readonly MutationEvent[],
   corpusIds: ReadonlySet<string>
 ): string[] {
-  const deleted = new Set(standupWindowDeletedStreams(windowEvents, corpusIds));
+  const deleted = new Set(windowEvents.filter((event) => event.type === "delete").map((event) => event.item_id));
   const unknown = new Set<string>();
   for (const event of windowEvents) {
     if (event.item_id === "_workspace" || corpusIds.has(event.item_id) || deleted.has(event.item_id)) continue;
@@ -730,7 +749,7 @@ export const MAX_STANDUP_WINDOW_EVENTS = 1000000;
  * @returns The validated cap.
  */
 export function parseStandupWindowMaxEvents(raw: string | undefined): number {
-  if (raw === undefined || raw.trim() === "") return DEFAULT_STANDUP_WINDOW_MAX_EVENTS;
+  if (raw === undefined) return DEFAULT_STANDUP_WINDOW_MAX_EVENTS;
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < 1 || value > MAX_STANDUP_WINDOW_EVENTS) {
     refuseStandupWindow("window_max_events_invalid", `--max-events '${raw}' is out of range.`);

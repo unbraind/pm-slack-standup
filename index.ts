@@ -19,7 +19,7 @@ import type { ProgressOptions } from "./progress-deltas.ts";
 import {
   admitStandupWindowBoundary, buildStandupWindowPacket, parseStandupWindowMaxEvents,
   readStandupWindowBoundary, refuseStandupWindow, scanStandupWindowEvents,
-  standupWindowCoverageRegressions, standupWindowDeletedStreams,
+  standupWindowCoverageRegressions, standupWindowDeletedStreams, standupWindowHasCursorCoverage,
   standupWindowUnknownStreams,
 } from "./reporting-window.ts";
 import type { StandupWindowItemRow, StandupWindowPacket } from "./reporting-window.ts";
@@ -27,7 +27,7 @@ export * from "./reporting-window.ts";
 
 import {
   certifyCompleteListResult, inspectCompleteListResult, createPmCliExpectedError, EXIT_CODE,
-  listMutationEvents, PmClient, readSettings, resolveRuntimeStatusRegistry,
+  listMutationEvents, PmClient, readSettings, resolveRuntimeStatusRegistry, writeFileAtomic,
 } from "@unbrained/pm-cli/sdk";
 import type { RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
 import { classifyStandupItem, DEFAULT_STATUS_REGISTRY } from "./status-roles.ts";
@@ -2609,7 +2609,7 @@ export default defineExtension({
       { long: "--cursor-file", value_name: "path", description: "State file holding the retained boundary; required, created on first admission" },
       { long: "--no-advance", description: "Render the window packet WITHOUT retaining the next boundary (a restart reproduces the same packet)" },
       { long: "--max-events", value_name: "n", description: "Window safety cap (1..1000000, default 10000); an over-cap window is reported incomplete and not admitted" },
-      { long: "--output", value_name: "file", description: "Write the packet JSON to this file BEFORE the boundary is admitted (durable delivery)" },
+      { long: "--output", value_name: "file", description: "Atomically write the packet JSON before admitting the boundary; without output the command previews" },
     ];
 
     /**
@@ -2625,10 +2625,17 @@ export default defineExtension({
       if (cursorFile === undefined) {
         refuseStandupWindow("window_cursor_file_missing", "no --cursor-file was supplied.");
       }
-      const maxEvents = parseStandupWindowMaxEvents(readStrOption(ctx.options, "max-events"));
-      const noAdvance = readBoolOption(ctx.options, "no-advance");
+      const rawMaxEvents = Object.hasOwn(ctx.options, "max-events") ? ctx.options["max-events"] : ctx.options.maxEvents;
+      if (rawMaxEvents !== undefined && typeof rawMaxEvents !== "string") {
+        refuseStandupWindow("window_max_events_invalid", "--max-events must be an integer string.");
+      }
+      const maxEvents = parseStandupWindowMaxEvents(rawMaxEvents);
       const outputPath = readStrOption(ctx.options, "output");
+      const noAdvance = readBoolOption(ctx.options, "no-advance") || outputPath === undefined;
       const cursorFilePath = resolve(cursorFile);
+      if (outputPath !== undefined && resolve(outputPath) === cursorFilePath) {
+        refuseStandupWindow("window_output_conflict", "packet output would overwrite the retained boundary.");
+      }
       const snapshot = readStandupWindowBoundary(cursorFilePath);
       const items = await readSdkStandupItems(ctx);
 
@@ -2645,6 +2652,7 @@ export default defineExtension({
       const deletedStreams = standupWindowDeletedStreams(scan.windowEvents, corpusIds);
       const incompleteReasons: string[] = [];
       if (scan.capped) incompleteReasons.push("event_cap_exceeded");
+      if (!standupWindowHasCursorCoverage(snapshot.boundary)) incompleteReasons.push("cursor_coverage_missing");
       if (regressedStreams.length > 0) incompleteReasons.push("history_regression");
       if (unknownStreams.length > 0) incompleteReasons.push("unknown_event_stream");
 
@@ -2687,10 +2695,10 @@ export default defineExtension({
        * @param target - The resolved --output path.
        * @param content - The packet bytes to write.
        */
-      const writePacketFile = (target: string, content: StandupWindowPacket): void => {
+      const writePacketFile = async (target: string, content: StandupWindowPacket): Promise<void> => {
         try {
           mkdirSync(dirname(target), { recursive: true });
-          writeFileSync(target, `${JSON.stringify(content, null, 2)}\n`, "utf8");
+          await writeFileAtomic(target, `${JSON.stringify(content, null, 2)}\n`);
         } catch (err: unknown) {
           throw writeError(target, err);
         }
@@ -2700,7 +2708,8 @@ export default defineExtension({
       // boundary is admitted, so a crash at any point either re-produces this
       // packet (boundary not yet admitted) or the packet is already durable —
       // a window is never skipped.
-      if (outputPath) writePacketFile(resolve(outputPath), packet);
+      const deliver = outputPath === undefined ? undefined : () => writePacketFile(resolve(outputPath), packet);
+      if (!shouldAdmit && deliver) await deliver();
 
       if (shouldAdmit && scan.lastEvent !== null) {
         const admission = await admitStandupWindowBoundary(cursorFilePath, snapshot, {
@@ -2711,11 +2720,10 @@ export default defineExtension({
           covered_streams: scan.maxOffsets,
           admitted_events: scan.totalEvents,
           admitted_at: new Date().toISOString(),
-        }, { pmRoot: ctx.pm_root, owner: `standup-window:${process.pid}`, waitMs: 250 });
+        }, { pmRoot: ctx.pm_root, owner: `standup-window:${process.pid}`, waitMs: 250 }, deliver);
         if (!admission.admitted) {
           incompleteReasons.push("window_contended");
           const contended = assemble(false, incompleteReasons);
-          if (outputPath) writePacketFile(resolve(outputPath), contended);
           return contended;
         }
       }
@@ -2778,7 +2786,6 @@ export default defineExtension({
       // expected list from the real activation, so a newly registered command
       // path cannot be added without appearing here.
       commands: ["standup", "slack-standup", "standup export", "standup decisions", "standup progress", "standup variance", "standup window"],
-
       // Mirror the handler's contract without aborting here (the runtime
       // swallows throws from preflight). An empty delta is an explicit
       // pass-through that leaves the runtime's preflight decision untouched.
