@@ -265,7 +265,8 @@ function verifyPackedWindow(invoke: (args: string[], expectedStatus?: number) =>
   assert.equal(preview.window.incomplete, false);
   assert.ok(preview.window.events > 0);
   assert.equal(existsSync(cursor), false);
-  assert.deepEqual(decodeToon(invoke([...command, "--no-advance"]).stdout), preview);
+  const lean = JSON.parse(invoke([...command, "--no-advance", "--json", "--lean"]).stdout);
+  assert.deepEqual(decodeToon(invoke([...command, "--no-advance"]).stdout), lean);
   const admitted = JSON.parse(invoke([...command, "--output", output, "--json"]).stdout) as StandupWindowPacket;
   assert.deepEqual(admitted, { ...preview, window: { ...preview.window, admitted: true } });
   assert.deepEqual(JSON.parse(readFileSync(output, "utf8")), admitted);

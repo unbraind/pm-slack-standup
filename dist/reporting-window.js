@@ -169,9 +169,7 @@ export function parseStandupWindowBoundaryState(parsed) {
  * @returns The newline-terminated state-file bytes.
  */
 export function serializeStandupWindowBoundary(boundary) {
-    const coveredStreams = {};
-    for (const [streamId, offset] of boundary.covered_streams)
-        coveredStreams[streamId] = offset;
+    const coveredStreams = Object.fromEntries(boundary.covered_streams);
     return `${JSON.stringify({
         version: STANDUP_WINDOW_STATE_VERSION,
         boundary: {
@@ -263,7 +261,7 @@ export async function admitStandupWindowBoundary(path, snapshot, boundary, lock,
             await writeFileAtomic(path, serializeStandupWindowBoundary(boundary));
         }
         catch (error) {
-            const reason = error instanceof Error ? error.message : String(error);
+            const reason = String(error);
             refuseStandupWindow("window_state_write_failed", `writing the state file at ${path} failed: ${reason}`, EXIT_CODE.GENERIC_FAILURE);
         }
         return { admitted: true };
@@ -317,9 +315,9 @@ export function eventAfterBoundary(event, boundary) {
  * @returns True when the event must appear in this window.
  */
 export function eventInStandupWindow(event, boundary) {
-    if (eventAfterBoundary(event, boundary))
-        return true;
     if (boundary === null)
+        return true;
+    if (eventAfterBoundary(event, boundary))
         return true;
     return event.stream_offset > (boundary.covered_streams.get(event.stream_id) ?? -1);
 }

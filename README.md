@@ -379,9 +379,9 @@ skip work between reports:
 - The output is a compact TOON packet (JSON with `--json`) sized for agents:
   per-window event counts (including `late_events`, `workspace_events`),
   `touched_items`, sorted `ops`, the bucketed `sections` rows, and the
-  `boundary_before` / `boundary_next` chain. A consumer can detect a missing
-  report because each packet's `boundary_before` must equal the previous
-  packet's `boundary_next`.
+  `boundary_before` / `boundary_next` SDK cursor chain. Retained per-stream
+  coverage also advances for late-only windows, even when the native cursor
+  remains unchanged; cursor-string equality alone does not prove delivery.
 - Stdout-only rendering is a preview: restart reproduces the same packet
   while the tracker is unchanged. `--no-advance` also previews when output is
   supplied. Admission requires `--output <file>`: packet delivery and the

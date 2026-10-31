@@ -82,6 +82,12 @@ test("a serialized boundary round-trips through the strict parser", () => {
   assert.equal(serializeStandupWindowBoundary(parsed), serializeStandupWindowBoundary(boundary));
 });
 
+test("state producer preserves reserved object keys through SDK-facing serialization", () => {
+  const boundary = boundaryAt("2026-10-27T00:00:00Z", "constructor", 0);
+  boundary.covered_streams = new Map([["constructor", 0], ["__proto__", 2]]);
+  assert.deepEqual(parseStandupWindowBoundaryState(JSON.parse(serializeStandupWindowBoundary(boundary))), boundary);
+});
+
 test("the strict parser refuses every invalid boundary shape with a typed code", () => {
   const valid = JSON.parse(serializeStandupWindowBoundary(boundaryAt("2026-10-27T00:00:00.000Z", "item-1", 1, { "item-1": 1 })));
   const cases: Array<[string, unknown]> = [
