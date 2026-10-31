@@ -7,7 +7,9 @@ SDK. It retains an opaque cursor and per-stream offsets instead of introducing
 another journal. Stdout-only calls preview; `--output` atomically delivers a
 packet under the SDK generation-fenced admission lease before retaining the exact next boundary.
 The host floor is pm CLI 2026.10.27, whose public `acquireLockLease().fence()`
-prevents a lost lock generation from publishing. The development SDK pin is unchanged.
+prevents a lost lock generation from publishing with the built-in lock provider; an extension `lock_acquire`
+override runs `fence()` unfenced and must exclude or fence concurrent commits itself. The development SDK pin
+is unchanged.
 Use a separate cursor for each independent reporting consumer. Consume a delivered
 packet before requesting the next window with the same output file.
 
@@ -36,7 +38,7 @@ older-input replay, CRLF/whitespace/unicode values, relationships, status change
 custom lifecycle roles, deletion, backdated events, previews, and crash replay.
 The measured run uses 521 operations and 27 windows, partitioning 458 SDK
 events without omissions or duplicates. The window module independently measures
-100% lines, statements, branches and functions across 36 focused window tests, plus the seeded model test.
+100% lines, statements, branches and functions across 37 focused window tests, plus the seeded model test.
 
 Public-data validation is reproducible with:
 

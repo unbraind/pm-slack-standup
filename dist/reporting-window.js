@@ -431,7 +431,8 @@ export function standupWindowHasCursorCoverage(boundary) {
  * @returns The regressed stream ids, sorted.
  */
 export function standupWindowCoverageRegressions(boundary, scan) {
-    if (boundary === null)
+    // A capped scan stopped early: streams it never reached are unread, not regressed.
+    if (boundary === null || scan.capped)
         return [];
     const regressed = [];
     for (const [streamId, coveredOffset] of boundary.covered_streams) {

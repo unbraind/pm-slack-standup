@@ -342,14 +342,19 @@ test("the scan stops at the window cap and reports it, and refuses cursorless co
   );
 });
 
-test("a non-final page that reaches exactly the cap keeps scanning covered pages and is not capped", async () => {
-  const boundary = boundaryAt("2026-10-27T12:00:00.000Z", "item-1", 2, { "item-1": 2 });
-  const readPage = async (since?: string): Promise<MutationEventPage> => {
+/** A two-page journal: two new item-2 window events, then the given final page. */
+function twoPageJournal(finalPage: MutationEvent[]): (since?: string) => Promise<MutationEventPage> {
+  return async (since?: string) => {
     if (since === undefined) return page([eventAt("item-2", 1, "2026-10-27T13:00:00.000Z"), eventAt("item-2", 2, "2026-10-27T14:00:00.000Z")], true, "cursor-1");
-    // Only events the boundary already covers follow, so the window holds exactly the cap.
-    if (since === "cursor-1") return page([eventAt("item-1", 1, "2026-10-27T10:00:00.000Z"), eventAt("item-1", 3, "2026-10-27T11:00:00.000Z")], false, "cursor-2");
+    if (since === "cursor-1") return page(finalPage, false, "cursor-2");
     throw new Error("unexpected page cursor");
   };
+}
+
+test("a non-final page that reaches exactly the cap keeps scanning covered pages and is not capped", async () => {
+  const boundary = boundaryAt("2026-10-27T12:00:00.000Z", "item-1", 2, { "item-1": 2 });
+  // Only events the boundary already covers follow, so the window holds exactly the cap.
+  const readPage = twoPageJournal([eventAt("item-1", 1, "2026-10-27T10:00:00.000Z"), eventAt("item-1", 3, "2026-10-27T11:00:00.000Z")]);
   const scan = await scanStandupWindowEvents(readPage, boundary, 2);
   assert.equal(scan.capped, false);
   assert.equal(scan.windowEvents.length, 2);
@@ -414,6 +419,15 @@ test("coverage regressions report streams that shrank below the admitted boundar
   assert.deepEqual(standupWindowCoverageRegressions(null, scan), []);
   const intact = boundaryAt("2026-10-27T12:00:00.000Z", "item-1", 2, { "item-1": 1 });
   assert.deepEqual(standupWindowCoverageRegressions(intact, scan), []);
+});
+
+test("a capped scan reports no regressions for streams on pages it never read", async () => {
+  // The boundary covers item-9, which appears only on page 2; page 1 already exceeds the cap.
+  const boundary = boundaryAt("2026-10-27T12:00:00.000Z", "item-1", 0, { "item-1": 0, "item-9": 0 });
+  const scan = await scanStandupWindowEvents(twoPageJournal([eventAt("item-9", 1, "2026-10-27T10:00:00.000Z")]), boundary, 1);
+  assert.equal(scan.capped, true);
+  assert.equal(scan.pages, 1);
+  assert.deepEqual(standupWindowCoverageRegressions(boundary, scan), []);
 });
 
 test("unknown and deleted streams are certified against the corpus", () => {

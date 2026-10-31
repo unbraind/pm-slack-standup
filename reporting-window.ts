@@ -593,7 +593,8 @@ export function standupWindowCoverageRegressions(
   boundary: StandupWindowBoundary | null,
   scan: StandupWindowEventScan
 ): string[] {
-  if (boundary === null) return [];
+  // A capped scan stopped early: streams it never reached are unread, not regressed.
+  if (boundary === null || scan.capped) return [];
   const regressed: string[] = [];
   for (const [streamId, coveredOffset] of boundary.covered_streams) {
     if ((scan.maxOffsets.get(streamId) ?? -1) < coveredOffset) regressed.push(streamId);
