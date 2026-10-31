@@ -668,6 +668,17 @@ test("a transition committed between the scan and the corpus read is reported in
   }
 });
 
+test("an unverifiable history stream refuses the window as history_unavailable", async () => {
+  const fixture = await runtimeFixture();
+  try {
+    const target = await admittedInProgressItem(fixture);
+    writeFileSync(getHistoryPath(fixture.pmRoot, target), "{ not json\n", { flag: "a" });
+    await assert.rejects(runWindow(fixture, fixture.directory), (error: unknown) => (error as { code?: unknown }).code === "history_unavailable");
+  } finally {
+    await removeRuntimeFixture(fixture);
+  }
+});
+
 test("an item deletion is reported as deleted work, and lost history coverage marks the report incomplete", async () => {
   const fixture = await runtimeFixture();
   try {

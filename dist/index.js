@@ -2192,7 +2192,17 @@ export default defineExtension({
                 refuseStandupWindow("window_output_conflict", "packet output would overwrite the retained boundary.");
             }
             const snapshot = readStandupWindowBoundary(cursorFilePath);
-            const scan = await scanStandupWindowEvents((since) => listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000, verify: true }), snapshot.boundary, maxEvents);
+            // Only the SDK read is wrapped: a history read or verification failure is one safe refusal,
+            // while the scan's own window_* refusals keep their codes.
+            const readVerifiedPage = async (since) => {
+                try {
+                    return await listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000, verify: true });
+                }
+                catch {
+                    throw new ProgressRefusal("history_unavailable");
+                }
+            };
+            const scan = await scanStandupWindowEvents(readVerifiedPage, snapshot.boundary, maxEvents);
             // Read the corpus after the scan: a mutation in between lands in a later window instead of being admitted stale.
             const items = await readSdkStandupItems(ctx);
             const registry = await readStandupStatusRegistry(ctx.pm_root);
