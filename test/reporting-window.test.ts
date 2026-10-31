@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import {
   acquireLock, appendHistoryEntry, createHistoryEntry, emptyImportedDocument, getHistoryPath,
-  isPmCliExpectedError, locateItem, readLocatedItem,
+  isPmCliExpectedError, locateItem, PmClient, readLocatedItem,
 } from "@unbrained/pm-cli/sdk";
 import type { ItemDocument, MutationEvent, MutationEventPage, PmCliExpectedError } from "@unbrained/pm-cli/sdk";
 import {
@@ -600,12 +600,18 @@ test("a restart reproduces the same packet until the boundary is admitted", asyn
   }
 });
 
+/** Admit the fixture's first window and return its in-progress item. */
+async function admittedInProgressItem(fixture: RuntimeFixture): Promise<string> {
+  await runWindow(fixture, fixture.directory);
+  const target = fixture.items.find((item) => item.status === "in_progress")?.id;
+  assert.ok(target, "the fixture must contain an in-progress item");
+  return target;
+}
+
 test("a late backdated append appears exactly once in the next admitted window", async () => {
   const fixture = await runtimeFixture();
   try {
-    await runWindow(fixture, fixture.directory);
-    const target = fixture.items.find((item) => item.status === "in_progress")?.id;
-    assert.ok(target, "the fixture must contain an in-progress item");
+    const target = await admittedInProgressItem(fixture);
     const lateEntry = await appendBackdatedEvent(fixture, target, "2020-01-01T00:00:00.000Z");
     assert.ok(lateEntry);
     const window = await runWindow(fixture, fixture.directory);
@@ -634,6 +640,29 @@ test("a window lists every touched open item and names touched items no section 
     assert.deepEqual(window.window.unsectioned_items, [canceled]);
     assert.equal(window.window.touched_items, 6);
     assert.equal(window.window.admitted, true);
+  } finally {
+    await removeRuntimeFixture(fixture);
+  }
+});
+
+test("a transition committed between the scan and the corpus read is reported in the next window", async (t) => {
+  const fixture = await runtimeFixture();
+  try {
+    const target = await admittedInProgressItem(fixture);
+    await fixture.client.update(target, { title: "Touched before the race" });
+    // A peer closes the item right after the report reads its corpus.
+    const list = PmClient.prototype.listAllComplete; let raced = false;
+    t.mock.method(PmClient.prototype, "listAllComplete", async function (this: PmClient, ...args: Parameters<PmClient["listAllComplete"]>) {
+      const result = await list.apply(this, args);
+      if (!raced) { raced = true; await fixture.client.close(target, "Closed during the report"); }
+      return result;
+    });
+    await runWindow(fixture, fixture.directory);
+    assert.ok(raced, "the corpus read must be the raced one");
+    t.mock.restoreAll();
+    const next = await runWindow(fixture, fixture.directory);
+    assert.ok(next.window.ops.includes("close"), "the close lands in a later window instead of being admitted stale");
+    assert.ok(next.sections.done.some((row) => row.id === target));
   } finally {
     await removeRuntimeFixture(fixture);
   }
@@ -775,7 +804,7 @@ test("delivery failure retains the old boundary and crash replay preserves the d
     writeFileSync(blocker, "blocking output parent");
     const before = readStandupWindowBoundary(statePath).bytes;
     await fixture.client.create({ title: "Work after recovery", type: "Task" });
-    await assert.rejects(runWindow(fixture, fixture.directory, { "cursor-file": statePath, output: join(blocker, "packet.json") }), /could not write/);
+    await assert.rejects(runWindow(fixture, fixture.directory, { "cursor-file": statePath, output: join(blocker, "packet.json") }), /standup window: could not write/);
     assert.equal(readStandupWindowBoundary(statePath).bytes, before);
     await assert.rejects(runWindow(fixture, fixture.directory, { "no-advance": true, output: join(blocker, "preview.json") }), /could not write/);
   } finally {

@@ -672,8 +672,12 @@ export function parseDays(raw) {
  * (so the exporter aborts with a clean exit 1 + actionable message rather than
  * leaking a Node fs stack trace). Recognizes the common errno cases (missing
  * directory, permission, is-a-directory) and falls back to the raw message.
+ *
+ * @param path - The path that could not be written.
+ * @param err - The raw write failure.
+ * @param command - The command named in the message (default `standup export`).
  */
-export function writeError(path, err) {
+export function writeError(path, err, command = "standup export") {
     const code = err?.code;
     const detail = err instanceof Error ? err.message : typeof err === "string" ? err : String(err);
     let hint;
@@ -689,7 +693,7 @@ export function writeError(path, err) {
     else {
         hint = detail;
     }
-    return new CommandError(`standup export: could not write to '${path}': ${hint}.`, EXIT_CODE.GENERIC_FAILURE);
+    return new CommandError(`${command}: could not write to '${path}': ${hint}.`, EXIT_CODE.GENERIC_FAILURE);
 }
 // ---------------------------------------------------------------------------
 // Data fetch
@@ -2188,8 +2192,9 @@ export default defineExtension({
                 refuseStandupWindow("window_output_conflict", "packet output would overwrite the retained boundary.");
             }
             const snapshot = readStandupWindowBoundary(cursorFilePath);
-            const items = await readSdkStandupItems(ctx);
             const scan = await scanStandupWindowEvents((since) => listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000, verify: true }), snapshot.boundary, maxEvents);
+            // Read the corpus after the scan: a mutation in between lands in a later window instead of being admitted stale.
+            const items = await readSdkStandupItems(ctx);
             const registry = await readStandupStatusRegistry(ctx.pm_root);
             const corpusIds = new Set(items.map((item) => item.id));
             const regressedStreams = standupWindowCoverageRegressions(snapshot.boundary, scan);
@@ -2250,7 +2255,7 @@ export default defineExtension({
                     await writeFileAtomic(target, `${JSON.stringify(content, null, 2)}\n`);
                 }
                 catch (err) {
-                    throw writeError(target, err);
+                    throw writeError(target, err, "standup window");
                 }
             };
             // Durable delivery: with --output the packet is on disk BEFORE the

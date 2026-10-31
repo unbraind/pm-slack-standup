@@ -292,8 +292,12 @@ export declare function parseDays(raw: string | null | undefined): number | unde
  * (so the exporter aborts with a clean exit 1 + actionable message rather than
  * leaking a Node fs stack trace). Recognizes the common errno cases (missing
  * directory, permission, is-a-directory) and falls back to the raw message.
+ *
+ * @param path - The path that could not be written.
+ * @param err - The raw write failure.
+ * @param command - The command named in the message (default `standup export`).
  */
-export declare function writeError(path: string, err: unknown): CommandError;
+export declare function writeError(path: string, err: unknown, command?: string): CommandError;
 /** Read-buffer cap for `pm` output, in bytes. 64 MiB by default; override with the
  * `PM_JSON_MAX_BUFFER` env var. Resolved per call so the override takes effect
  * without an import-order dependency. Invalid or non-positive values fall back to

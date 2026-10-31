@@ -899,8 +899,12 @@ export function parseDays(raw: string | null | undefined): number | undefined {
  * (so the exporter aborts with a clean exit 1 + actionable message rather than
  * leaking a Node fs stack trace). Recognizes the common errno cases (missing
  * directory, permission, is-a-directory) and falls back to the raw message.
+ *
+ * @param path - The path that could not be written.
+ * @param err - The raw write failure.
+ * @param command - The command named in the message (default `standup export`).
  */
-export function writeError(path: string, err: unknown): CommandError {
+export function writeError(path: string, err: unknown, command = "standup export"): CommandError {
   const code = (err as { code?: string } | null)?.code;
   const detail =
     err instanceof Error ? err.message : typeof err === "string" ? err : String(err);
@@ -915,7 +919,7 @@ export function writeError(path: string, err: unknown): CommandError {
     hint = detail;
   }
   return new CommandError(
-    `standup export: could not write to '${path}': ${hint}.`,
+    `${command}: could not write to '${path}': ${hint}.`,
     EXIT_CODE.GENERIC_FAILURE
   );
 }
@@ -2637,13 +2641,13 @@ export default defineExtension({
         refuseStandupWindow("window_output_conflict", "packet output would overwrite the retained boundary.");
       }
       const snapshot = readStandupWindowBoundary(cursorFilePath);
-      const items = await readSdkStandupItems(ctx);
-
       const scan = await scanStandupWindowEvents(
         (since?: string) => listMutationEvents({ pmRoot: ctx.pm_root, since, limit: 1000, verify: true }),
         snapshot.boundary,
         maxEvents,
       );
+      // Read the corpus after the scan: a mutation in between lands in a later window instead of being admitted stale.
+      const items = await readSdkStandupItems(ctx);
 
       const registry = await readStandupStatusRegistry(ctx.pm_root);
       const corpusIds = new Set(items.map((item) => item.id));
@@ -2705,7 +2709,7 @@ export default defineExtension({
           mkdirSync(dirname(target), { recursive: true });
           await writeFileAtomic(target, `${JSON.stringify(content, null, 2)}\n`);
         } catch (err: unknown) {
-          throw writeError(target, err);
+          throw writeError(target, err, "standup window");
         }
       };
 

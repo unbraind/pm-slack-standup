@@ -382,7 +382,8 @@ skip work between reports:
   read yet. The delivery lease is keyed by the cursor file, so consumers with
   separate cursors that share an output file can overwrite each other's packet
   unless something outside pm serializes them.
-- The output is a compact TOON packet (JSON with `--json`) sized for agents:
+- Stdout is a compact TOON packet (JSON with `--json`); the `--output` file is
+  always pretty-printed JSON, whichever format stdout uses. The packet is sized for agents:
   per-window event counts (including `late_events`, `workspace_events`),
   `touched_items`, sorted `ops`, the bucketed `sections` rows, and the
   `boundary_before` / `boundary_next` SDK cursor chain. Retained per-stream
