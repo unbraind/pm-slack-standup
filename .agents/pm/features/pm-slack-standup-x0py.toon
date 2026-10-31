@@ -1,0 +1,12 @@
+id: pm-slack-standup-x0py
+title: Resume window scans from a verified journal suffix instead of rescanning every page
+description: "Every pm standup window run reads and verifies the whole mutation journal from the first page, so run time grows linearly with journal size. --max-events bounds only the reported window, not the scan (CodeRabbit on #175)."
+type: Feature
+status: open
+priority: 3
+tags[2]: performance,reporting-window
+created_at: "2026-10-31T03:12:40.041Z"
+updated_at: "2026-10-31T03:12:40.041Z"
+author: codex
+acceptance_criteria: "A window run on an unchanged large journal reads only pages after the retained boundary; Coverage regression and lost-history checks stay certified, with revert proofs; Restart packet equality is preserved"
+body: ""
