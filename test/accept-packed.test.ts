@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 
 import {
-  acceptanceEnvironment,
+  acceptanceEnvironment, installedHostEnvironment,
   acceptanceLaunchers,
   acceptanceVersions,
   acceptPacked,
@@ -112,6 +112,16 @@ test("packed environment strips case-insensitive tracker and script overrides wi
   assert.equal(clean.NODE_V8_COVERAGE, "/coverage");
   assert.equal(clean.PATH, "/tools");
   assert.equal(input.PM_PATH, "/private");
+});
+
+test("installed consumers cannot write into the canonical driver counter directory", () => {
+  const source = { NODE_V8_COVERAGE: "canonical-counters", PATH: "tool-path", NPM_TOKEN: "synthetic-token" };
+  const consumer = installedHostEnvironment(source);
+  assert.equal(source.NODE_V8_COVERAGE, "canonical-counters", "the acceptance driver stays instrumented");
+  assert.equal(consumer.NODE_V8_COVERAGE, undefined, "installed copies are outside the canonical source inventory");
+  assert.equal(consumer.PATH, source.PATH);
+  assert.equal(consumer.NPM_TOKEN, undefined);
+  assert.equal(acceptanceEnvironment(source).NODE_V8_COVERAGE, "canonical-counters", "source helper subprocesses retain profiling");
 });
 
 test("packed tarball selection requires exactly one artifact and ignores other filenames", () => {

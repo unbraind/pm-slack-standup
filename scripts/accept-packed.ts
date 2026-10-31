@@ -124,6 +124,18 @@ export function acceptanceEnvironment(source: NodeJS.ProcessEnv): NodeJS.Process
   return environment;
 }
 
+/**
+ * Keep the canonical acceptance driver profiled without collecting unrelated installed-host counters.
+ * Installed copies live outside the source inventory; their behavioral assertions still run unchanged.
+ * @param source - Inherited settings to isolate without changing the parent process.
+ * @returns Credential-free consumer settings without the parent's V8 counter destination.
+ */
+export function installedHostEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const environment = acceptanceEnvironment(source);
+  delete environment.NODE_V8_COVERAGE;
+  return environment;
+}
+
 const cleanEnvironment = acceptanceEnvironment(process.env);
 /** Maximum time allowed for one install, pack, or pm subprocess. */
 const commandTimeoutMs = 5 * 60 * 1000;
@@ -357,6 +369,14 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
   const npmLauncher = launchers.npm;
   const temporaryRoot = mkdtempSync(join(temporaryParent, "pm-slack-standup-packed-acceptance-"));
   try {
+    // Only immutable package downloads are shared; installs, trackers, configuration and global data stay isolated.
+    const consumerEnvironment = {
+      ...installedHostEnvironment(cleanEnvironment),
+      npm_config_cache: join(temporaryRoot, "npm-cache"),
+      BUN_INSTALL_CACHE_DIR: join(temporaryRoot, "bun-cache"),
+      npm_config_audit: "false",
+      npm_config_fund: "false",
+    };
     console.error("packed acceptance: pack artifact");
     const packRoot = join(temporaryRoot, "pack");
     mkdirSync(packRoot);
@@ -364,7 +384,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       npmLauncher.command,
       [...npmLauncher.prefix, "pack", "--ignore-scripts", "--pack-destination", packRoot],
       root,
-      { ...cleanEnvironment, npm_config_ignore_scripts: "true", NPM_CONFIG_IGNORE_SCRIPTS: "true" },
+      { ...consumerEnvironment, npm_config_ignore_scripts: "true", NPM_CONFIG_IGNORE_SCRIPTS: "true" },
     );
     const tarball = packedTarball(packRoot);
     const scenarios: AcceptanceScenario[] = [
@@ -382,13 +402,11 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       const isolatedData = join(scenarioRoot, "xdg-data");
       mkdirSync(scenarioRoot);
       const scenarioEnvironment: NodeJS.ProcessEnv = {
-        ...cleanEnvironment,
+        ...consumerEnvironment,
         PM_PATH: join(scenarioRoot, ".agents", "pm"),
         PM_GLOBAL_PATH: join(scenarioRoot, "global-pm"),
         XDG_CONFIG_HOME: isolatedConfig,
         XDG_DATA_HOME: isolatedData,
-        npm_config_cache: join(scenarioRoot, "npm-cache"),
-        BUN_INSTALL_CACHE_DIR: join(scenarioRoot, "bun-cache"),
       };
       mkdirSync(isolatedConfig);
       mkdirSync(isolatedData);
@@ -425,12 +443,11 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     mkdirSync(globalConfigRoot);
     mkdirSync(globalDataRoot);
     const globalEnvironment: NodeJS.ProcessEnv = {
-      ...cleanEnvironment,
+      ...consumerEnvironment,
       PM_PATH: join(globalProjectRoot, ".agents", "pm"),
       PM_GLOBAL_PATH: join(globalScenarioRoot, "global-pm"),
       XDG_CONFIG_HOME: globalConfigRoot,
       XDG_DATA_HOME: globalDataRoot,
-      npm_config_cache: join(globalScenarioRoot, "npm-cache"),
     };
     run(npmLauncher.command, [...npmLauncher.prefix, "install", "--global", "--prefix", globalHostRoot, "--ignore-scripts", `${cliPackage}@${developmentVersion}`], globalScenarioRoot, globalEnvironment);
     const globalHostCli = globalHostEntry(globalHostRoot, globalHostRoot, process.platform);

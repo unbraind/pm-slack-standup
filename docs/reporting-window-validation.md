@@ -69,7 +69,8 @@ atomic delivery before admission, boundary chaining, and empty replay.
 
 ## Local release-gate results
 
-Both `npm run release:check` and `bun run release:check` ran with isolated Git
+Before the CI timing remediation below, both `npm run release:check` and
+`bun run release:check` ran with isolated Git
 identity and at most two workers. Each completed **348/350 passing tests**, with
 only the two instrumented packed matrices exceeding their unchanged 290-second
 subprocess deadline. All nine runtime modules measured **100% in all four
@@ -95,3 +96,26 @@ docstrings (139 declarations in 19 source files) passed. Canonical-reader,
 production audit (zero vulnerabilities), pack inventory, changelog, release-date
 and publish-attestation checks passed. Exact-head CI remains the complete release
 validation; local timing failures are not presented as passing gates.
+
+
+## CI timing remediation
+
+The first pushed head's Node 22 CI completed 349/350 tests: one packed matrix
+hit the unchanged 290-second deadline, while the other finished in 264.544
+seconds. Its complete 19-source coverage report met 100% in every dimension,
+but the failed test correctly kept the job red.
+
+The acceptance driver now shares only package download caches within its own
+temporary run. Every installation, tracker, configuration and global-data path
+remains separate. Fixture audit/funding work is disabled; the independent
+production audit gate remains enabled. Installed consumers no longer inherit the
+canonical V8 counter directory, since their copies are outside the source
+inventory. The acceptance driver and canonical source-helper subprocesses retain
+profiling. No assertions, six-scenario matrix, launcher mode, worker limit,
+290-second timeout, source inventory or 100% threshold was removed or reduced.
+
+The linked window/model suite passes 35/35 and focused driver contracts pass
+12/12. Reverting consumer counter isolation fails its regression; restoration
+passes 1/1. Types, lint and zero duplication pass; docstrings now cover 140
+declarations in the same 19 source files. Shipped runtime files and the exact
+recorded artifact are unchanged. The replacement pushed head requires fresh CI.
