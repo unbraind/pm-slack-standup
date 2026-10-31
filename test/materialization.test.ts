@@ -55,7 +55,7 @@ test("retained materialization cannot certify an unavailable target in any SDK r
       try {
         const response = await f.harness.runCommand({ command, pmRoot: f.pmRoot,
           args: [command === "standup progress" ? target : f.source],
-          options: { revision: f.selection.revision, dryRun: true, includeDone: true, allOpen: true, format: "plain" } });
+          options: { "cursor-file": join(f.directory, "window.json"), revision: f.selection.revision, dryRun: true, includeDone: true, allOpen: true, format: "plain" } });
         noLiveOutcome(response.result, target, "Commitment 0");
         if (command === "standup variance") assert.equal((response.result as CommitmentVarianceReport).rows[0].state, "unsupported");
       } catch (error) { assert.ok(refused("history_unavailable")(error)); }
@@ -135,6 +135,7 @@ test("every installed command and export excludes unavailable outcomes in JSON a
       else if (command === "standup progress") args.push(f.targets[0]);
       else if (["standup", "slack-standup"].includes(command)) args.push("--dry-run", "--include-done", "--all-open", "--format", "plain");
       else if (command === "standup export") args.push("--include-done", "--all-open", "--format", "json");
+      if (command === "standup window") args.push("--cursor-file", join(f.directory, "window.json"));
       if (json) args.push("--json");
       const before = treeState(f.pmRoot);
       const output = spawnSync(process.execPath, [cli, "--path", f.pmRoot, ...args], { cwd: f.directory, env: environment, encoding: "utf8", timeout: 60000 });

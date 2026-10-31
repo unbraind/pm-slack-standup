@@ -29,7 +29,7 @@ test("every SDK and registered report refuses adversarial history without author
           () => readProgressDeltas(f.ctx, f.id), () => readProgressDeltas({ pm_root: f.pmRoot }, f.id),
           () => readSdkStandupItems(f.ctx), () => readSdkStandupItems({ pm_root: f.pmRoot }),
           ...f.harness.activation.commands.handlers.map(({ command }) => () => harness.runCommand({ command, args: [f.id], pmRoot: f.pmRoot,
-            options: { revision: 1, dryRun: true, format: command === "standup" || command === "slack-standup" ? "plain" : "json", output: join(f.directory, "refused.json"), historyDir: join(f.directory, "refused-snapshots") } })),
+            options: { "cursor-file": join(f.directory, "window.json"), revision: 1, dryRun: true, format: command === "standup" || command === "slack-standup" ? "plain" : "json", output: join(f.directory, "refused.json"), historyDir: join(f.directory, "refused-snapshots") } })),
           ...["json", "md"].map((format) => () => harness.runExporter({ exporter: "standup", pmRoot: f.pmRoot,
             options: { format, output: join(f.directory, "refused.json") } })),
         ];

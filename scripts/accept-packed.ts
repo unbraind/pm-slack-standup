@@ -7,7 +7,7 @@ import { join, resolve, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { COMPLETE_LIST_COMMAND_ARGUMENTS, encodeProgressEvidence, encodeStandupCommitment } from "../index.ts";
-import type { CommitmentVarianceReport, ProgressReport } from "../index.ts";
+import type { CommitmentVarianceReport, ProgressReport, StandupWindowPacket } from "../index.ts";
 import { treeState } from "../test/tracker-state.ts";
 import { isMainInvocation } from "./main-invocation.ts";
 
@@ -38,6 +38,8 @@ interface AcceptanceReceipt {
   readonly variance_verified?: true;
   /** Orphaned live storage and native deletion were distinguished through the installed host. */
   readonly materialization_verified?: true;
+  /** Retained reporting windows were exercised through the installed host. */
+  readonly window_verified?: true;
 }
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -119,6 +121,19 @@ export function acceptanceEnvironment(source: NodeJS.ProcessEnv): NodeJS.Process
       delete environment[key];
     }
   }
+  return environment;
+}
+
+/**
+ * Keep the canonical acceptance driver profiled without collecting unrelated installed-host counters.
+ * Installed copies live outside the source inventory; their behavioral assertions still run unchanged.
+ * @param source - Inherited settings to isolate without changing the parent process.
+ * @returns Credential-free consumer settings whose empty V8 counter destination disables collection.
+ */
+export function installedHostEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const environment = acceptanceEnvironment(source);
+  // An own empty value: Node's child_process copies the parent's NODE_V8_COVERAGE into an env that lacks the key.
+  environment.NODE_V8_COVERAGE = "";
   return environment;
 }
 
@@ -254,6 +269,30 @@ function verifyPackedMaterialization(invoke: (args: string[], expectedStatus?: n
   } finally { writeFileSync(path, original); }
 }
 
+/** Verify preview replay, durable admission and an empty restart on each packed host. */
+function verifyPackedWindow(invoke: (args: string[], expectedStatus?: number) => SpawnSyncReturns<string>, pmRoot: string): void {
+  const cursor = join(pmRoot, "packed-window.json");
+  const output = join(pmRoot, "packed-packet.json");
+  const command = ["standup", "window", "--cursor-file", cursor];
+  const preview = JSON.parse(invoke([...command, "--no-advance", "--json"]).stdout) as StandupWindowPacket;
+  assert.equal(preview.window.incomplete, false);
+  assert.ok(preview.window.events > 0);
+  assert.equal(existsSync(cursor), false);
+  const lean = JSON.parse(invoke([...command, "--no-advance", "--json", "--lean"]).stdout);
+  assert.deepEqual(decodeToon(invoke([...command, "--no-advance"]).stdout), lean);
+  const previewDelivery = JSON.parse(invoke([...command, "--no-advance", "--output", join(pmRoot, "packed-preview-packet.json"), "--json"]).stdout) as StandupWindowPacket;
+  assert.equal(previewDelivery.window.admitted, false);
+  assert.equal(existsSync(cursor), false, "--no-advance never admits, even with --output");
+  const admitted = JSON.parse(invoke([...command, "--output", output, "--json"]).stdout) as StandupWindowPacket;
+  assert.deepEqual(admitted, { ...preview, window: { ...preview.window, admitted: true } });
+  assert.deepEqual(JSON.parse(readFileSync(output, "utf8")), admitted);
+  const empty = JSON.parse(invoke([...command, "--json"]).stdout) as StandupWindowPacket;
+  assert.equal(empty.window.events, 0);
+  assert.equal(empty.window.incomplete, false);
+  assert.equal(empty.window.boundary_before, admitted.window.boundary_next);
+  assert.equal(empty.window.admitted, false);
+}
+
 /** Exercise the new command through each installed host, retaining real native SDK/history behavior. */
 function verifyPackedProgress(invoke: (args: string[], expectedStatus?: number) => SpawnSyncReturns<string>, id: string, pmRoot: string): void {
   const initial = JSON.parse(invoke(["standup", "progress", id, "--json"]).stdout) as ProgressReport;
@@ -323,6 +362,7 @@ function verifyPackedProgress(invoke: (args: string[], expectedStatus?: number) 
     }
   } finally { writeFileSync(path, original); }
   verifyPackedMaterialization(invoke, id, pmRoot);
+  verifyPackedWindow(invoke, pmRoot);
 }
 
 /** Pack once, exercise all real npm/Bun hosts, emit reconciled receipts, and remove fixtures. */
@@ -333,6 +373,14 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
   const npmLauncher = launchers.npm;
   const temporaryRoot = mkdtempSync(join(temporaryParent, "pm-slack-standup-packed-acceptance-"));
   try {
+    // Only immutable package downloads are shared; installs, trackers, configuration and global data stay isolated.
+    const consumerEnvironment = {
+      ...installedHostEnvironment(cleanEnvironment),
+      npm_config_cache: join(temporaryRoot, "npm-cache"),
+      BUN_INSTALL_CACHE_DIR: join(temporaryRoot, "bun-cache"),
+      npm_config_audit: "false",
+      npm_config_fund: "false",
+    };
     console.error("packed acceptance: pack artifact");
     const packRoot = join(temporaryRoot, "pack");
     mkdirSync(packRoot);
@@ -340,7 +388,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       npmLauncher.command,
       [...npmLauncher.prefix, "pack", "--ignore-scripts", "--pack-destination", packRoot],
       root,
-      { ...cleanEnvironment, npm_config_ignore_scripts: "true", NPM_CONFIG_IGNORE_SCRIPTS: "true" },
+      { ...consumerEnvironment, npm_config_ignore_scripts: "true", NPM_CONFIG_IGNORE_SCRIPTS: "true" },
     );
     const tarball = packedTarball(packRoot);
     const scenarios: AcceptanceScenario[] = [
@@ -358,13 +406,11 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       const isolatedData = join(scenarioRoot, "xdg-data");
       mkdirSync(scenarioRoot);
       const scenarioEnvironment: NodeJS.ProcessEnv = {
-        ...cleanEnvironment,
+        ...consumerEnvironment,
         PM_PATH: join(scenarioRoot, ".agents", "pm"),
         PM_GLOBAL_PATH: join(scenarioRoot, "global-pm"),
         XDG_CONFIG_HOME: isolatedConfig,
         XDG_DATA_HOME: isolatedData,
-        npm_config_cache: join(scenarioRoot, "npm-cache"),
-        BUN_INSTALL_CACHE_DIR: join(scenarioRoot, "bun-cache"),
       };
       mkdirSync(isolatedConfig);
       mkdirSync(isolatedData);
@@ -387,7 +433,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
       const listed = JSON.parse(runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as Record<string, unknown>;
       const exported = runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, ["standup", "export", "--format", "json"]);
       verifyPackedProgress((args, expectedStatus) => runPm(launchers, scenario, scenarioRoot, scenarioEnvironment, args, expectedStatus), String((listed.items as Array<{ id: string }>)[0].id), scenarioEnvironment.PM_PATH!);
-      receipts.push({ ...scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]), progress_verified: true, variance_verified: true, materialization_verified: true });
+      receipts.push({ ...scenarioReceipt(scenario, actualVersion, listed, exported, [inProgressTitle, openTitle]), progress_verified: true, variance_verified: true, materialization_verified: true, window_verified: true });
     }
 
     console.error("packed acceptance: npm-global-current");
@@ -401,12 +447,11 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     mkdirSync(globalConfigRoot);
     mkdirSync(globalDataRoot);
     const globalEnvironment: NodeJS.ProcessEnv = {
-      ...cleanEnvironment,
+      ...consumerEnvironment,
       PM_PATH: join(globalProjectRoot, ".agents", "pm"),
       PM_GLOBAL_PATH: join(globalScenarioRoot, "global-pm"),
       XDG_CONFIG_HOME: globalConfigRoot,
       XDG_DATA_HOME: globalDataRoot,
-      npm_config_cache: join(globalScenarioRoot, "npm-cache"),
     };
     run(npmLauncher.command, [...npmLauncher.prefix, "install", "--global", "--prefix", globalHostRoot, "--ignore-scripts", `${cliPackage}@${developmentVersion}`], globalScenarioRoot, globalEnvironment);
     const globalHostCli = globalHostEntry(globalHostRoot, globalHostRoot, process.platform);
@@ -420,7 +465,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     const globalExport = run(process.execPath, [globalHostCli, "standup", "export", "--format", "json"], globalProjectRoot, globalEnvironment);
     const globalItems = JSON.parse(run(process.execPath, [globalHostCli, ...COMPLETE_LIST_COMMAND_ARGUMENTS], globalProjectRoot, globalEnvironment).stdout) as { items: Array<{ id: string }> };
     verifyPackedProgress((args, expectedStatus) => run(process.execPath, [globalHostCli, ...args], globalProjectRoot, globalEnvironment, commandTimeoutMs, expectedStatus), globalItems.items[0].id, globalEnvironment.PM_PATH!);
-    receipts.push({ ...globalReceipt(globalVersion, developmentVersion, globalExport), progress_verified: true, variance_verified: true, materialization_verified: true });
+    receipts.push({ ...globalReceipt(globalVersion, developmentVersion, globalExport), progress_verified: true, variance_verified: true, materialization_verified: true, window_verified: true });
 
     console.error("packed acceptance: bun-global-current");
     const bunRoot = join(temporaryRoot, "bun-global-current");
@@ -440,7 +485,7 @@ export function acceptPacked(root: string, temporaryParent = tmpdir()): void {
     const bunExport = invokeBun(["standup", "export", "--format", "json"]);
     const bunItems = JSON.parse(invokeBun(COMPLETE_LIST_COMMAND_ARGUMENTS.slice()).stdout) as { items: Array<{ id: string }> };
     verifyPackedProgress(invokeBun, bunItems.items[0].id, bunEnvironment.PM_PATH);
-    receipts.push({ ...globalReceipt(bunVersion, developmentVersion, bunExport), scenario: "bun-global-current", progress_verified: true, variance_verified: true, materialization_verified: true });
+    receipts.push({ ...globalReceipt(bunVersion, developmentVersion, bunExport), scenario: "bun-global-current", progress_verified: true, variance_verified: true, materialization_verified: true, window_verified: true });
 
     process.stdout.write(`${JSON.stringify({ ok: true, receipts })}\n`);
   } finally {
