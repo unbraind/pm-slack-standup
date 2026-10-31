@@ -1,0 +1,10 @@
+{
+  "sha256": "c3d3fd0cde498bfa1e7372a6f5620c82b899e64b7d6445c75d48e430000721d3",
+  "bytes": 129382,
+  "entries": 45,
+  "window_artifacts": 4,
+  "host_floor": "2026.10.27",
+  "source_commit": "415328ba6695973d9ff63e4c1c39749171a6263d",
+  "node_scenarios": 6,
+  "bun_scenarios": 6
+}

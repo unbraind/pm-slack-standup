@@ -65,3 +65,33 @@ The six packed acceptance scenarios exercise the exact fresh tarball with npm
 and Bun, current and minimum hosts, project-local `npx`/`bunx`, and npm/Bun global
 host installations. Each verifies window preview replay, TOON/JSON agreement,
 atomic delivery before admission, boundary chaining, and empty replay.
+
+
+## Local release-gate results
+
+Both `npm run release:check` and `bun run release:check` ran with isolated Git
+identity and at most two workers. Each completed **348/350 passing tests**, with
+only the two instrumented packed matrices exceeding their unchanged 290-second
+subprocess deadline. All nine runtime modules measured **100% in all four
+coverage dimensions**. The interrupted acceptance-script paths left global
+coverage at **96.17% lines/statements, 99.88% branches, 97.59% functions**; both
+release gates correctly failed their unchanged 100% thresholds. Follow-up:
+[pm-slack-standup-packed-timing](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-packed-timing.toon).
+
+Fresh `node scripts/accept-packed.ts` and `bun scripts/accept-packed.ts` each
+passed all six installed-host scenarios on the final implementation. Their
+129,382-byte tarballs were byte-identical, contained 45 entries and all four
+window module artifacts, and declared host floor 2026.10.27. The
+[artifact receipt](evidence/reporting-window-artifact.json) records the SHA-256
+and immutable source commit; no tarball is committed.
+
+Actual installed-CLI probes separately passed five checks: a capped window,
+three invalid-limit refusals, and explicit `--no-advance --output` delivering a
+preview without admitting a cursor. The final five behavioral mutants each
+failed; restoring the implementation passed the five-case selection.
+
+Typecheck, lint, zero-duplication (69 TypeScript files, zero clone pairs), and
+docstrings (139 declarations in 19 source files) passed. Canonical-reader,
+production audit (zero vulnerabilities), pack inventory, changelog, release-date
+and publish-attestation checks passed. Exact-head CI remains the complete release
+validation; local timing failures are not presented as passing gates.

@@ -6,11 +6,14 @@ status: open
 priority: 2
 tags: []
 created_at: "2026-10-26T18:53:49.669Z"
-updated_at: "2026-10-26T19:08:31.472Z"
+updated_at: "2026-10-31T01:48:44.388Z"
 author: codex-agent
 acceptance_criteria: Explain and reproduce the instrumented packed-install timing discrepancy; retain the 290000 ms subprocess timeout and every coverage threshold; record standalone and full npm/Bun receipts
-comments[1]{created_at,author,text}:
+comments[4]{created_at,author,text}:
   "2026-10-26T19:08:31.471Z",codex-agent,"Standalone acceptance completed all five scenarios with matching SDK identities, rendered fixture counts and no missing fixture data. Full npm and Bun gates each passed 285/287 tests and timed out only their two instrumented real-install matrices. This separates functional acceptance from the unchanged 290000 ms budget; investigate instrumentation, fresh per-scenario caches and shared scheduling without lowering coverage or increasing that timeout."
+  "2026-10-31T00:59:00.361Z",codex-agent,"Cursor-window delivery validation repeats the existing instrumented limit: complete isolated npm release check ran 350 tests, 348 passed, and only both real-install matrices exceeded 290000 ms. Runtime modules measured 100% in all four dimensions; acceptance-script paths left unexecuted by timeout reduced global coverage to 96.17% lines/statements, 99.88% branches, 97.59% functions. No timeout or coverage threshold was changed. Current-source Node/Bun standalone receipts and exact-head CI will be linked from pm-slack-standup-kovw."
+  "2026-10-31T01:23:33.985Z",codex-agent,"Bun full release validation also completed 348/350 tests, failing only the same two 290000 ms matrix timeouts. Its runtime-module coverage and overall authored-source percentages match the npm receipt. Preserve this as timing evidence; it is not a passing release gate. Final-source standalone fresh-pack receipts and CI are pending on pm-slack-standup-kovw."
+  "2026-10-31T01:48:44.387Z",codex-agent,"Final-source standalone acceptance completed every scenario: 6/6 under Node and 6/6 under Bun, with byte-identical fresh artifacts. This distinguishes functional packed acceptance from both complete local release gates (348/350 each; two 290-second instrumented timeouts each). Runtime coverage is 100% in every dimension; the overall gate remains failed at unchanged thresholds. Current evidence and the PR check board are tracked by pm-slack-standup-kovw."
 files[2]{path,scope}:
   scripts/accept-packed.ts,project
   test/accept-packed.test.ts,project
