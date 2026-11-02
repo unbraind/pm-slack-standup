@@ -2,12 +2,18 @@ id: pm-slack-standup-release-notes-1029
 title: Restore generated notes for prepared 2026.10.29
 description: "Repair delivered item lifecycle and release attribution, then regenerate the exact prepared-version changelog without changing version or workflows."
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-29T18:35:47.045Z"
-updated_at: "2026-10-29T18:56:02.961Z"
+updated_at: "2026-10-30T20:36:11.137Z"
+closed_at: "2026-10-30T20:36:09.410Z"
+completed_at: "2026-10-29T21:05:02.000Z"
 author: codex-agent
+release: 2026.10.30
+resolution: "Delivered by PR #168 (389b70a): Restore generated notes for prepared 2026.10.29 release"
+expected_result: Restore generated notes for prepared 2026.10.29
+actual_result: "PR #168 merged at 2026-10-29T21:05:02Z as 389b70a; required CI passed on the merged head."
 comments[2]{created_at,author,text}:
   "2026-10-29T18:36:28.110Z",codex-agent,Read-only audit found the prepared 2026.10.29 ahead of npm with no tag or matching changelog section. Verified merged delivery PRs and successful release CI. Their owning items remain in_progress. Append-only pinned CLI lifecycle and release updates are explicitly authorized for recovery; unrelated open follow-ups remain open.
   "2026-10-29T18:55:50.543Z",codex-agent,"Recovery closes only the verified deliveries in merged PRs 164 and 166, pins 2026.10.29 and regenerates the exact dated section with the repository command. Linked npm run changelog:check passes 1/1; origin/main lacks the heading and the repaired metadata makes the same generator include it. Source, version, dependency pins and workflows are unchanged. Fresh npm/Bun full release gates remain required at unchanged thresholds in CI."
@@ -17,4 +23,5 @@ tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   "npm run changelog:check",project,codex-agent,"2026-10-29T18:49:15.856Z",local_mutation,fix/changelog-2026-10-29
 docs[1]{path,scope}:
   README.md,project
+close_reason: "Delivered by PR #168 (389b70a): Restore generated notes for prepared 2026.10.29 release"
 body: ""
