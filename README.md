@@ -363,6 +363,84 @@ Requests with any configured terminal lifecycle role disappear; private alternat
 The SDK exports `collectDecisionRequests`, its typed contracts, and actionable
 `DecisionRequestRefusal` errors. See the [schema, CLI and SDK example](docs/decision-requests.md).
 
+## Cursor-complete reporting windows
+
+`pm standup window` builds a standup from a **certified event boundary** instead
+of a wall-clock date window, and retains the **exact next boundary** after the
+packet is rendered — so crashes and late or backdated appends never silently
+skip work between reports:
+
+- The boundary lives in a small JSON state file you own (`--cursor-file`,
+  required). It stores the opaque `pm history events` cursor of the last
+  admitted event plus the highest admitted offset of every history stream, so
+  the next report sees both forward appends and events appended after the
+  boundary with older timestamps. No second event journal is created; all
+  event reads go through the pm SDK mutation-event reader.
+- Use one cursor file and one output file per consumer. Admitting a boundary
+  records that its packet was delivered; two independent consumers sharing a
+  cursor file would let one consumer's admission skip events the other has not
+  read yet. The delivery lease is keyed by the cursor file, so consumers with
+  separate cursors that share an output file can overwrite each other's packet
+  unless something outside pm serializes them.
+- Stdout is a compact TOON packet (JSON with `--json`); the `--output` file is
+  always pretty-printed JSON, whichever format stdout uses. The packet is sized for agents:
+  per-window event counts (including `late_events`, `workspace_events`),
+  `touched_items`, sorted `ops`, the bucketed `sections` rows, and the
+  `boundary_before` / `boundary_next` SDK cursor chain. Retained per-stream
+  coverage also advances for late-only windows, even when the native cursor
+  remains unchanged; cursor-string equality alone does not prove delivery.
+- Stdout-only rendering is a preview: restart reproduces the same packet
+  while the tracker is unchanged. `--no-advance` also previews when output is
+  supplied. Admission requires `--output <file>`: packet delivery and the
+  boundary comparison share one lease, and the packet is atomically written
+  BEFORE the boundary is admitted. A losing reporter sharing the same cursor
+  file preserves the winner's output. Consume each delivered file before
+  requesting the next report.
+- A window that cannot be certified is reported `incomplete` with typed
+  reasons (`event_cap_exceeded` from `--max-events`, `stream_offset_gap` when
+  an append sorted before a page already read so a stream's offsets were not
+  all seen (the next run re-reads the whole journal), `history_regression` when
+  the journal shrank below admitted coverage, `cursor_coverage_missing` when
+  retained offsets no longer account for every admitted event, `unknown_event_stream` for
+  events without a corpus item, `window_contended` when a concurrent reporter
+  admitted first) and is never admitted, so nothing is skipped silently.
+  `pm delete` removes the item but keeps its history stream, so deletion events
+  are surfaced as `deleted_items` instead of failing certification.
+- Sections list every touched item they apply to: `up_next` is not capped at
+  the daily top three. Touched items that no section shows, such as canceled
+  items or declared decision requests, are named in `unsectioned_items`.
+- Each run reads and verifies the whole mutation journal, starting from its
+  first page, because coverage and regression checks need every stream. The
+  scan therefore grows linearly with journal size; `--max-events` bounds only
+  the events reported in the window.
+
+```bash
+# Preview: one window covering the whole journal
+pm standup window --cursor-file .standup-window.json
+
+# Agent-readable JSON, delivered durably before the boundary is admitted
+pm standup window --cursor-file .standup-window.json --json --output window.json
+
+# Preview without admitting (a restart re-renders the same packet)
+pm standup window --cursor-file .standup-window.json --no-advance
+
+# Resume the raw event stream yourself from the retained boundary
+pm history events --since "$(jq -r .window.boundary_next window.json)"
+```
+
+The raw `pm history events --since` cursor is timestamp-ordered: an append
+backdated before it is not returned. It is not a cursor-complete replacement
+for `standup window`, which also tracks per-stream offsets.
+
+Typed refusals (`window_cursor_file_missing`, `window_state_unreadable`,
+`window_state_version_unsupported`, `window_state_invalid_shape`,
+`window_max_events_invalid`, `window_state_write_failed`,
+`window_page_cursor_missing`, `window_output_conflict`) carry an operator remedy each; the SDK exports
+`standupWindowRefusalMessage`, the boundary state reader/writer, the journal
+scan, membership, certification and packet helpers, and the
+`STANDUP_WINDOW_REFUSAL_REMEDIES` table. See the
+[validation evidence](https://github.com/unbraind/pm-slack-standup/blob/main/docs/reporting-window-validation.md).
+
 ## Commitment variance receipts
 
 `pm standup variance PLAN_ID --revision 4 --json` compares explicit commitments
@@ -375,17 +453,20 @@ Capture explicit links using `encodeStandupCommitment` and the native comments
 API; read them with the typed `readCommitmentVariance` SDK function or CLI. See
 the [contract](docs/commitment-variance.md),
 [SDK example](docs/commitment-variance-example.md), and
-[validation evidence](docs/commitment-variance-validation.md). Reporting is
+[validation evidence](https://github.com/unbraind/pm-slack-standup/blob/main/docs/commitment-variance-validation.md). Reporting is
 read-only and sends no Slack messages.
 
 ## Without git
 
-Standup previews, decision reports, commitment variance receipts, exports and Slack posts work from a plain
+Standup previews, decision reports, commitment variance receipts, window packets, exports and Slack posts work from a plain
 initialized tracker with no Git executable. Slack posting needs a webhook and
 network access; previews and decision reports only read tracker data. Package
 release and GitHub workflows need a Git repository.
 
-The supported host floor is pm CLI 2026.10.20. Configured status aliases and
+The supported host floor is pm CLI 2026.10.27. Window delivery uses its
+generation-fenced lease API so expired reporters cannot publish over a peer when the built-in lock provider
+is active. An extension `lock_acquire` override owns its lease lifecycle and runs `fence()` unfenced, so such
+a provider must exclude or fence concurrent commits itself. Configured status aliases and
 terminal roles are authoritative; canceled items with old blocker links now stay
 out of the Blocked section. Invalid history now refuses a report even after SDK
 caches were primed. Legacy display aliases such as `doing`, `on_hold`, and `done`

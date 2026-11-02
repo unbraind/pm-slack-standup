@@ -1,11 +1,11 @@
 {
   "name": "pm-slack-standup",
-  "version": "2026.10.29",
+  "version": "2026.11.2",
   "manifest_version": 2,
   "description": "Post pm context as a Slack standup message",
   "author": "@unbraind",
   "entry": "./dist/index.js",
-  "pm_min_version": "2026.10.20",
+  "pm_min_version": "2026.10.27",
   "priority": 50,
   "trusted": true,
   "sandbox_profile": "restricted",

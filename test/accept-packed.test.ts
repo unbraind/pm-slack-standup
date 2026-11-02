@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 
 import {
-  acceptanceEnvironment,
+  acceptanceEnvironment, installedHostEnvironment,
   acceptanceLaunchers,
   acceptanceVersions,
   acceptPacked,
@@ -114,6 +114,31 @@ test("packed environment strips case-insensitive tracker and script overrides wi
   assert.equal(input.PM_PATH, "/private");
 });
 
+test("installed consumers cannot write into the canonical driver counter directory", () => {
+  const source = { NODE_V8_COVERAGE: "canonical-counters", PATH: "tool-path", NPM_TOKEN: "synthetic-token" };
+  const consumer = installedHostEnvironment(source);
+  assert.equal(source.NODE_V8_COVERAGE, "canonical-counters", "the acceptance driver stays instrumented");
+  assert.equal(consumer.NODE_V8_COVERAGE, "", "installed copies are outside the canonical source inventory");
+  assert.equal(consumer.PATH, source.PATH);
+  assert.equal(consumer.NPM_TOKEN, undefined);
+  assert.equal(acceptanceEnvironment(source).NODE_V8_COVERAGE, "canonical-counters", "source helper subprocesses retain profiling");
+});
+
+test("installed host children never inherit the parent's counter directory", () => {
+  // Node copies the parent's NODE_V8_COVERAGE into a child env that lacks the key, so only an own empty value blocks it.
+  const previous = process.env.NODE_V8_COVERAGE;
+  const counters = mkdtempSync(join(tmpdir(), "standup-parent-counters-"));
+  process.env.NODE_V8_COVERAGE = counters;
+  try {
+    const child = spawnSync(process.execPath, ["-p", "JSON.stringify(process.env.NODE_V8_COVERAGE ?? null)"], { env: installedHostEnvironment(process.env), encoding: "utf8" });
+    assert.equal(child.status, 0, child.stderr);
+    assert.equal(child.stdout.trim(), JSON.stringify(""));
+  } finally {
+    if (previous === undefined) delete process.env.NODE_V8_COVERAGE; else process.env.NODE_V8_COVERAGE = previous;
+    rmSync(counters, { recursive: true, force: true });
+  }
+});
+
 test("packed tarball selection requires exactly one artifact and ignores other filenames", () => {
   const directory = mkdtempSync(join(tmpdir(), "standup-pack-count-"));
   try {
@@ -197,7 +222,7 @@ for (const direct of [false, true]) test(`packed acceptance completes npm/Bun ma
       cwd: root, encoding: "utf8", env: environment, timeout: 290_000, maxBuffer: 16 * 1024 * 1024,
     });
     assert.equal(result.status, 0, result.stderr || result.error?.message || "packed acceptance did not exit successfully");
-    const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string; progress_verified: boolean; variance_verified: boolean; materialization_verified: boolean }[] };
+    const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string; progress_verified: boolean; variance_verified: boolean; materialization_verified: boolean; window_verified: boolean }[] };
     assert.equal(receipt.ok, true);
     assert.deepEqual(receipt.receipts.map((entry) => entry.scenario), ["npm-current", "bun-current", "npm-minimum", "bun-minimum", "npm-global-current", "bun-global-current"]);
     const versions = acceptanceVersions(JSON.parse(readFileSync(join(root, "package.json"), "utf8")));
@@ -206,6 +231,7 @@ for (const direct of [false, true]) test(`packed acceptance completes npm/Bun ma
       assert.equal(entry.progress_verified, true);
       assert.equal(entry.variance_verified, true);
       assert.equal(entry.materialization_verified, true);
+      assert.equal(entry.window_verified, true);
       assert.equal(entry.rendered_items, entry.tracker_items);
       assert.equal(entry.tracker_items, entry.scenario.includes("global") ? 1 : 2);
       assert.equal(entry.host_version, entry.scenario.endsWith("minimum") ? versions.minimumVersion : versions.developmentVersion);
