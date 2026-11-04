@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Investigate packed npm and Bun acceptance exceeding the unchanged local timeout under shared load ([pm-slack-standup-packed-timing](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-packed-timing.toon))
+
 ## 2026.11.1 - 2026-11-01
 
 ### Added
