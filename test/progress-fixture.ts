@@ -6,8 +6,8 @@ import type { RuntimeFixture } from "./runtime-fixture.ts";
 import { readProgressDeltas } from "../index.ts";
 import type { ProgressEvidence, ProgressOptions } from "../index.ts";
 
-/** Explicit unset scope prevents ambient session focus from choosing fixture relationships. */
-export const progressScope = { parent: "none", sprint: "none", release: "none", assignee: "none" };
+/** Explicit SDK unsets preserve empty fixture relationships without literal sentinel values (GH-1614). */
+export const progressScope = { unset: ["parent", "sprint", "release", "assignee"] };
 /** Public, revision-bound assessment; callers may override one field for boundary cases. */
 export function evidence(overrides: Partial<ProgressEvidence> = {}): ProgressEvidence {
   return { version: 1, kind: "criterion", subject: "AC1", targetRevision: "artifact-v1", evidenceRevision: "test-v1", value: "accepted", ...overrides };
