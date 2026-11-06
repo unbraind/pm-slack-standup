@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createExtensionTestHarness, runRegisteredServiceOverrideForTest, type ExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
-import type { ExtensionApi } from "@unbrained/pm-cli/sdk/authoring";
 
 import extension from "../index.ts";
+import { runtimeFixture, runtimeCommand, removeRuntimeFixture, runtimeStdout } from "./runtime-fixture.ts";
+import { treeState } from "./tracker-state.ts";
 
 test("extension has required shape", () => {
   assert.ok(extension, "module should export a default value");
@@ -14,27 +15,60 @@ test("extension has required shape", () => {
   assert.strictEqual(typeof extension.activate, "function", "activate should be a function");
 });
 
-test("extension registers at least one capability", () => {
-  const registered: string[] = [];
-  const noop = () => {};
-  // Mirror the full ExtensionApi surface so activate() can register every
-  // capability the extension uses (command + standup exporter).
-  const api = {
-    registerCommand: (command: { name?: string }) => {
-      registered.push(`command:${command?.name ?? "unknown"}`);
-    },
-    registerParser: noop, registerPreflight: noop, registerService: noop,
-    registerFlags: noop, registerItemFields: noop, registerItemTypes: noop,
-    registerMigration: noop, registerRenderer: noop,
-    registerImporter: () => { registered.push("importer"); },
-    registerExporter: () => { registered.push("exporter"); },
-    registerSearchProvider: noop, registerVectorStoreAdapter: noop,
-    hooks: { beforeCommand: noop, afterCommand: noop, onWrite: noop, onRead: noop, onIndex: noop },
-  };
-  extension.activate(api as unknown as ExtensionApi);
-  assert.ok(registered.includes("command:standup"), "should register the standup command");
-  assert.ok(registered.includes("command:slack-standup"), "should register the alias command");
-  assert.ok(registered.includes("exporter"), "should register the standup exporter");
+test("extension registers and dispatches its public contracts against a real tracker", async (context) => {
+  const fixture = await runtimeFixture();
+  const stdout = runtimeStdout(context);
+  try {
+    const { harness, pmRoot, client } = fixture;
+    assert.equal(harness.activationSummary().preflight_overrides, 1);
+    for (const name of ["standup", "slack-standup"]) {
+      harness.assertCommandContract({ name, flags: ["--dry-run", "--format", "--team", "--sections"] });
+    }
+    harness.assertExporter({ name: "standup" });
+    harness.assertCommandContract({ name: "standup export", flags: ["--format", "--team", "--output"] });
+    harness.assertServiceOverride({ name: "output_format" });
+    // Reports use native item schema and read-only host SDK context; this
+    // extension owns no item fields, types or mutation hooks to emulate.
+    const summary = harness.activationSummary();
+    assert.deepEqual(summary.item_fields, []);
+    assert.deepEqual(summary.item_types, []);
+    assert.deepEqual(summary.hooks, []);
+
+    const active = fixture.items.find((item) => item.status === "in_progress");
+    assert.ok(active);
+    await client.schemaAddStatus("reviewing", { role: ["active"] });
+    await client.update(active.id, { title: "SDK mutation visible in standup", status: "reviewing" });
+    const before = treeState(pmRoot);
+    for (const command of ["standup", "slack-standup"]) {
+      stdout.length = 0;
+      const result = await runtimeCommand(fixture, command,
+        { dryRun: true, format: "plain", team: "alice", sections: "in_progress" });
+      assert.equal(result.dryRun, true);
+      assert.equal(result.format, "plain");
+      assert.equal(result.wip, 1);
+      assert.match(String(result.rendered), /SDK mutation visible in standup/);
+      assert.doesNotMatch(String(result.rendered), /Waiting for local fixture/);
+      assert.ok(stdout.join("").includes(String(result.rendered)));
+    }
+    stdout.length = 0;
+    const receipt = await harness.runExporter({ exporter: "standup", pmRoot,
+      options: { format: "json", team: "alice", sections: "in_progress" } });
+    assert.equal(receipt.handled, true);
+    assert.deepEqual(receipt.warnings, []);
+    assert.ok(receipt.result && typeof receipt.result === "object");
+    const result = receipt.result as Record<string, unknown>;
+    assert.equal(result.raw_stdout, true);
+    assert.deepEqual(stdout, [], "the service owns stdout delivery on a modern host");
+    const snapshot = JSON.parse(String(result.output));
+    assert.equal(snapshot.counts.total, 1);
+    assert.equal(snapshot.sections_data.in_progress[0].title, "SDK mutation visible in standup");
+    const output = await harness.runServiceOverride({ service: "output_format", command: "standup export",
+      payload: { command: "standup export", result } });
+    assert.equal(output.handled, true);
+    assert.deepEqual(output.warnings, []);
+    assert.equal(output.result, result.output);
+    assert.equal(treeState(pmRoot), before, "dispatch must preserve native items, history and schema");
+  } finally { await removeRuntimeFixture(fixture); }
 });
 
 // ---------------------------------------------------------------------------
@@ -54,6 +88,7 @@ test("extension registers at least one capability", () => {
 // precisely why this bug class was invisible to the suite.
 // ---------------------------------------------------------------------------
 
+/** Activate the package through the real SDK for service contract checks. */
 async function activateForServiceTest(): Promise<ExtensionTestHarness> {
   const harness = await createExtensionTestHarness(extension, {
     name: "pm-slack-standup",
@@ -118,8 +153,8 @@ test("output_format override declines a standup export that is not raw stdout", 
  *
  * Derived from the real activation rather than a hand-maintained list, so a
  * newly registered command path fails here instead of quietly falling outside
- * the scope. Driven through the SDK harness, because the api double above
- * registers the override and then never inspects what was registered.
+ * the scope. Driven through the SDK harness, so the assertion observes the host
+ * registry used for actual command dispatch.
  */
 test("the preflight scope covers every registered command path", async () => {
   const harness = await activateForServiceTest();
