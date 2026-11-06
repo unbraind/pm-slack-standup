@@ -1,0 +1,25 @@
+id: pm-slack-standup-sdk-harness-g9
+title: Replace residual standup registration mock with SDK harness
+description: Adopt the public SDK test harness for positive extension registration and invocation coverage from the G9 adoption audit.
+type: Chore
+status: in_progress
+priority: 2
+tags[2]: sdk-adoption,testing
+created_at: "2026-11-06T15:47:19.852Z"
+updated_at: "2026-11-06T15:57:26.013Z"
+author: codex-sol
+acceptance_criteria: No handwritten positive ExtensionApi host remains in smoke tests; real non-git tracker commands and exporter exercise registered flags and output receipts; behavioural revert proofs documented
+comments[4]{created_at,author,text}:
+  "2026-11-06T15:47:32.993Z",codex-sol,"Scope: companion pm-cli-website-28c9 (G9), read-only evidence from docs/sdk-feature-adoption-2026-11-06.md. Replace the residual positive smoke-test API capture mock using createExtensionTestHarness and its public assertions/dispatch. Reuse the real non-git runtime fixture; preserve presentation/domain rules and intentional old-host tests. Installed pinned SDK is 2026.11.4; public registry now reports 2026.11.6; no dependency bump is needed or authorized."
+  "2026-11-06T15:53:52.841Z",codex-sol,"Replaced the positive ExtensionApi capture mock with createExtensionTestHarness via the existing runtime fixture. Public assertCommandContract/assertExporter/assertServiceOverride and runCommand/runExporter/runServiceOverride now cover flags, both command names, schemaAddStatus plus PmClient.update on a real non-git tracker, stdout ownership and native storage preservation. No custom item schema or mutation hooks are registered; native schema/status roles and domain-specific Slack rendering remain covered. Intentional legacy-host test is retained. Revert/withdrawal proofs in a disposable copy: missing dry-run flag fails with missing --dry-run; missing alias fails registration; replacing the host tracker read with an empty list fails wip 0 versus 1; raw_stdout false fails true receipt assertion. Each control exits 1; restored implementation passes 6/6 smoke tests. This is a test-only migration, so these are behavioral negative controls rather than a production bugfix revert. Linked focused command passed 9/9 tests through pm test; lint, typecheck and build:test passed. Full npm/Bun gates and PR review follow."
+  "2026-11-06T15:55:43.404Z",codex-sol,The first full npm gate caught six duplicated assertion lines in the expanded smoke test at the unchanged zero-duplication threshold. Reused runtimeCommand from the existing fixture so the SDK receipt assertions stay centralized; no threshold change. Rechecking focused tests and both full gates with isolated Git identity settings.
+  "2026-11-06T15:57:21.543Z",codex-sol,"Final focused command after centralizing receipt assertions passed 9/9 with zero failures through pm test --run --progress. Lint, typecheck, build:test and duplication (0%) passed. Implementation and evidence are ready for one PR on standup-sdk-extension-test-harness; full npm/Bun gates, CI and the required bot loop are pending and will be reported on the PR. Item stays in_progress for orchestrator verification; claim released before the review handoff. No production implementation, SDK version or thresholds changed."
+files[3]{path,scope}:
+  test/runtime-export.test.ts,project
+  test/runtime-fixture.ts,project
+  test/smoke.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/smoke.test.ts test/runtime-export.test.ts,project,codex-sol,"2026-11-06T15:50:17.867Z",local_mutation,standup-sdk-extension-test-harness
+docs[1]{path,scope}:
+  docs/sdk-testing.md,project
+body: ""
