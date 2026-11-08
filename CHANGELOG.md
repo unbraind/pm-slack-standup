@@ -69,7 +69,6 @@
 ### Fixed
 
 - Propagate the docstring gate entry guard fix ([pm-slack-standup-9d6m](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-9d6m.toon))
-- Check external action pin properties without freezing Dependabot revisions ([pm-slack-standup-6wvl](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-6wvl.toon))
 
 ### Security
 
