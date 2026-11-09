@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026.11.9 - 2026-11-09
+
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#196](https://github.com/unbraind/pm-slack-standup/pull/196))
+- Bump the codeql-action group with 2 updates ([#190](https://github.com/unbraind/pm-slack-standup/pull/190))
+
 ## 2026.11.4 - 2026-11-04
 
 ### Fixed
