@@ -1,0 +1,25 @@
+id: pm-slack-standup-calendar-pins-195
+title: Accept calendar annotations only on trusted reusable workflow job pins
+description: "PR #195 fixes the trusted reusable-workflow calendar annotation regression. Keep the historical action-pin item and its October delivery separate, restore its generated changelog entry, and restrict the calendar exception to job references."
+type: Issue
+status: in_progress
+priority: 1
+tags[3]: "gh:unbraind/pm-slack-standup#191","gh:unbraind/pm-slack-standup#192","gh:unbraind/pm-slack-standup#195"
+created_at: "2026-11-09T16:19:14.707Z"
+updated_at: "2026-11-09T16:24:55.391Z"
+author: codex-agent
+acceptance_criteria: Trusted reusable workflow jobs accept calendar annotations; steps retain strict semver; October action-pin release entry remains generated; behavioral reverts fail
+comments[4]{created_at,author,text}:
+  "2026-11-09T16:19:16.938Z",codex-agent,"Continuation audit: reused PR #195 and fix/bot-green-1108. Remote head e0d816a; local merge 5a771dd already includes current main d67717d. Preserved the pending jobReference restriction and regression changes. Fetched all three unresolved threads with every comment; latest CodeRabbit review has no Outside diff range findings. All three are valid. Historical item pm-slack-standup-6wvl retains October release provenance; this separate item owns the new calendar fix and review evidence. Never rewrite existing history."
+  "2026-11-09T16:23:05.812Z",codex-agent,"Behavioral revert proofs in disposable copies: fixed pin suite passes 13/13. Removing only jobReference from packageWorkflow fails the job-only regression (12/13); removing only the calendar exception also fails it (12/13); restored fixed code passes 13/13. Both actual PR #191 and #192 workflow patches apply and pass 13/13. Self-review preserved unpadded strict-semver tags for steps; padded calendar annotations require job references. The provenance regression verifies separate item/title/release ownership. The October-entry regression remains pending the historical-state restoration decision."
+  "2026-11-09T16:24:53.876Z",codex-agent,"Review round status: PRRT_kwDOTbNzVM60_GdG fixed by jobReference restriction with pin-policy regression; both behavior-only reverts fail 12/13 and fixed restoration passes 13/13. PRRT_kwDOTbNzVM60_GdA addressed by this distinct issue, preserved historical title/release, and removal of the calendar acceptance criterion from the October item; reverting only that criterion fails the new provenance test 0/1, fixed passes 1/1. PRRT_kwDOTbNzVM60_GdD is valid and remains blocked: the generator filters done statuses, and the inherited reopening removes the October entry. A prepared assertion reproduces the missing entry (0/1); restoring the historical closed state needs an exception to the explicit no-close rule, requested from the owner. Do not interpret this as an invalid finding or completed review round. That failing assertion is retained outside the committed test suite until the correction is authorized."
+  "2026-11-09T16:24:54.652Z",codex-agent,"Validation: linked focused tests 14/14; node --test --test-concurrency=2 test/identity-audit.test.ts test/release-workflow.test.ts test/sdk-adoption.test.ts passes 16/16; npm run accept:canonical-reader passes 1/1. npm run build, build:test, typecheck, lint, duplication (0 percent), docstring (140/140 declarations), verify:release-changelog-date, verify:release-publish-attestation, audit:prod (0 vulnerabilities), changelog:full, changelog:check and git diff --check pass. Committed dist rebuilt with no diff. Main history byte-prefix checks pass for both inherited changed streams; this new stream is append-only. pm health reports only existing global extension/host version-skew advisory, no merge reconciliation needed. Follow targeted-gates-only review scope: full release/coverage certification stays in CI at https://github.com/unbraind/pm-slack-standup/pull/195/checks . Earlier local npm/Bun matrix timeouts remain tracked by pm-slack-standup-packed-timing; no new full-gate or coverage claim. No review threads were answered or resolved. Release this claim for orchestrator follow-up without closing it."
+files[2]{path,scope}:
+  test/action-pin-provenance.test.ts,project
+  test/workflow-security.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/workflow-security.test.ts test/action-pin-provenance.test.ts,project,codex-agent,"2026-11-09T16:20:48.524Z",local_mutation,fix/bot-green-1108
+docs[2]{path,scope}:
+  CHANGELOG.md,project
+  docs/action-pins.md,project
+body: ""

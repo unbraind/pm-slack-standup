@@ -40,7 +40,7 @@ function assertActionPins(workflow: string): void {
       const version = value.comment?.trim();
       const semver = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
       const calendar = /^v[1-9]\d{3}\.(0?[1-9]|1[0-2])\.(0?[1-9]|[12]\d|3[01])$/;
-      const packageWorkflow = pin[1] === "unbraind" && pin[2]!.startsWith("pm-github/.github/workflows/");
+      const packageWorkflow = jobReference && pin[1] === "unbraind" && pin[2]!.startsWith("pm-github/.github/workflows/");
       assert.ok(semver.test(version ?? "") || (packageWorkflow && calendar.test(version ?? "")), `${reference}: missing or malformed version comment`);
       assert.match(workflow.slice(value.range![1], value.range![2]), /^[ \t]+# v\d+\.\d+\.\d+[ \t]*(?:\r?\n)?$/, "version comment must be on the uses line with exactly one space after #");
       const observed = OBSERVED_VERSIONS.get(`${pin[1]}/${pin[2]}@${version}`);
@@ -69,11 +69,15 @@ test("workflow inventory accepts spaced uses keys with valid pins", () => {
 `]);
 });
 
-test("trusted package workflows accept calendar tags in job and step references", () => {
-  for (const tag of ["v2026.11.02", "v2026.01.09", "v2026.1.09", "v2026.11.2"]) {
-    for (const prefix of ["uses:", "- uses:"]) {
-      assertReferenceFragment(`${prefix} unbraind/pm-github/.github/workflows/check.yml@${"a".repeat(40)} # ${tag}`);
-    }
+test("trusted package workflows accept calendar tags in job references only", () => {
+  const sha = "a".repeat(40);
+  for (const tag of ["v2026.11.02", "v2026.01.09", "v2026.1.09"]) {
+    assertReferenceFragment(`uses: unbraind/pm-github/.github/workflows/check.yml@${sha} # ${tag}`);
+    assert.throws(() => assertReferenceFragment(`- uses: unbraind/pm-github/.github/workflows/check.yml@${sha} # ${tag}`), /missing or malformed version comment/);
+  }
+  // Unpadded annotations also match strict semver, which remains valid for steps.
+  for (const prefix of ["uses:", "- uses:"]) {
+    assertReferenceFragment(`${prefix} unbraind/pm-github/.github/workflows/check.yml@${sha} # v2026.11.2`);
   }
 });
 
@@ -89,7 +93,7 @@ test("calendar annotations retain owner, package, pin and comment boundaries", (
     `unbraind/pm-github/.github/workflows/check.yml@${sha} # v2026.11.032`,
     `unbraind/pm-github/.github/workflows/check.yml@${sha} #  v2026.11.02`,
     `unbraind/pm-github/.github/workflows/check.yml@${sha} # v2026.11.02 trailing`,
-  ]) assert.throws(() => assertReferenceFragment(`- uses: ${reference}`), reference);
+  ]) assert.throws(() => assertReferenceFragment(`uses: ${reference}`), reference);
 });
 
 test("workflow inventory rejects quoted uses keys with mutable tag pins", () => {
