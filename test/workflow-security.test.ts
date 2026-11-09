@@ -85,6 +85,7 @@ test("calendar annotations retain owner, package, pin and comment boundaries", (
   const sha = "a".repeat(40);
   for (const reference of [
     `actions/setup-node@${sha} # v2026.11.02`,
+    `actions/pm-github/.github/workflows/check.yml@${sha} # v2026.11.02`,
     `unbraind/other/.github/workflows/check.yml@${sha} # v2026.11.02`,
     "unbraind/pm-github/.github/workflows/check.yml@main # v2026.11.02",
     `unbraind/pm-github/.github/workflows/check.yml@${sha} # v2026.00.02`,
