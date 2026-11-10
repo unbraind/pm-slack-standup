@@ -1,7 +1,13 @@
 The workflow action-pin gate checks properties rather than freezing approved
 revisions. Every external action or reusable workflow must use a full 40-digit
 lowercase hexadecimal commit SHA, an owner in the explicit allow-list, and an
-exact `# vX.Y.Z` annotation. A YAML syntax-tree walk prevents quoted keys, flow mappings and block scalars
+exact `# vX.Y.Z` annotation. The trusted `unbraind/pm-github` reusable workflows
+also accept calendar release tags such as `# v2026.11.02` on job references,
+with a four-digit year and bounded month/day components. This exception does
+not apply to step references, other packages or action owners. Unpadded tags
+that also match strict semver remain valid everywhere. The exception still
+requires a full immutable SHA and an
+annotation on the same physical line. A YAML syntax-tree walk prevents quoted keys, flow mappings and block scalars
 from evading the gate. Aliases are refused pending an explicit policy review.
 The gate inventories every workflow, including
 CodeQL, Dependabot and reusable workflow callers.

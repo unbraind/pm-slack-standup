@@ -6,12 +6,12 @@ status: closed
 priority: 1
 tags: []
 created_at: "2026-10-16T22:29:54.869Z"
-updated_at: "2026-10-22T11:16:43.736Z"
-closed_at: "2026-10-21T18:48:09.851Z"
+updated_at: "2026-11-09T21:09:04.538Z"
+closed_at: "2026-11-09T21:09:04.490Z"
 completed_at: "2026-10-21T18:48:09.851Z"
 author: codex-agent
 release: 2026.10.21
-comments[25]{created_at,author,text}:
+comments[32]{created_at,author,text}:
   "2026-10-16T22:30:26.055Z",codex-agent,"Root cause: test/workflow-security.test.ts freezes individual reviewed commits and covers only two workflows. Replace eligibility with owner, SHA and version properties across every workflow. Docker references will be rejected explicitly; local actions remain allowed. Known offline tag evidence will validate comments without rejecting future unknown commits. Full semantic-version comments replace existing major-only comments."
   "2026-10-16T22:33:09.729Z",codex-agent,"Behavioural revert proof: restoring only the prior commit-equality implementation under the new tests exits 1, rejecting future SHA pins and failing adversarial assertions. The fixed gate passes 4/4. Applied the original PR 126 diff locally, resolved only its legacy major-version comments to full v7.1.0 annotations, and reran all four tests successfully. Restored the original dependency revision afterward; no Dependabot branch was edited."
   "2026-10-17T09:26:17.963Z",codex-agent,Resumed partial work and fast-forwarded to current main. Verified existing action SHA annotations against upstream tag refs; retain only comment normalization in workflows. Reviewing parser bypass cases before acceptance and re-running the Dependabot patch proof and behavioural revert locally.
@@ -37,6 +37,13 @@ comments[25]{created_at,author,text}:
   "2026-10-18T04:34:24.981Z",codex-agent,"Round 3 release gates PASS at 847589481f7a95c4ce6b2c6edc8993e26475069b with isolated HOME and disabled global/system Git identity: npm run release:check and bun run release:check each pass 265/265, zero failures/skips/cancellations/todos, 100% lines/statements/branches/functions across all 11 production sources. Canonical-reader acceptance passes 1/1 and all five packed npm/Bun scenarios pass in each gate. CI receipts: https://github.com/unbraind/pm-slack-standup/actions/runs/39097252572/job/117586157755 and https://github.com/unbraind/pm-slack-standup/actions/runs/39097252572/job/117586157631 . The temporary validation workflow is now removed; validator and regression source are unchanged. Duplicate local full runs were stopped on the overloaded host; no local full-pass claim is made. Both review replies were posted after pushing. Leave item in progress for orchestrator verification."
   "2026-10-21T18:44:28.413Z",codex-agent,"author=codex-agent,\"text=Authorized tracker reconciliation, audit 2026-10-21. Reverified current main 765b440ce656: merged #131 (2b70cf6); source tree exactly matches the audited snapshot. **Check external action pin properties without freezing Dependabot revisions.** [PR #131](https://github.com/unbraind/pm-slack-standup/pull/131) validates full action-pin properties and approved owners without freezing Dependabot revisions; real runner validation is recorded.\""
   "2026-10-21T19:23:24.584Z",codex-agent,"Tracker-only reconciliation applied to the authorized audit candidates. Linked git diff --check passed. After this final pm write, regenerate with npm run changelog:full; npm run changelog:check and npx pm health are the remaining local gates. Full release gates are delegated to CI; no implementation functions changed, so behavioral revert proof does not apply."
+  "2026-11-08T03:05:25.996Z",pi-agent,"Reopened for a verified annotation regression: PRs #191 and #192 already measure 100 percent in every coverage dimension. The final failing assertion is the strict semver annotation regex rejecting the trusted reusable workflow calendar tag v2026.11.02. Coverage inventory is already sources [\".\"] with an empty ignore list on main. Extend only trusted package workflow annotation validation, retain immutable SHA, owner, same-line and hostile-input checks, and prove failure with the old validation restored."
+  "2026-11-08T03:07:56.553Z",pi-agent,"Focused workflow security tests pass 13 of 13 and typecheck passes. In a disposable copy, restoring only strict semver validation makes the new calendar regression fail, and restoring the fixed validator passes 13 of 13. The linked focused command passes through pm test --run --only-last --progress. Older linked commands from historical branches are refused by clone trust and were not acknowledged or rewritten. Full npm and Bun release gates will run directly in an isolated home."
+  "2026-11-08T03:32:39.304Z",pi-agent,"Both actual PR patches apply cleanly in disposable copies and each passes all 13 pin-security tests. The full isolated npm gate has reported the two existing packed acceptance matrices failing near their unchanged 290-second parent bound; recurrence is tracked by reopening pm-slack-standup-packed-timing. The annotation fix changes neither acceptance behavior nor thresholds. Typecheck, focused linked test and the isolated strict-semver behavioral revert remain passing evidence. Full gate completion and Bun results remain pending."
+  "2026-11-08T03:49:32.585Z",pi-agent,Retain the existing 2026.10.21 release assignment as historical delivery provenance while recording this new calendar-annotation regression in append-only history. The earlier temporary clearing is retained in the audit; no historical record or release tag is rewritten. Package changelog generation remains canonical and unchanged.
+  "2026-11-08T03:59:54.039Z",pi-agent,"Final local gates: npm run release:check and bun run release:check each complete 360 tests with 358 passing, two failing, zero skips. Both failures are the unchanged real packed acceptance matrix 290-second timeouts. Measured statements/lines are 96.21 percent, branches 99.88 percent and functions 97.63 percent, so no complete local coverage claim is made. The annotation regression remains isolated: focused pin tests pass 13 of 13, typecheck passes, both actual bot patches pass, and the strict-semver behavioral revert fails then restores. Keep the timing recurrence separate on pm-slack-standup-packed-timing. CI remains the full gate."
+  "2026-11-08T04:02:20.316Z",pi-agent,"Review handoff: https://github.com/unbraind/pm-slack-standup/pull/195. The final CI checks are visible at https://github.com/unbraind/pm-slack-standup/pull/195/checks and remain the full gate. Focused policy, actual bot patches, typecheck and behavioral revert pass. Both local full gates retain the two packed-matrix timeouts documented on pm-slack-standup-packed-timing. This claim is released for orchestrator review; the item remains in progress and no item is closed."
+  "2026-11-09T16:20:45.267Z",codex-agent,"PR #195 review correction: the new calendar annotation fix belongs to pm-slack-standup-calendar-pins-195. Preserve this item title and release 2026.10.21 as the original PR #131 delivery. Removed the new acceptance criterion from this historical item using pinned mutations; existing audit records remain unchanged. Restoration of the original closed state requires an exception to the review task no-close instruction."
 files[9]{path,scope}:
   .agents/pm/issues/pm-slack-standup-6wvl.toon,project
   .github/workflows/ci.yml,project
@@ -47,7 +54,7 @@ files[9]{path,scope}:
   package-lock.json,project
   package.json,project
   test/workflow-security.test.ts,project
-tests[4]:
+tests[5]:
   - command: node --test test/workflow-security.test.ts
     scope: project
     provenance:
@@ -78,6 +85,13 @@ tests[4]:
       created_at: "2026-10-21T19:18:25.728Z"
       source_kind: local_mutation
       source_ref: chore/reconcile-tracker-1021
+  - command: node --test --test-concurrency=2 test/workflow-security.test.ts
+    scope: project
+    provenance:
+      author: pi-agent
+      created_at: "2026-11-08T03:07:00.244Z"
+      source_kind: local_mutation
+      source_ref: fix/bot-green-1108
 docs[2]{path,scope}:
   CHANGELOG.md,project
   docs/action-pins.md,project
