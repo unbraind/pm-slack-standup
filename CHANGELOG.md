@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.11.10 - 2026-11-10
+
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#198](https://github.com/unbraind/pm-slack-standup/pull/198))
+
 ## 2026.11.9 - 2026-11-09
 
 ### Dependencies
