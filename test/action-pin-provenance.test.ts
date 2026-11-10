@@ -54,6 +54,10 @@ test("calendar annotation work keeps separate release provenance from the Octobe
   assert.match(historical, /^release: 2026\.10\.21$/m);
   assert.match(historical, /^status: closed$/m);
   assert.doesNotMatch(historical, /^acceptance_criteria: Calendar release/m);
+  assert.ok(
+    readChangelogSections().get("2026.10.21")?.includes("[pm-slack-standup-6wvl]("),
+    "the delivered October action-pin entry must stay generated under 2026.10.21",
+  );
   assert.match(calendar, /^title: Accept calendar annotations only on trusted reusable workflow job pins$/m);
   assert.doesNotMatch(calendar, /^release: 2026\.10\.21$/m);
   const items = new Map(readTrackedItems().map((item) => [item.id, item]));
@@ -89,8 +93,4 @@ test("every closed delivered item keeps its changelog entry under its declared r
     if (section === undefined) continue;
     assert.ok(section.includes(`[${item.id}](`), `${item.id} must stay listed under ${item.release}`);
   }
-  assert.ok(
-    sections.get("2026.10.21")?.includes("[pm-slack-standup-6wvl]("),
-    "the delivered October action-pin entry must stay generated",
-  );
 });
