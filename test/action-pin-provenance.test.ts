@@ -56,7 +56,13 @@ test("calendar annotation work keeps separate release provenance from the Octobe
   assert.doesNotMatch(historical, /^acceptance_criteria: Calendar release/m);
   assert.match(calendar, /^title: Accept calendar annotations only on trusted reusable workflow job pins$/m);
   assert.doesNotMatch(calendar, /^release: 2026\.10\.21$/m);
-  assert.ok(calendar.includes("gh:unbraind/pm-slack-standup#195"));
+  const items = new Map(readTrackedItems().map((item) => [item.id, item]));
+  assert.deepEqual(items.get("pm-slack-standup-calendar-pins-195")?.provenanceTags, [
+    "gh:unbraind/pm-slack-standup#191",
+    "gh:unbraind/pm-slack-standup#192",
+    "gh:unbraind/pm-slack-standup#195",
+  ]);
+  assert.deepEqual(items.get("pm-slack-standup-6wvl")?.provenanceTags, []);
 });
 
 test("each GitHub provenance tag stays on exactly one tracked item", () => {
