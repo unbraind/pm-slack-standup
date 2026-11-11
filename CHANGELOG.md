@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026.11.11 - 2026-11-11
+
+### Dependencies
+
+- Bump jscpd ([#201](https://github.com/unbraind/pm-slack-standup/pull/201))
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#191](https://github.com/unbraind/pm-slack-standup/pull/191))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#192](https://github.com/unbraind/pm-slack-standup/pull/192))
+
 ## 2026.11.10 - 2026-11-10
 
 ### Dependencies
