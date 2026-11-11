@@ -64,13 +64,13 @@
 
 ### Added
 
-- Add --format blocks, --schedule, --include-blockers, --team, --compact to pm-slack-standup ([pm-slack-standup-9o06](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-9o06.toon))
 - Show declared decision requests in periodic standups ([pm-slack-standup-murn](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-murn.toon))
+- Add --format blocks, --schedule, --include-blockers, --team, --compact to pm-slack-standup ([pm-slack-standup-9o06](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-9o06.toon))
 
 ### Other
 
-- Correct tracker reconciliation review records ([pm-slack-standup-rh0e](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-rh0e.toon))
 - Revalidate delivered decision-request sections on the current public tracker ([pm-slack-standup-defb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-defb.toon))
+- Correct tracker reconciliation review records ([pm-slack-standup-rh0e](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-rh0e.toon))
 
 ## 2026.10.21 - 2026-10-21
 
@@ -182,9 +182,9 @@
 
 ### Fixed
 
+- Keep publish-attestation bindings within their shell scope ([pm-slack-standup-8smy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-8smy.toon))
 - The publish-attestation gate misses a publish routed through an unquoted shell variable ([pm-slack-standup-83u3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-83u3.toon))
 - A failed provenance publish silently falls back to an unattested one ([pm-slack-standup-ofro](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-ofro.toon))
-- Keep publish-attestation bindings within their shell scope ([pm-slack-standup-8smy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-8smy.toon))
 
 ### Closed
 
@@ -383,11 +383,11 @@
 
 ### Added
 
-- Deep feature expansion: multi-format output, grouping, sections, date windows ([pm-slack-standup-h64p](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-h64p.toon))
 - Add --days relative date window alongside --since ([pm-slack-standup-5sow](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-5sow.toon))
 - Add --sections selection/ordering with dedicated Blocked section ([pm-slack-standup-jimx](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-jimx.toon))
 - Add --group-by sprint and type (extend assignee/status) ([pm-slack-standup-f4m6](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-f4m6.toon))
 - Add --format slack\|blockkit\|markdown\|plain unified output ([pm-slack-standup-dgyy](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-dgyy.toon))
+- Deep feature expansion: multi-format output, grouping, sections, date windows ([pm-slack-standup-h64p](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-h64p.toon))
 
 ### Other
 
