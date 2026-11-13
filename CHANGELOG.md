@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.11.13 - 2026-11-13
+
+### Dependencies
+
+- Bump the codeql-action group with 2 updates ([#205](https://github.com/unbraind/pm-slack-standup/pull/205))
+
 ## 2026.11.11 - 2026-11-11
 
 ### Dependencies
