@@ -1,0 +1,24 @@
+id: pm-slack-standup-toolchain-1114b
+title: Adopt pm-cli option contract and current toolchain
+description: ""
+type: Chore
+status: in_progress
+priority: 2
+tags[1]: "gh:unbraind/pm-slack-standup#204"
+created_at: "2026-11-14T05:05:14.453Z"
+updated_at: "2026-11-14T06:21:45.133Z"
+author: codex-toolchain-1114b
+comments[3]{created_at,author,text}:
+  "2026-11-14T05:05:19.218Z",codex-toolchain-1114b,"CI diagnosis: named failure is an intentional coverage-gate fixture, not the failing suite. Real gate: branches 99.94 percent, index.ts line 2632. GH-1665 folds max-events onto maxEvents, making the kebab-key branch unreachable. Remove the obsolete alias branch; retain raw non-string and invalid-range handler validation. Add direct spelling-conflict host refusal with exit 2 and no boundary/output writes. This supersedes the separate earlier 1104 migration, which addressed literal SDK fixture fields."
+  "2026-11-14T05:09:25.152Z",codex-toolchain-1114b,The reporting-window file passed 40/40 before removing the unreachable alias branch; the linked focused command also passes after removal and preserves non-git operation and typed refusals. This is dead-branch removal with unchanged handler behavior; reverting restores the demonstrated CI branch-coverage miss rather than a behavioral difference. Full release gates remain to run at 100 percent in every dimension.
+  "2026-11-14T06:21:45.133Z",codex-toolchain-1114b,"| Failure | Cause (changelog) | Fix |\n| --- | --- | --- |\n| coverage branches 99.94 percent; index.ts alias fallback | pm-cli 2026.11.8 GH-1665 maps max-events to maxEvents; named failure is a deliberate coverage fixture | delete unreachable kebab-key fallback; retain typed handler guards; prove spelling-conflict host code/exit 2 and no boundary/output writes |\n\nFocused reporting-window file passes 40/40. Typecheck, lint, duplication, docstrings, canonical-reader acceptance, production audit, pack dry-run, release date, publish attestation and changelog checks pass. Both npm run release:check and bun run release:check complete 363 tests: 361 pass, two fail, zero skipped/canceled. The only failures are the two packed matrices reaching the unchanged 290-second outer deadline (null status), the class already tracked by pm-slack-standup-packed-timing. In both diagnostic reports the touched index.ts is 100 percent in all four dimensions; global diagnostic coverage is statements/lines 96.21, branches 99.88, functions 97.63 because accept-packed.ts is incomplete. Full unchanged coverage and packed certification remain required in CI. Neither deadlines, seed counts, source scope nor thresholds changed. Reverting the removed alias-key branch restores the baseline coverage miss without a behavioral difference; focused tests pass before and after."
+files[4]{path,scope}:
+  index.ts,project
+  package-lock.json,project
+  package.json,project
+  test/reporting-window.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm run build && node --test --test-concurrency=2 test/reporting-window.test.ts,project,codex-toolchain-1114b,"2026-11-14T05:07:06.647Z",local_mutation,chore/adopt-pm-cli-option-contract
+docs[1]{path,scope}:
+  CHANGELOG.md,project
+body: ""
