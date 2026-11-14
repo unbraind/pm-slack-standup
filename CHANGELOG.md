@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Adopt pm-cli option contract and current toolchain ([pm-slack-standup-toolchain-1114b](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-toolchain-1114b.toon))
+
 ## 2026.11.13 - 2026-11-13
 
 ### Dependencies
