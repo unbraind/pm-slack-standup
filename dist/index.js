@@ -2180,7 +2180,7 @@ export default defineExtension({
             if (cursorFile === undefined) {
                 refuseStandupWindow("window_cursor_file_missing", "no --cursor-file was supplied.");
             }
-            const rawMaxEvents = Object.hasOwn(ctx.options, "max-events") ? ctx.options["max-events"] : ctx.options.maxEvents;
+            const rawMaxEvents = ctx.options.maxEvents;
             if (rawMaxEvents !== undefined && typeof rawMaxEvents !== "string") {
                 refuseStandupWindow("window_max_events_invalid", "--max-events must be an integer string.");
             }

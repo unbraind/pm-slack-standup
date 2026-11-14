@@ -868,6 +868,10 @@ test("the command refuses typed input errors and needs no git executable", async
       await assert.rejects(runWindow(fixture, fixture.directory, { maxEvents: raw }),
         (error: unknown) => isWindowRefusal(error, "window_max_events_invalid"));
     }
+    await assert.rejects(runWindow(fixture, fixture.directory, { "max-events": "1", maxEvents: "2" }),
+      { code: "extension_option_spelling_conflict", exitCode: 2 });
+    assert.equal(existsSync(join(fixture.directory, "window-state.json")), false);
+    assert.equal(existsSync(join(fixture.directory, "delivered-packet.json")), false);
     // With git unreachable the window still renders, admits, and re-renders empty.
     const first = await runWindow(fixture, fixture.directory);
     assert.equal(first.window.admitted, true);
