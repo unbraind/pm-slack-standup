@@ -39,6 +39,14 @@
 
 - Investigate packed npm and Bun acceptance exceeding the unchanged local timeout under shared load ([pm-slack-standup-packed-timing](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-packed-timing.toon))
 
+## 2026.11.3 - 2026-11-03
+
+No changes.
+
+## 2026.11.2 - 2026-11-02
+
+No changes.
+
 ## 2026.11.1 - 2026-11-01
 
 ### Added
@@ -92,6 +100,10 @@
 - Revalidate delivered decision-request sections on the current public tracker ([pm-slack-standup-defb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-defb.toon))
 - Correct tracker reconciliation review records ([pm-slack-standup-rh0e](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-rh0e.toon))
 
+## 2026.10.23 - 2026-10-23
+
+No changes.
+
 ## 2026.10.21 - 2026-10-21
 
 ### Changed
@@ -117,11 +129,47 @@
 
 - Closed: Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
+## 2026.10.20 - 2026-10-20
+
+No changes.
+
+## 2026.10.19 - 2026-10-19
+
+No changes.
+
+## 2026.10.18 - 2026-10-18
+
+No changes.
+
+## 2026.10.17 - 2026-10-17
+
+No changes.
+
+## 2026.10.16 - 2026-10-16
+
+No changes.
+
+## 2026.10.15 - 2026-10-15
+
+No changes.
+
 ## 2026.10.14 - 2026-10-14
 
 ### Fixed
 
 - Preserve Unicode code points when clipping Block Kit standup sections ([pm-slack-standup-github-efbbd7c92737-113](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-113.toon))
+
+## 2026.10.13 - 2026-10-13
+
+No changes.
+
+## 2026.10.9 - 2026-10-09
+
+No changes.
+
+## 2026.10.8 - 2026-10-08
+
+No changes.
 
 ## 2026.10.5 - 2026-10-05
 
@@ -137,6 +185,10 @@
 
 - Auto-merge green Dependabot updates and group the pm toolchain into one daily PR ([pm-slack-standup-gquv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-gquv.toon))
 
+## 2026.10.4 - 2026-10-04
+
+No changes.
+
 ## 2026.9.26 - 2026-09-26
 
 ### Fixed
@@ -146,6 +198,18 @@
 ### Other
 
 - Certify pm CLI 2026.9.23 and adopt the guarded pm-ops merge-driver launcher ([pm-slack-standup-19up](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-19up.toon))
+
+## 2026.9.25 - 2026-09-25
+
+No changes.
+
+## 2026.9.23 - 2026-09-23
+
+No changes.
+
+## 2026.9.19 - 2026-09-19
+
+No changes.
 
 ## 2026.9.18 - 2026-09-18
 
@@ -164,6 +228,10 @@
 ### Other
 
 - Certify pm CLI 2026.9.10 and pick up the canonical auditor fixes the lockfile was holding back ([pm-slack-standup-z4kx](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-z4kx.toon))
+
+## 2026.9.9 - 2026-09-09
+
+No changes.
 
 ## 2026.9.8 - 2026-09-08
 
@@ -209,6 +277,10 @@
 ### Closed
 
 - Closed: Fix PR 56 scalar execution-order bypass ([pm-slack-standup-nafb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-nafb.toon))
+
+## 2026.8.29 - 2026-08-29
+
+No changes.
 
 ## 2026.8.28 - 2026-08-28
 
@@ -276,6 +348,10 @@
 
 - Release commits discard the rebuilt dist, so the git-install path serves the previous version ([pm-slack-standup-cims](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-cims.toon))
 
+## 2026.7.31 - 2026-07-31
+
+No changes.
+
 ## 2026.7.29 - 2026-07-29
 
 ### Added
@@ -325,6 +401,10 @@
 
 - Closed: Recommend pm merge reconcile (2026.7.22) over raw history-repair in Multi-agent merge safety docs ([pm-slack-standup-dkqk](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-dkqk.toon))
 
+## 2026.7.22 - 2026-07-22
+
+No changes.
+
 ## 2026.7.19 - 2026-07-19
 
 ### Added
@@ -334,6 +414,18 @@
 ### Other
 
 - Harden release bun-verify so registry-mirror lag cannot block the GitHub release ([pm-slack-standup-do6k](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-do6k.toon))
+
+## 2026.7.18 - 2026-07-18
+
+No changes.
+
+## 2026.7.11 - 2026-07-11
+
+No changes.
+
+## 2026.7.10 - 2026-07-10
+
+No changes.
 
 ## 2026.7.7 - 2026-07-07
 
@@ -352,6 +444,14 @@
 - Align Node engine with pm CLI runtime ([pm-slack-standup-r884](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-r884.toon))
 - Regenerate CHANGELOG after pm close item ([pm-slack-standup-xuty](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-xuty.toon))
 
+## 2026.6.14 - 2026-06-14
+
+No changes.
+
+## 2026.6.13 - 2026-06-13
+
+No changes.
+
 ## 2026.6.12 - 2026-06-12
 
 ### Added
@@ -362,6 +462,14 @@
 ### Other
 
 - Align pm-slack-standup with pm CLI 2026.6.12 release readiness ([pm-slack-standup-7ikg](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-7ikg.toon))
+
+## 2026.6.10-1 - 2026-06-10
+
+No changes.
+
+## 2026.6.10 - 2026-06-09
+
+No changes.
 
 ## 2026.6.9 - 2026-06-09
 
@@ -386,6 +494,10 @@
 - PM ecosystem production-readiness sweep 2026-06-07 ([pm-slack-standup-diqb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-diqb.toon))
 - Harden release readiness checks ([pm-slack-standup-9bl1](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-9bl1.toon))
 - Align package dependencies to pm CLI/SDK 2026.6.6 ([pm-slack-standup-iv4f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-iv4f.toon))
+
+## 2026.6.5 - 2026-06-05
+
+No changes.
 
 ## 2026.6.4-1 - 2026-06-04
 
@@ -427,6 +539,10 @@
 ### Fixed
 
 - standup threw plain Error (no exitCode) → runtime double-invocation ([pm-slack-standup-uyr9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-uyr9.toon))
+
+## 2026.5.31 - 2026-05-31
+
+No changes.
 
 ## 2026.5.30 - 2026-05-30
 
