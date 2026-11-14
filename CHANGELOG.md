@@ -76,9 +76,9 @@
 
 ## 2026.10.26 - 2026-10-26
 
-### Other
+### Fixed
 
-- Point the npm homepage at the package catalog and link the author ([pm-slack-standup-vpn3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-vpn3.toon))
+- Point the npm homepage at the package's website and link the author ([pm-slack-standup-vpn3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-vpn3.toon))
 
 ## 2026.10.25 - 2026-10-25
 
@@ -112,10 +112,6 @@
 
 - Enable GitHub CodeQL code scanning ([pm-slack-standup-52od](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-52od.toon))
 - Certify pm-slack-standup on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates ([pm-slack-standup-74w8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-74w8.toon))
-
-### Closed
-
-- Closed: Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ## 2026.10.14 - 2026-10-14
 
@@ -222,6 +218,7 @@
 ### Closed
 
 - Closed: The identity gate deadlocks the one remediation its own failure message prescribes ([pm-slack-standup-yzns](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-yzns.toon))
+- Closed: Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ## 2026.8.17 - 2026-08-17
 

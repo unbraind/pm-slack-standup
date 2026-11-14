@@ -1,17 +1,17 @@
 id: pm-slack-standup-vpn3
-title: Point the npm homepage at the package catalog and link the author
-description: Apply the owner-requested package homepage and linked author metadata; verify the matching GitHub repository website. Published npm metadata updates with the next release.
-type: Chore
+title: Point the npm homepage at the package's website and link the author
+description: "GH issue #152: https://github.com/unbraind/pm-slack-standup/issues/152 · author @unbraind · state reason completed · created 2026-10-25T21:55:42Z · updated 2026-10-26T08:38:32Z"
+type: Issue
 status: closed
 priority: 2
-tags[1]: "gh:unbraind/pm-slack-standup#152"
-created_at: "2026-10-26T07:02:51.200Z"
-updated_at: "2026-10-30T20:36:17.108Z"
-closed_at: "2026-10-30T20:36:15.040Z"
-completed_at: "2026-10-26T08:38:31.000Z"
+tags[2]: "gh:unbraind/pm-slack-standup#152","github_author:unbraind"
+created_at: "2026-10-25T21:55:42Z"
+updated_at: "2026-11-14T09:46:40.079Z"
+closed_at: "2026-10-26T08:38:32Z"
+completed_at: "2026-10-26T08:38:32Z"
 author: codex-agent
 acceptance_criteria: Package homepage points to its catalog page; author links to the about page; repository and bugs remain unchanged; GitHub website matches; local manifest checks pass.
-release: 2026.10.26
+release: v2026.10.26
 resolution: "Delivered by PR #156 (6f21f4d): Point the npm homepage at the package catalog and link the author"
 expected_result: Package homepage points to its catalog page; author links to the about page; repository and bugs remain unchanged; GitHub website matches; local manifest checks pass.
 actual_result: "PR #156 merged at 2026-10-26T08:38:31Z as 6f21f4d; required CI passed on the merged head."
@@ -30,5 +30,15 @@ tests[4]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test test/package-metadata.test.ts,project,codex-agent,"2026-10-26T07:32:11.019Z",local_mutation,chore/npm-homepage-author
 docs[1]{path,scope}:
   CHANGELOG.md,project
-close_reason: "Delivered by PR #156 (6f21f4d): Point the npm homepage at the package catalog and link the author"
-body: ""
+close_reason: "Closed on GitHub as completed on 2026-10-26T08:38:32Z; closing PR https://github.com/unbraind/pm-slack-standup/pull/156 (\"Point the npm homepage at the package catalog and link the author\")"
+github_close_reason: "Closed on GitHub as completed on 2026-10-26T08:38:32Z; closing PR https://github.com/unbraind/pm-slack-standup/pull/156 (\"Point the npm homepage at the package catalog and link the author\")"
+github_closed_at: "2026-10-26T08:38:32Z"
+github_created_at: "2026-10-25T21:55:42Z"
+github_link_only: false
+github_number: 152
+github_release: v2026.10.26
+github_state: closed
+github_state_reason: completed
+github_updated_at: "2026-10-26T08:38:32Z"
+github_url: "https://github.com/unbraind/pm-slack-standup/issues/152"
+body: "## Why\n\nOn npm, `pm-slack-standup` links **Homepage** to `https://github.com/unbraind/pm-slack-standup#readme`, the same place as the Repository link beside it. The package has its page in the pm cli package catalog: https://pm-cli.unbrained.dev/packages/pm-slack-standup. Pointing npm there gives people a useful place to land and lets search engines tie the package to its website. The author field (`\"@unbraind\"`) has no link to the person behind the work.\n\n## What to change\n\nIn `package.json`:\n\n```json\n\"homepage\": \"https://pm-cli.unbrained.dev/packages/pm-slack-standup\",\n\"author\": { \"name\": \"unbrained\", \"url\": \"https://unbrained.dev/about\" },\n```\n\n- Currently: `\"homepage\": \"https://github.com/unbraind/pm-slack-standup#readme\"`, `\"author\": \"@unbraind\"`.\n- Keep `repository` and `bugs` as they are.\n- Set the repository's GitHub website (About → Website) to the same address (currently empty): `gh repo edit unbraind/pm-slack-standup --homepage https://pm-cli.unbrained.dev/packages/pm-slack-standup`.\n- npm takes the new fields with the next published version.\n\n## Acceptance\n\n- [ ] `npm view pm-slack-standup homepage` prints `https://pm-cli.unbrained.dev/packages/pm-slack-standup` after the next release.\n- [ ] `npm view pm-slack-standup author` includes the url `https://unbrained.dev/about`.\n- [ ] The GitHub repository's website is `https://pm-cli.unbrained.dev/packages/pm-slack-standup`.\n\n## Context\n\nChecked 2026-10-25 with `npm view` and the GitHub API. The same change has been filed in every published unbrained package's repository (pm-cli as unbraind/pm-cli#1594, its extensions, pm-web and the agent-ready clis), so they all link the same way: the product page as homepage, https://unbrained.dev/about as the author."
