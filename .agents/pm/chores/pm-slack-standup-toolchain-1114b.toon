@@ -2,12 +2,17 @@ id: pm-slack-standup-toolchain-1114b
 title: Adopt pm-cli option contract and current toolchain
 description: ""
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags[1]: "gh:unbraind/pm-slack-standup#204"
 created_at: "2026-11-14T05:05:14.453Z"
-updated_at: "2026-11-14T06:21:45.133Z"
+updated_at: "2026-11-14T08:54:11.390Z"
+closed_at: "2026-11-14T08:54:11.259Z"
+completed_at: "2026-11-14T08:54:11.259Z"
 author: codex-toolchain-1114b
+resolution: Implemented and merged in #207 (f51ff42).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #207 as f51ff42; checks successful at head 1318991: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 comments[3]{created_at,author,text}:
   "2026-11-14T05:05:19.218Z",codex-toolchain-1114b,"CI diagnosis: named failure is an intentional coverage-gate fixture, not the failing suite. Real gate: branches 99.94 percent, index.ts line 2632. GH-1665 folds max-events onto maxEvents, making the kebab-key branch unreachable. Remove the obsolete alias branch; retain raw non-string and invalid-range handler validation. Add direct spelling-conflict host refusal with exit 2 and no boundary/output writes. This supersedes the separate earlier 1104 migration, which addressed literal SDK fixture fields."
   "2026-11-14T05:09:25.152Z",codex-toolchain-1114b,The reporting-window file passed 40/40 before removing the unreachable alias branch; the linked focused command also passes after removal and preserves non-git operation and typed refusals. This is dead-branch removal with unchanged handler behavior; reverting restores the demonstrated CI branch-coverage miss rather than a behavioral difference. Full release gates remain to run at 100 percent in every dimension.
@@ -21,4 +26,5 @@ tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   npm run build && node --test --test-concurrency=2 test/reporting-window.test.ts,project,codex-toolchain-1114b,"2026-11-14T05:07:06.647Z",local_mutation,chore/adopt-pm-cli-option-contract
 docs[1]{path,scope}:
   CHANGELOG.md,project
+close_reason: "Delivered by #207 \"Adopt pm-cli 2026.11.13 extension option contract and land the pm-toolchain bump\" (merged as f51ff42). Checks successful at the PR head 1318991: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 body: ""
