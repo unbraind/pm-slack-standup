@@ -6,10 +6,10 @@ status: in_progress
 priority: 2
 tags[2]: ci,performance
 created_at: "2026-10-26T18:53:49.669Z"
-updated_at: "2026-11-15T21:15:44.459Z"
+updated_at: "2026-11-15T21:16:55.131Z"
 author: codex-agent
 acceptance_criteria: Explain and reproduce the instrumented packed-install timing discrepancy; retain the 290000 ms subprocess timeout and every coverage threshold; record standalone and full npm/Bun receipts
-comments[11]{created_at,author,text}:
+comments[12]{created_at,author,text}:
   "2026-10-26T19:08:31.471Z",codex-agent,"Standalone acceptance completed all five scenarios with matching SDK identities, rendered fixture counts and no missing fixture data. Full npm and Bun gates each passed 285/287 tests and timed out only their two instrumented real-install matrices. This separates functional acceptance from the unchanged 290000 ms budget; investigate instrumentation, fresh per-scenario caches and shared scheduling without lowering coverage or increasing that timeout."
   "2026-10-31T00:59:00.361Z",codex-agent,"Cursor-window delivery validation repeats the existing instrumented limit: complete isolated npm release check ran 350 tests, 348 passed, and only both real-install matrices exceeded 290000 ms. Runtime modules measured 100% in all four dimensions; acceptance-script paths left unexecuted by timeout reduced global coverage to 96.17% lines/statements, 99.88% branches, 97.59% functions. No timeout or coverage threshold was changed. Current-source Node/Bun standalone receipts and exact-head CI will be linked from pm-slack-standup-kovw."
   "2026-10-31T01:23:33.985Z",codex-agent,"Bun full release validation also completed 348/350 tests, failing only the same two 290000 ms matrix timeouts. Its runtime-module coverage and overall authored-source percentages match the npm receipt. Preserve this as timing evidence; it is not a passing release gate. Final-source standalone fresh-pack receipts and CI are pending on pm-slack-standup-kovw."
@@ -21,6 +21,7 @@ comments[11]{created_at,author,text}:
   "2026-11-08T03:59:57.835Z",pi-agent,"Both final isolated release gates reproduce the recurrence: npm passes 358 of 360 tests in 1537 seconds, Bun passes 358 of 360 in 1102 seconds, with zero skipped tests. Each real packed matrix is terminated at its unchanged 290-second parent timeout. Partial counters leave aggregate statements/lines at 96.21 percent, branches at 99.88 percent and functions at 97.63 percent. No timeout, threshold, scenario or source inventory was relaxed. Exact-head CI must distinguish this recurrence from the calendar-annotation fix."
   "2026-11-15T21:10:11.998Z",codex-sol,"Reusing this existing flaky packed-gate item for Fleet CI v2, companion pm-cli-website-dyhg. Preserve exact required checks test (22.18.0) and test (26), committed dist verification, native Windows launcher acceptance, and all existing release gates. Add deterministic quick prefixes and validated harness scaling; no release workflow or verifier edits."
   "2026-11-15T21:15:43.627Z",codex-sol,"Typecheck, test typecheck, lint, strict YAML parse, publish-attestation verifier and committed dist rebuild passed. Touched quick suites passed 65/65 in 63.9s (scale 3); packed harness unit contracts passed 14/14 in 1.43s, including invalid/fractional scale behavior. Quick commitment/progress models measured 37.2s/28.3s locally versus historical full 138.3s/107.3s on hosted hardware; not a controlled speedup. Main paired npm+Bun gate steps measured 16m47s (Node 26), 21m02s (floor). Full local depth was not run; real packed matrices and unchanged 100% coverage are left to PR CI because this host previously exceeded their unscaled budgets."
+  "2026-11-15T21:16:55.131Z",codex-sol,Added an explicit unset-scale regression inside the packed watchdog test so both default and configured branches remain covered even when CI Deep inherits scale 3. Focused test passed under scale 3. Final-head CI and wall time remain pending.
 files[8]{path,scope}:
   .github/workflows/ci-deep.yml,project
   .github/workflows/ci.yml,project

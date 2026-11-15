@@ -247,6 +247,8 @@ test("acceptance watchdog scaling rejects invalid factors and rounds fractional 
   assert.equal(acceptanceTime(100, 3), 300);
   const previous = process.env.PM_TEST_TIME_SCALE;
   try {
+    delete process.env.PM_TEST_TIME_SCALE;
+    assert.equal(acceptanceTime(1), 1);
     process.env.PM_TEST_TIME_SCALE = "1.5";
     assert.equal(acceptanceTime(1), 2);
   } finally {
