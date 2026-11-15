@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { dirname } from "node:path";
@@ -89,7 +90,7 @@ test("property: arbitrary role registries preserve every eligible item under all
   let bucketCases = 0;
   let sectionCases = 0;
   let itemCases = 0;
-  for (let seed = 1; seed <= 64; seed++) {
+  for (let seed = 1; seed <= testDepth(64); seed++) {
     const { registry, records } = corpus(seed);
     const items = records.map(({ item }) => item);
     for (const allOpen of [false, true]) for (const includeDone of [false, true]) {

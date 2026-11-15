@@ -1,3 +1,4 @@
+import { testTime } from "./support/time.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -400,7 +401,7 @@ test("fetchAllItems kills a hung pm read at the timeout rather than waiting fore
     );
     // The point of the ceiling is that the call returns; asserting it came back
     // well inside the child's 30s sleep is what proves the kill happened.
-    assert.ok(Date.now() - started < 10_000, "the read must be killed, not awaited");
+    assert.ok(Date.now() - started < testTime(10_000), "the read must be killed, not awaited");
   } finally {
     if (saved === undefined) delete process.env["PM_READ_TIMEOUT_MS"];
     else process.env["PM_READ_TIMEOUT_MS"] = saved;
@@ -524,7 +525,7 @@ test("Windows argv preserves empty values, metacharacters and backslashes withou
     return samples[3];
   };
   const large = medianMs(200_000);
-  assert.ok(large < 5000, `200k run took ${large}ms, above the generous 5,000 ms ceiling`);
+  assert.ok(large < testTime(5000), `200k run took ${large}ms, above the generous 5,000 ms ceiling`);
 });
 
 test("fetchAllItems passes a metacharacter-laden pmRoot as one discrete argv element, never a shell string", posixOnly, () => {

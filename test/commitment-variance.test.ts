@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -96,7 +97,7 @@ test("schema refuses extreme inputs before reads; every producer validates and r
     ...[NaN, Infinity, -Infinity, 0, 1023, 32769, "8192", null].map((outputBytes) => ({ source, outputBytes }))]) {
     await assert.rejects(readCommitmentVariance({ pm_root: "nonexistent-tracker" }, input as CommitmentVarianceInput), refused("invalid_input"));
   }
-  for (let index = 0; index < 500; index++) {
+  for (let index = 0; index < testDepth(500); index++) {
     const declaration = { ...valid, key: ` key-${index} `, target: { id: " legacy-id ", revision: 1 + index } };
     const encoded = encodeStandupCommitment(declaration);
     const parsed = parseStandupCommitment(JSON.parse(encoded.slice(COMMITMENT_PREFIX.length)));

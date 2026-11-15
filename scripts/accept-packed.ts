@@ -139,7 +139,18 @@ export function installedHostEnvironment(source: NodeJS.ProcessEnv): NodeJS.Proc
 
 const cleanEnvironment = acceptanceEnvironment(process.env);
 /** Maximum time allowed for one install, pack, or pm subprocess. */
-const commandTimeoutMs = 5 * 60 * 1000;
+const commandTimeoutMs = acceptanceTime(5 * 60 * 1000);
+
+/**
+ * Scale harness watchdogs before any subprocess can start; product budgets are unchanged.
+ * @param milliseconds - Unscaled watchdog duration.
+ * @param scale - Explicit multiplier, defaulting to the runner configuration.
+ * @returns A positive integer deadline accepted by spawnSync.
+ */
+export function acceptanceTime(milliseconds: number, scale = Number(process.env.PM_TEST_TIME_SCALE ?? "1")): number {
+  if (!Number.isFinite(scale) || scale <= 0) throw new Error("PM_TEST_TIME_SCALE must be finite and positive");
+  return Math.ceil(milliseconds * scale);
+}
 
 /** Run one shell-free command and fail with bounded diagnostics. */
 export function run(command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = cleanEnvironment, timeoutMs = commandTimeoutMs, expectedStatus = 0): SpawnSyncReturns<string> {
