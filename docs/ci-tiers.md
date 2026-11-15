@@ -53,3 +53,9 @@ packed acceptance tests at 168–213 seconds, the commitment 500-seed model at
 recorded in the tracker/PR as available; cross-host times do not prove a speedup.
 Full local depth is reserved for post-merge CI Deep. Existing release workflows,
 release verifier scripts and action SHA/version-comment contracts are unchanged.
+
+## Review round E
+
+PRRT_kwDOTbNzVM63t-q1 and PRRT_kwDOTbNzVM63t-q5 are valid. Scale the sleeping fixture to three times the integer-rounded harness ceiling, retaining the product 300 ms read deadline. Report the actual generated registry count. Targeted fetch/status/workflow tests, typecheck, lint and strict YAML passed. Greptile failure is the review status, not an Actions test log.
+
+The cheap tier excludes only inert tracker record formats; executable tracker changes keep product gates. `test/ci-routing.test.ts` executes each detector with inert and executable tracker paths. Product deadlines, full-depth cases and coverage thresholds are unchanged.

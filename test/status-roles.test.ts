@@ -90,7 +90,8 @@ test("property: arbitrary role registries preserve every eligible item under all
   let bucketCases = 0;
   let sectionCases = 0;
   let itemCases = 0;
-  for (let seed = 1; seed <= testDepth(64); seed++) {
+  const registries = testDepth(64);
+  for (let seed = 1; seed <= registries; seed++) {
     const { registry, records } = corpus(seed);
     const items = records.map(({ item }) => item);
     for (const allOpen of [false, true]) for (const includeDone of [false, true]) {
@@ -140,7 +141,7 @@ test("property: arbitrary role registries preserve every eligible item under all
       assert.equal(blockedAgeDays(item, now, registry) !== undefined, expected === "blocked" && item.updated_at !== undefined);
     }
   }
-  console.log(`Property proof: 64 SDK registries, ${bucketCases} bucket cases, ${sectionCases} section selections, ${itemCases} item classifications; zero missing or duplicate eligible items`);
+  console.log(`Property proof: ${registries} SDK registries, ${bucketCases} bucket cases, ${sectionCases} section selections, ${itemCases} item classifications; zero missing or duplicate eligible items`);
 });
 
 test("configured names and aliases never override declared lifecycle roles; unknown roles refuse", () => {

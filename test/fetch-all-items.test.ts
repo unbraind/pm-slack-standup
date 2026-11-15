@@ -389,19 +389,22 @@ test("fetchAllItems kills a hung pm read at the timeout rather than waiting fore
   try {
     process.env["PM_READ_TIMEOUT_MS"] = "300";
     const bin = join(dir, "hanging-pm");
-    writeFileSync(bin, "#!/bin/sh\nsleep 30\n", { encoding: "utf-8", mode: 0o755 });
+    const ceiling = testTime(10_000);
+    const sleepSeconds = Math.ceil(ceiling * 3 / 1000);
+    writeFileSync(bin, `#!/bin/sh\nsleep ${sleepSeconds}\n`, { encoding: "utf-8", mode: 0o755 });
     chmodSync(bin, 0o755);
     const started = Date.now();
     assert.throws(
       () => fetchAllItems("/anywhere", bin),
       (e: unknown) => {
         assert.ok(e instanceof CommandError);
+        assert.match((e as CommandError).message, /ETIMEDOUT/);
         return true;
       }
     );
     // The point of the ceiling is that the call returns; asserting it came back
-    // well inside the child's 30s sleep is what proves the kill happened.
-    assert.ok(Date.now() - started < testTime(10_000), "the read must be killed, not awaited");
+    // well inside the child's scaled sleep is what proves the kill happened.
+    assert.ok(Date.now() - started < ceiling, "the read must be killed, not awaited");
   } finally {
     if (saved === undefined) delete process.env["PM_READ_TIMEOUT_MS"];
     else process.env["PM_READ_TIMEOUT_MS"] = saved;
