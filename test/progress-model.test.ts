@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { canonicalDocument } from "@unbrained/pm-cli/sdk";
@@ -14,7 +15,7 @@ test("500 seeded native-state sequences preserve relationships and reject eviden
   const f = await progressFixture();
   let operations = 0;
   try {
-    for (let seed = 1; seed <= 500; seed++) {
+    for (let seed = 1; seed <= testDepth(500); seed++) {
       const random = randomFor(seed);
       await f.client.focus(f.items[Math.floor(random() * f.items.length)].id);
       const id = (await f.client.create({ title: `Sequence ${seed}`, type: "Task", ...progressScope })).item.id;
@@ -95,9 +96,9 @@ test("500 seeded native-state sequences preserve relationships and reject eviden
         assert.ok(Number.isSafeInteger(number) && number >= 0);
       }
       await f.client.delete(id);
-      if (seed % 100 === 0) console.log(`progress-model: ${seed}/500 sequences checked`);
+      if (seed % 100 === 0) console.log(`progress-model: ${seed}/${testDepth(500)} sequences checked`);
     }
-    assert.equal(operations, 2000);
-    console.log("progress-model: 500 sequences, 2000 native mutations, SDK read-back after replay, zero mismatches");
+    assert.equal(operations, testDepth(500) * 4);
+    console.log(`progress-model: ${testDepth(500)} sequences, ${operations} native mutations, SDK read-back after replay, zero mismatches`);
   } finally { await f.close(); }
 });

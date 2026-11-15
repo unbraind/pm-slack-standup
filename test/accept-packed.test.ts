@@ -1,3 +1,4 @@
+import { testTime } from "./support/time.ts";
 /** Behavior contracts for packed acceptance configuration, subprocesses and receipts. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -7,7 +8,7 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 
 import {
-  acceptanceEnvironment, installedHostEnvironment,
+  acceptanceTime, acceptanceEnvironment, installedHostEnvironment,
   acceptanceLaunchers,
   acceptanceVersions,
   acceptPacked,
@@ -211,7 +212,7 @@ test("a real pack failure leaves no acceptance workspace behind", () => {
   }
 });
 
-for (const direct of [false, true]) test(`packed acceptance completes npm/Bun matrices with npm_execpath ${direct ? "unset" : "inherited"}`, { timeout: 300_000 }, () => {
+for (const direct of [false, true]) test(`packed acceptance completes npm/Bun matrices with npm_execpath ${direct ? "unset" : "inherited"}`, { timeout: testTime(300_000) }, () => {
   const directory = mkdtempSync(join(tmpdir(), "standup-direct-node-"));
   const node = join(directory, process.platform === "win32" ? "node.exe" : "node");
   copyFileSync(process.execPath, node);
@@ -219,7 +220,7 @@ for (const direct of [false, true]) test(`packed acceptance completes npm/Bun ma
   if (direct) delete environment.npm_execpath;
   try {
     const result = spawnSync(direct ? node : process.execPath, [join(root, "scripts", "accept-packed.ts")], {
-      cwd: root, encoding: "utf8", env: environment, timeout: 290_000, maxBuffer: 16 * 1024 * 1024,
+      cwd: root, encoding: "utf8", env: environment, timeout: testTime(290_000), maxBuffer: 16 * 1024 * 1024,
     });
     assert.equal(result.status, 0, result.stderr || result.error?.message || "packed acceptance did not exit successfully");
     const receipt = JSON.parse(result.stdout) as { ok: boolean; receipts: { scenario: string; tracker_items: number; rendered_items: number; fixtures_present: boolean; host_version: string; progress_verified: boolean; variance_verified: boolean; materialization_verified: boolean; window_verified: boolean }[] };
@@ -237,4 +238,21 @@ for (const direct of [false, true]) test(`packed acceptance completes npm/Bun ma
       assert.equal(entry.host_version, entry.scenario.endsWith("minimum") ? versions.minimumVersion : versions.developmentVersion);
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+
+test("acceptance watchdog scaling rejects invalid factors and rounds fractional milliseconds", () => {
+  for (const scale of [NaN, Infinity, -Infinity, 0, -1]) assert.throws(() => acceptanceTime(100, scale), /finite and positive/);
+  assert.equal(acceptanceTime(1, 1.5), 2);
+  assert.equal(acceptanceTime(100, 3), 300);
+  const previous = process.env.PM_TEST_TIME_SCALE;
+  try {
+    delete process.env.PM_TEST_TIME_SCALE;
+    assert.equal(acceptanceTime(1), 1);
+    process.env.PM_TEST_TIME_SCALE = "1.5";
+    assert.equal(acceptanceTime(1), 2);
+  } finally {
+    if (previous === undefined) delete process.env.PM_TEST_TIME_SCALE;
+    else process.env.PM_TEST_TIME_SCALE = previous;
+  }
 });
