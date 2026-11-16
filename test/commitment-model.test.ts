@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { canonicalDocument, getItemAt, readSettings } from "@unbrained/pm-cli/sdk";
@@ -36,7 +37,7 @@ test("500 seeded SDK state sequences replay old captures and native fields under
       statuses.push(names);
     }
     const settings = await readSettings(f.pmRoot);
-    for (let seed = 1; seed <= 500; seed++) {
+    for (let seed = 1; seed <= testDepth(500); seed++) {
       const random = generator(seed);
       await f.client.focus(f.items[Math.floor(random() * f.items.length)].id);
       const target = (await f.client.create({ title: `Target ${seed}`, type: "Task", body: `  intent ${seed}\r\nline\n`, ...progressScope })).item.id;
@@ -104,8 +105,8 @@ test("500 seeded SDK state sequences replay old captures and native fields under
       const nativeComments = (await nativeDocument(f, source)).metadata.comments!;
       assert.ok(nativeComments.some((comment) => comment.text.includes("\r\n")), "native source bytes retain CRLF serialization");
       await f.client.delete(source); await f.client.delete(target);
-      if (seed % 100 === 0) console.log(`commitment-model: ${seed}/500 sequences checked`);
+      if (seed % 100 === 0) console.log(`commitment-model: ${seed}/${testDepth(500)} sequences checked`);
     }
-    console.log(`commitment-model: 500 sequences, ${mutations} native mutations, eight random registries, zero SDK read-back mismatches`);
+    console.log(`commitment-model: ${testDepth(500)} sequences, ${mutations} native mutations, eight random registries, zero SDK read-back mismatches`);
   } finally { await f.close(); }
 });

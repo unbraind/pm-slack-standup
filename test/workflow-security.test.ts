@@ -223,3 +223,19 @@ test("pin policy rejects escaped multiline source references before local or SHA
     }
   }
 });
+
+
+test("quick and deep tiers retain exact runtime floors and runner contracts", () => {
+  const ci = parseDocument(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")).toJS();
+  const deep = parseDocument(readFileSync(new URL("../.github/workflows/ci-deep.yml", import.meta.url), "utf8")).toJS();
+  assert.deepEqual(ci.jobs.test.strategy.matrix["node-version"], ["22.18.0", 26]);
+  assert.equal(ci.jobs.test["runs-on"], "ubuntu-latest");
+  assert.equal(ci.jobs["windows-acceptance-launcher"]["runs-on"], "windows-latest");
+  for (const job of Object.values(ci.jobs) as Record<string, unknown>[]) assert.ok(Number(job["timeout-minutes"]) <= 30);
+  assert.equal(ci.on.push, undefined);
+  assert.deepEqual(deep.jobs.deep.strategy.matrix, { "node-version": ["22.18.0", 26], "package-manager": ["npm", "bun"] });
+  assert.match(deep.jobs.deep["runs-on"], /PM_LOCAL_DEEP.*self-hosted.*pm-local.*ubuntu-latest/);
+  assert.equal(deep.jobs.deep["timeout-minutes"], 120);
+  const checkout = deep.jobs.deep.steps.find((step: { name: string }) => step.name === "Checkout");
+  assert.equal(checkout.with["persist-credentials"], false);
+});

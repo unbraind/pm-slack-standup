@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -198,6 +199,7 @@ test("seeded model-based property: windows partition the journal with no skips o
   const createdIds: string[] = [];
   let deletesUsed = 0;
   let operations = 0;
+  let generatedOperations = 0;
   let windows = 0;
   try {
     model.refresh(await readAllEvents(fixture.pmRoot));
@@ -322,8 +324,9 @@ test("seeded model-based property: windows partition the journal with no skips o
       assert.equal(state.boundary.admitted_events, events.length, "the retained event total must equal the journal");
     };
 
-    for (let iteration = 0; iteration < 150; iteration += 1) {
+    for (let iteration = 0; iteration < testDepth(150); iteration += 1) {
       const batch = pickInt(random, 2, 5);
+      generatedOperations += batch;
       for (let op = 0; op < batch; op += 1) {
         await applyRandomOperation();
         operations += 1;
@@ -373,7 +376,8 @@ test("seeded model-based property: windows partition the journal with no skips o
     else assert.equal(model.pending.length, 0, "the final window must be empty when everything is admitted");
     const totalEvents = (await readAllEvents(fixture.pmRoot)).length;
     assert.equal(model.admittedTotal, totalEvents, "admitted windows must partition the journal exactly: no skips, no duplicates");
-    assert.ok(operations >= 500, `the property run must apply at least 500 operations (applied ${operations})`);
+    assert.equal(operations, generatedOperations, "every generated operation must execute");
+    assert.ok(generatedOperations >= (testDepth(150) === 150 ? 500 : testDepth(150) * 2), "the generated prefix must contain a nonvacuous operation corpus");
     console.error(`property summary: ${operations} operations, ${windows} windows, ${totalEvents} events partitioned`);
   } finally {
     if (savedCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = savedCeiling;
