@@ -5,7 +5,6 @@
 ### Fixed
 
 - Accept calendar annotations only on trusted reusable workflow job pins ([pm-slack-standup-calendar-pins-195](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-calendar-pins-195.toon))
-- Investigate packed npm and Bun acceptance exceeding the unchanged local timeout under shared load ([pm-slack-standup-packed-timing](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-packed-timing.toon))
 - Synthetic HTTPS test webhook must advertise the address it listens on ([pm-slack-standup-wcyv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wcyv.toon))
 
 ### Other
