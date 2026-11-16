@@ -69,16 +69,31 @@ export async function removeRuntimeFixture(fixture: RuntimeFixture): Promise<voi
 /** An actual HTTPS webhook with synthetic routes and captured wire requests. */
 export interface RuntimeWebhook {
   url: string;
+  /** The literal loopback address the listener is bound to and `url` advertises. */
+  address: string;
+  /** The port the listener is bound to and `url` advertises. */
+  port: number;
   requests: Array<{ method?: string; path?: string; body: Record<string, unknown>; length?: string }>;
   stop: () => Promise<void>;
 }
+
+/**
+ * Bind and advertise one literal address, avoiding independent localhost lookups.
+ * A controlled resolver-order regression demonstrates that the old fixture can
+ * bind IPv6 while its HTTPS client connects to IPv4 and gets ECONNREFUSED.
+ * The certificate covers the literal IP so normal TLS verification stays enabled.
+ */
+const loopbackAddress = "127.0.0.1";
 
 /** Serve verified local TLS; success, HTTP refusal, hang, and reset are real network events. */
 export async function runtimeWebhook(directory: string): Promise<RuntimeWebhook> {
   const key = join(directory, "tls.key");
   const cert = join(directory, "tls.crt");
   execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key,
-    "-out", cert, "-days", "1", "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost"], { stdio: "ignore" });
+    "-out", cert, "-days", "1", "-subj", "/CN=localhost",
+    // The advertised URL uses the literal loopback address, so the certificate
+    // must cover that IP in addition to the localhost name.
+    "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"], { stdio: "ignore" });
   const requests: RuntimeWebhook["requests"] = [];
   const server = https.createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (req, res) => {
     let raw = "";
@@ -94,10 +109,13 @@ export async function runtimeWebhook(directory: string): Promise<RuntimeWebhook>
   });
   const oldCa = https.globalAgent.options.ca;
   https.globalAgent.options.ca = readFileSync(cert);
-  server.listen(0, "localhost");
+  server.listen(0, loopbackAddress);
   await once(server, "listening");
+  const bound = server.address() as AddressInfo;
   return {
-    url: `https://localhost:${(server.address() as AddressInfo).port}`,
+    url: `https://${bound.address}:${bound.port}`,
+    address: bound.address,
+    port: bound.port,
     requests,
     /** Close every disposable socket and restore the process's original trust store. */
     stop: async () => {
