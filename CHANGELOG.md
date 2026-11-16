@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Synthetic HTTPS test webhook must advertise the address it listens on ([pm-slack-standup-wcyv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wcyv.toon))
+
 ## 2026.11.15 - 2026-11-15
 
 ### Other
