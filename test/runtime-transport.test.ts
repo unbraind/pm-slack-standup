@@ -1,7 +1,63 @@
 import assert from "node:assert/strict";
+import net from "node:net";
+import dns from "node:dns";
+import https from "node:https";
 import test from "node:test";
 import { CommandError } from "../index.ts";
 import { runtimeFixture, runtimeCommand, removeRuntimeFixture, runtimeWebhook, runtimeStdout } from "./runtime-fixture.ts";
+
+test("HTTPS fixture remains reachable when localhost resolves to different listener and client families", async (context) => {
+  type LookupCallback = (error: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family?: number) => void;
+  const originalLookup = dns.lookup as unknown as (hostname: string, options: dns.LookupOptions | LookupCallback, callback?: LookupCallback) => void;
+  let localhostCalls = 0;
+  context.mock.method(dns, "lookup", ((hostname: string, options: dns.LookupOptions | LookupCallback, callback?: LookupCallback) => {
+    if (hostname !== "localhost") return originalLookup(hostname, options, callback);
+    const address = localhostCalls++ === 0 ? "::1" : "127.0.0.1";
+    const family = address === "::1" ? 6 : 4;
+    const complete = typeof options === "function" ? options : callback;
+    assert.ok(complete);
+    process.nextTick(() => {
+      if (typeof options === "object" && options?.all) complete(null, [{ address, family }]);
+      else complete(null, address, family);
+    });
+  }) as typeof dns.lookup);
+  const fixture = await runtimeFixture();
+  const webhook = await runtimeWebhook(fixture.directory);
+  try {
+    const result = await new Promise<number | undefined>((resolveRequest, rejectRequest) => {
+      const request = https.request(webhook.url, { method: "POST" }, response => {
+        response.resume();
+        response.on("end", () => resolveRequest(response.statusCode));
+      });
+      request.on("error", rejectRequest);
+      request.end("{}");
+    });
+    assert.equal(result, 200);
+    assert.equal(localhostCalls, 0, "literal loopback transport must not resolve localhost");
+  } finally {
+    await webhook.stop();
+    await removeRuntimeFixture(fixture);
+  }
+});
+
+test("the synthetic webhook advertises the exact loopback address it listens on", async () => {
+  // Regression guard for the CI Deep failures: a listener that binds one family
+  // of "localhost" while advertising the name forces the client to resolve the
+  // name a second time, and wherever the two resolutions disagree the client
+  // meets `connect ECONNREFUSED 127.0.0.1` instead of the listener. The URL must
+  // carry the literal bound address, so no second resolution exists.
+  const fixture = await runtimeFixture();
+  const webhook = await runtimeWebhook(fixture.directory);
+  try {
+    const advertised = new URL(webhook.url);
+    assert.notEqual(net.isIP(advertised.hostname), 0, `the advertised host must be a literal IP address, never a resolvable name: ${advertised.hostname}`);
+    assert.equal(advertised.hostname, webhook.address, "the URL must advertise the address the listener is bound to");
+    assert.equal(advertised.port, String(webhook.port), "the URL must advertise the port the listener is bound to");
+  } finally {
+    await webhook.stop();
+    await removeRuntimeFixture(fixture);
+  }
+});
 
 test("real HTTPS failures, timeout, and multi-target fallback preserve delivery receipts", async (context) => {
   const fixture = await runtimeFixture();
