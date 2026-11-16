@@ -2,13 +2,18 @@ id: pm-slack-standup-packed-timing
 title: Investigate packed npm and Bun acceptance exceeding the unchanged local timeout under shared load
 description: "Direct source npm release validation on the toolchain bump ran 287 tests: 285 passed, and the two real packed acceptance matrices exceeded their existing 290000 ms subprocess timeout. The matrices cover npm-current, bun-current, npm-minimum, bun-minimum and npm-global-current. Earlier branch CI completed the same matrices and reached only the separate changelog drift. Preserve timeout and coverage thresholds; distinguish host contention or install cost from package regressions. Validation evidence is on pm-slack-standup-jnje."
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags[3]: ci,"gh:unbraind/pm-slack-standup#213",performance
 created_at: "2026-10-26T18:53:49.669Z"
-updated_at: "2026-11-16T13:16:47.624Z"
+updated_at: "2026-11-16T20:39:10.124Z"
+closed_at: "2026-11-16T20:39:10.041Z"
+completed_at: "2026-11-16T20:39:10.041Z"
 author: codex-agent
 acceptance_criteria: Explain and reproduce the instrumented packed-install timing discrepancy; retain the 290000 ms subprocess timeout and every coverage threshold; record standalone and full npm/Bun receipts
+resolution: Implemented and merged in #194 (169f3c4).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #194 as 169f3c4; checks successful at head b87dbd4: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 comments[16]{created_at,author,text}:
   "2026-10-26T19:08:31.471Z",codex-agent,"Standalone acceptance completed all five scenarios with matching SDK identities, rendered fixture counts and no missing fixture data. Full npm and Bun gates each passed 285/287 tests and timed out only their two instrumented real-install matrices. This separates functional acceptance from the unchanged 290000 ms budget; investigate instrumentation, fresh per-scenario caches and shared scheduling without lowering coverage or increasing that timeout."
   "2026-10-31T00:59:00.361Z",codex-agent,"Cursor-window delivery validation repeats the existing instrumented limit: complete isolated npm release check ran 350 tests, 348 passed, and only both real-install matrices exceeded 290000 ms. Runtime modules measured 100% in all four dimensions; acceptance-script paths left unexecuted by timeout reduced global coverage to 96.17% lines/statements, 99.88% branches, 97.59% functions. No timeout or coverage threshold was changed. Current-source Node/Bun standalone receipts and exact-head CI will be linked from pm-slack-standup-kovw."
@@ -88,4 +93,5 @@ tests[6]:
       source_ref: ci/quick-pr-tier-deep-local-tier
 docs[1]{path,scope}:
   docs/ci-tiers.md,project
+close_reason: "Delivered by #194 \"test: replace standup registration mock with SDK harness\" (merged as 169f3c4). Checks successful at the PR head b87dbd4: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 body: ""

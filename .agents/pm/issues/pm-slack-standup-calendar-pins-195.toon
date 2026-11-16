@@ -2,13 +2,18 @@ id: pm-slack-standup-calendar-pins-195
 title: Accept calendar annotations only on trusted reusable workflow job pins
 description: "PR #195 fixes the trusted reusable-workflow calendar annotation regression. Keep the historical action-pin item and its October delivery separate, restore its generated changelog entry, and restrict the calendar exception to job references."
 type: Issue
-status: in_progress
+status: closed
 priority: 1
 tags[4]: "gh:unbraind/pm-slack-standup#191","gh:unbraind/pm-slack-standup#192","gh:unbraind/pm-slack-standup#195","gh:unbraind/pm-slack-standup#212"
 created_at: "2026-11-09T16:19:14.707Z"
-updated_at: "2026-11-16T13:16:44.218Z"
+updated_at: "2026-11-16T20:39:21.871Z"
+closed_at: "2026-11-16T20:39:21.845Z"
+completed_at: "2026-11-16T20:39:21.845Z"
 author: codex-agent
 acceptance_criteria: Trusted reusable workflow jobs accept calendar annotations; steps retain strict semver; October action-pin release entry remains generated; behavioral reverts fail
+resolution: Implemented and merged in #195 (3c14920).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #195 as 3c14920; checks successful at head f136888: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 comments[19]{created_at,author,text}:
   "2026-11-09T16:19:16.938Z",codex-agent,"Continuation audit: reused PR #195 and fix/bot-green-1108. Remote head e0d816a; local merge 5a771dd already includes current main d67717d. Preserved the pending jobReference restriction and regression changes. Fetched all three unresolved threads with every comment; latest CodeRabbit review has no Outside diff range findings. All three are valid. Historical item pm-slack-standup-6wvl retains October release provenance; this separate item owns the new calendar fix and review evidence. Never rewrite existing history."
   "2026-11-09T16:23:05.812Z",codex-agent,"Behavioral revert proofs in disposable copies: fixed pin suite passes 13/13. Removing only jobReference from packageWorkflow fails the job-only regression (12/13); removing only the calendar exception also fails it (12/13); restored fixed code passes 13/13. Both actual PR #191 and #192 workflow patches apply and pass 13/13. Self-review preserved unpadded strict-semver tags for steps; padded calendar annotations require job references. The provenance regression verifies separate item/title/release ownership. The October-entry regression remains pending the historical-state restoration decision."
@@ -82,4 +87,5 @@ tests[6]:
 docs[2]{path,scope}:
   CHANGELOG.md,project
   docs/action-pins.md,project
+close_reason: "Delivered by #195 \"Accept calendar tags on trusted reusable workflow pins\" (merged as 3c14920). Checks successful at the PR head f136888: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 body: ""

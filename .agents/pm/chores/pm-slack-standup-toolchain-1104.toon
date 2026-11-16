@@ -2,13 +2,18 @@ id: pm-slack-standup-toolchain-1104
 title: Adopt the 2026.11.4 toolchain and literal SDK field contract
 description: "Supersede Dependabot PR https://github.com/unbraind/pm-slack-standup/pull/186 with a reviewed toolchain migration. Verify seeded SDK fixtures against literal typed fields and preserve all native-state assertions."
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags[4]: dependencies,"gh:unbraind/pm-slack-standup#186",migration,sdk
 created_at: "2026-11-05T04:49:24.949Z"
-updated_at: "2026-11-05T05:54:18.381Z"
+updated_at: "2026-11-16T20:39:04.859Z"
+closed_at: "2026-11-16T20:39:04.827Z"
+completed_at: "2026-11-16T20:39:04.827Z"
 author: codex-toolchain-1104
 acceptance_criteria: Exact requested pins; focused regressions and coverage pass; typecheck and lint pass; separate review PR contains tracker evidence
+resolution: Implemented and merged in #189 (9d9e715).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #189 as 9d9e715; checks successful at head 9034610: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 comments[4]{created_at,author,text}:
   "2026-11-05T04:50:11.015Z",codex-toolchain-1104,"Cause (test): pm-cli 2026.10.30 GH-1614 keeps typed SDK fields literal. The shared progressScope passes parent/sprint/release/assignee none on create and update; commitment-variance reproduces placeholder refusal before its assertions. Replace fixture scalars with unset lists, retaining all seeded model and race assertions. GH-1577 already makes create focus inheritance opt-in; explicit unsets keep the fixture contract on both creates and updates. No production sentinel use found."
   "2026-11-05T05:20:15.103Z",codex-toolchain-1104,"Focused commitment-variance file passes 10/10 after explicit SDK unsets; typecheck, lint, build, test compilation, strict tracker health and changelog regeneration/check pass. Fresh tracked dist and changelog outputs are unchanged. The complete coverage gate runs through pm test with original 500-sequence assertions and all four thresholds at 100. Author normalization on the unpublished review branch preserves the inherited commit tree and leaves the original Dependabot ref intact."
@@ -44,4 +49,5 @@ tests[3]:
       source_ref: fix/toolchain-2026-11-4
 docs[1]{path,scope}:
   CHANGELOG.md,project
+close_reason: "Delivered by #189 \"Clear typed SDK fixture fields with unset on pm-cli 2026.11.4\" (merged as 9d9e715). Checks successful at the PR head 9034610: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 body: ""
