@@ -40,9 +40,12 @@ function assertActionPins(workflow: string): void {
       const version = value.comment?.trim();
       const semver = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
       const calendar = /^v[1-9]\d{3}\.(0?[1-9]|1[0-2])\.(0?[1-9]|[12]\d|3[01])$/;
+      // The 2026.11.15 caller contract annotates pm-github reusable job references with
+      // the owning package and its calendar release: "pm-github 2026.11.15".
+      const packageCalendar = /^pm-github [1-9]\d{3}\.(0?[1-9]|1[0-2])\.(0?[1-9]|[12]\d|3[01])$/;
       const packageWorkflow = jobReference && pin[1] === "unbraind" && pin[2]!.startsWith("pm-github/.github/workflows/");
-      assert.ok(semver.test(version ?? "") || (packageWorkflow && calendar.test(version ?? "")), `${reference}: missing or malformed version comment`);
-      assert.match(workflow.slice(value.range![1], value.range![2]), /^[ \t]+# v\d+\.\d+\.\d+[ \t]*(?:\r?\n)?$/, "version comment must be on the uses line with exactly one space after #");
+      assert.ok(semver.test(version ?? "") || (packageWorkflow && (calendar.test(version ?? "") || packageCalendar.test(version ?? ""))), `${reference}: missing or malformed version comment`);
+      assert.match(workflow.slice(value.range![1], value.range![2]), /^[ \t]+# (?:v\d+\.\d+\.\d+|pm-github [1-9]\d{3}\.(?:0?[1-9]|1[0-2])\.(?:0?[1-9]|[12]\d|3[01]))[ \t]*(?:\r?\n)?$/, "version comment must be on the uses line with exactly one space after #");
       const observed = OBSERVED_VERSIONS.get(`${pin[1]}/${pin[2]}@${version}`);
       if (observed !== undefined) assert.equal(pin[3], observed, `${reference}: comment disagrees with observed tag`);
     },
@@ -79,6 +82,11 @@ test("trusted package workflows accept calendar tags in job references only", ()
   for (const prefix of ["uses:", "- uses:"]) {
     assertReferenceFragment(`${prefix} unbraind/pm-github/.github/workflows/check.yml@${sha} # v2026.11.2`);
   }
+  // The 2026.11.15 caller contract: package-annotated calendar releases on job references.
+  for (const annotation of ["pm-github 2026.11.15", "pm-github 2026.1.9"]) {
+    assertReferenceFragment(`uses: unbraind/pm-github/.github/workflows/pm-github-sync.yml@${sha} # ${annotation}`);
+    assert.throws(() => assertReferenceFragment(`- uses: unbraind/pm-github/.github/workflows/pm-github-sync.yml@${sha} # ${annotation}`), /missing or malformed version comment/);
+  }
 });
 
 test("calendar annotations retain owner, package, pin and comment boundaries", () => {
@@ -94,6 +102,12 @@ test("calendar annotations retain owner, package, pin and comment boundaries", (
     `unbraind/pm-github/.github/workflows/check.yml@${sha} # v2026.11.032`,
     `unbraind/pm-github/.github/workflows/check.yml@${sha} #  v2026.11.02`,
     `unbraind/pm-github/.github/workflows/check.yml@${sha} # v2026.11.02 trailing`,
+    `unbraind/pm-github/.github/workflows/check.yml@${sha} # pm-github v2026.11.02`,
+    `unbraind/pm-github/.github/workflows/check.yml@${sha} # pm-github 2026.11.02 trailing`,
+    `unbraind/pm-github/.github/workflows/check.yml@${sha} # pm-changelog 2026.11.02`,
+    `unbraind/pm-github/.github/workflows/check.yml@${sha} # pm-github 2026.13.02`,
+    `unbraind/pm-github/.github/workflows/check.yml@${sha} # pm-github 2026.11.00`,
+    `unbraind/pm-github/.github/workflows/check.yml@${sha} # pm-github 2026.11.032`,
   ]) assert.throws(() => assertReferenceFragment(`uses: ${reference}`), reference);
 });
 
@@ -238,4 +252,21 @@ test("quick and deep tiers retain exact runtime floors and runner contracts", ()
   assert.equal(deep.jobs.deep["timeout-minutes"], 120);
   const checkout = deep.jobs.deep.steps.find((step: { name: string }) => step.name === "Checkout");
   assert.equal(checkout.with["persist-credentials"], false);
+});
+
+
+test("pm-github callers pin the bounded-dispatch release without a version override", () => {
+  for (const name of ["sync", "closeout"]) {
+    const source = readFileSync(new URL(`../.github/workflows/pm-github-${name}.yml`, import.meta.url), "utf8");
+    const workflow = parseDocument(source).toJS();
+    const job = workflow.jobs[`gated-${name}`];
+    assert.equal(job.uses, `unbraind/pm-github/.github/workflows/pm-github-${name}.yml@a3a2e7ccbee2bbd23933d10be578422b967a519c`);
+    assert.match(source, /# pm-github 2026\.11\.15/);
+    assert.equal(job.with?.["pm-github-version"], undefined);
+    assert.equal(job["runs-on"], undefined);
+  }
+  const release = parseDocument(readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8")).toJS().jobs.release;
+  assert.match(release.uses, /^unbraind\/pm-ops\/\.github\/workflows\/daily-release\.yml@[a-f0-9]{40}$/);
+  assert.equal(release["runs-on"], undefined);
+  assert.equal(release.permissions["id-token"], "write");
 });
