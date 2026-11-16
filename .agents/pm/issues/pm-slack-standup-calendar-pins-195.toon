@@ -4,12 +4,14 @@ description: "PR #195 fixes the trusted reusable-workflow calendar annotation re
 type: Issue
 status: in_progress
 priority: 1
-tags[3]: "gh:unbraind/pm-slack-standup#191","gh:unbraind/pm-slack-standup#192","gh:unbraind/pm-slack-standup#195"
+tags[4]: "gh:unbraind/pm-slack-standup#191","gh:unbraind/pm-slack-standup#192","gh:unbraind/pm-slack-standup#195","gh:unbraind/pm-slack-standup#212"
 created_at: "2026-11-09T16:19:14.707Z"
-updated_at: "2026-11-10T17:40:44.964Z"
+updated_at: "2026-11-16T12:19:04.403Z"
+assignee: codex-sol
+claim_principal: codex-sol
 author: codex-agent
 acceptance_criteria: Trusted reusable workflow jobs accept calendar annotations; steps retain strict semver; October action-pin release entry remains generated; behavioral reverts fail
-comments[11]{created_at,author,text}:
+comments[15]{created_at,author,text}:
   "2026-11-09T16:19:16.938Z",codex-agent,"Continuation audit: reused PR #195 and fix/bot-green-1108. Remote head e0d816a; local merge 5a771dd already includes current main d67717d. Preserved the pending jobReference restriction and regression changes. Fetched all three unresolved threads with every comment; latest CodeRabbit review has no Outside diff range findings. All three are valid. Historical item pm-slack-standup-6wvl retains October release provenance; this separate item owns the new calendar fix and review evidence. Never rewrite existing history."
   "2026-11-09T16:23:05.812Z",codex-agent,"Behavioral revert proofs in disposable copies: fixed pin suite passes 13/13. Removing only jobReference from packageWorkflow fails the job-only regression (12/13); removing only the calendar exception also fails it (12/13); restored fixed code passes 13/13. Both actual PR #191 and #192 workflow patches apply and pass 13/13. Self-review preserved unpadded strict-semver tags for steps; padded calendar annotations require job references. The provenance regression verifies separate item/title/release ownership. The October-entry regression remains pending the historical-state restoration decision."
   "2026-11-09T16:24:53.876Z",codex-agent,"Review round status: PRRT_kwDOTbNzVM60_GdG fixed by jobReference restriction with pin-policy regression; both behavior-only reverts fail 12/13 and fixed restoration passes 13/13. PRRT_kwDOTbNzVM60_GdA addressed by this distinct issue, preserved historical title/release, and removal of the calendar acceptance criterion from the October item; reverting only that criterion fails the new provenance test 0/1, fixed passes 1/1. PRRT_kwDOTbNzVM60_GdD is valid and remains blocked: the generator filters done statuses, and the inherited reopening removes the October entry. A prepared assertion reproduces the missing entry (0/1); restoring the historical closed state needs an exception to the explicit no-close rule, requested from the owner. Do not interpret this as an invalid finding or completed review round. That failing assertion is retained outside the committed test suite until the correction is authorized."
@@ -21,12 +23,16 @@ comments[11]{created_at,author,text}:
   "2026-11-10T17:29:12.298Z",codex-agent,"PRRT_kwDOTbNzVM60_GdA verification: pm history pm-slack-standup-6wvl --verify --strict-exit validates all 67 records; current item hash equals latest after_hash. Compared original October close event with restored close event and current item: identical original close_reason, status closed and completed_at 2026-10-21T18:48:09.851Z. Release matches the original assignment 2026.10.21; title describes the original PR #131 delivery. Calendar work remains on this separate in-progress item with exactly #191/#192/#195 tags and no October release. Existing changed history streams retain main as a byte-identical prefix. Preserved the already-correct restoration without another close event; closed no other item. changelog:full preserves the original October entry. CodeRabbit chat-limit response is missing verification, not approval."
   "2026-11-10T17:29:59.874Z",codex-agent,"Focused restored tests pass 16/16 (provenance 3, workflow pin policy 13), including pm test --run --only-last --progress. Identity/release/SDK targeted tests pass 16/16. Typecheck, build:test, lint, duplication (0 percent across 70 sources), docstrings (140 declarations), release-date and publish-attestation checks pass. Full npm test is running exactly once under timeout 2700, using the package script node --test --test-concurrency=2. Strict tracker health reports one gate-failing local advisory: pm-github extension host/runtime version skew (pinned host 2026.11.7 versus local extension 2026.11.10). History integrity and drift checks pass; two unrelated stale items and inherited provenance-domain advisories remain. No thresholds or unrelated tracker items changed."
   "2026-11-10T17:40:44.229Z",codex-agent,"Final full-suite receipt: timeout 2700 npm test ran exactly once, completed within the budget in 696901 ms, and exited 1. Read the final parent summary: 363 tests, 361 pass, 2 fail, 0 cancelled, 0 skipped, 0 todo. Both failures are the existing test/accept-packed.test.ts npm/Bun matrices with npm_execpath inherited/unset reaching their unchanged 290000 ms parent limits (290537 ms and 290522 ms observed). No full-suite success or coverage claim; CI must certify the full gate. This is the recurrence already tracked by pm-slack-standup-packed-timing; no duplicate item or timeout/threshold change. Canonical-reader acceptance passes 1/1; changelog:full and changelog:check pass with the historical entry under 2026.10.21; build leaves committed dist unchanged. Final focused, history verification, changelog and identity checks will run after the last tracker write. Release only this claim and leave this item in progress for orchestrator verification."
+  "2026-11-16T09:08:48.334Z",pi-glm,"PR checks test (22.18.0) and test (26) for the pm-github 2026.11.15 pin PR fail at test/workflow-security.test.ts:58 'every external workflow action has an immutable pin and version annotation from a trusted owner': the caller contract now annotates pm-github reusable job references with '# pm-github 2026.11.15' (the fleet-wide shape landed by the 27 merged sibling pins), while assertActionPins only accepted the older '# vYYYY.M.D' calendar form. Fix: extend the job-reference calendar exception to also accept the package-annotated form 'pm-github YYYY.M.D' (new packageCalendar pattern and trailing-comment match), keep strict semver for every other reference and for steps, and add fixture coverage for accepted and malformed package annotations. The open Greptile thread asked to revert the caller comments to '# v2026.11.15'; refused: the caller annotation matches the merged fleet contract and the task contract is to move the tests to the new caller shape, not move the caller back to the old one. Also merged origin/main (Fleet CI v2 quick/deep tiers) with no conflicts; main's CI files and their runs-on assertions are kept unchanged."
+  "2026-11-16T12:06:07.885Z",codex-sol,"Codex continuation: preserved the unfinished package-calendar pin regression change and merge 4a71ce9. Job 132764984788 confirms missing or malformed version comment for the new pm-github caller; the Node 26 job is being checked separately. Thread PRRT_kwDOTbNzVM63oHcc identifies the correct failure but reverting the annotation is refused because the merged sibling contract uses the package calendar comment. Keep strict owner, SHA and step boundaries. Run quick tests and verify the reusable release caller contract alongside existing CI runner tests."
+  "2026-11-16T12:15:13.984Z",codex-sol,The Node 26 job 132764984556 confirms the same package-calendar annotation failure as Node 22.18.0. Updated test/workflow-security.test.ts retains quick/deep runs-on checks and adds the actual reusable Daily Release job contract plus both exact pm-github caller SHA/comment assertions with no version override. Focused linked workflow tests pass 15/15; typecheck and lint pass. Quick npm tests are still running; no full-suite success is claimed yet.
+  "2026-11-16T12:18:57.316Z",codex-sol,"The quick suite caught a provenance fixture coupled to exactly three tags after adding the mandatory PR #212 tag to this existing item. Updated the exact expected tag array to include #212, retaining all three historical tags, one-owner-per-tag checks, October closed status/release checks and changelog provenance. This is a fixture contract update, not a history rewrite. Two packed acceptance tests also reach their unchanged 290-second limits; the existing pm-slack-standup-packed-timing issue owns that separate risk."
 files[4]{path,scope}:
   .agents/pm/history/pm-slack-standup-6wvl.jsonl,project
   .agents/pm/issues/pm-slack-standup-6wvl.toon,project
   test/action-pin-provenance.test.ts,project
   test/workflow-security.test.ts,project
-tests[3]:
+tests[5]:
   - command: node --test --test-concurrency=2 test/workflow-security.test.ts test/action-pin-provenance.test.ts
     scope: project
     provenance:
@@ -49,6 +55,20 @@ tests[3]:
       created_at: "2026-11-10T17:29:58.414Z"
       source_kind: local_mutation
       source_ref: fix/bot-green-1108
+  - command: node --test test/workflow-security.test.ts
+    scope: project
+    provenance:
+      author: pi-glm
+      created_at: "2026-11-16T09:08:53.667Z"
+      source_kind: local_mutation
+      source_ref: ci/pm-github-2026.11.15-bounded-ci-dispatch
+  - command: node --test test/workflow-security.test.ts test/action-pin-provenance.test.ts
+    scope: project
+    provenance:
+      author: codex-sol
+      created_at: "2026-11-16T12:19:03.916Z"
+      source_kind: local_mutation
+      source_ref: ci/pm-github-2026.11.15-bounded-ci-dispatch
 docs[2]{path,scope}:
   CHANGELOG.md,project
   docs/action-pins.md,project

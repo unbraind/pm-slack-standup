@@ -65,6 +65,7 @@ test("calendar annotation work keeps separate release provenance from the Octobe
     "gh:unbraind/pm-slack-standup#191",
     "gh:unbraind/pm-slack-standup#192",
     "gh:unbraind/pm-slack-standup#195",
+    "gh:unbraind/pm-slack-standup#212",
   ]);
   assert.deepEqual(items.get("pm-slack-standup-6wvl")?.provenanceTags, []);
 });
