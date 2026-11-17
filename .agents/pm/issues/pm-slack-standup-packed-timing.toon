@@ -2,14 +2,14 @@ id: pm-slack-standup-packed-timing
 title: Investigate packed npm and Bun acceptance exceeding the unchanged local timeout under shared load
 description: "Direct source npm release validation on the toolchain bump ran 287 tests: 285 passed, and the two real packed acceptance matrices exceeded their existing 290000 ms subprocess timeout. The matrices cover npm-current, bun-current, npm-minimum, bun-minimum and npm-global-current. Earlier branch CI completed the same matrices and reached only the separate changelog drift. Preserve timeout and coverage thresholds; distinguish host contention or install cost from package regressions. Validation evidence is on pm-slack-standup-jnje."
 type: Issue
-status: in_progress
+status: open
 priority: 2
 tags[3]: ci,"gh:unbraind/pm-slack-standup#213",performance
 created_at: "2026-10-26T18:53:49.669Z"
-updated_at: "2026-11-16T13:16:47.624Z"
+updated_at: "2026-11-16T20:45:02.556Z"
 author: codex-agent
 acceptance_criteria: Explain and reproduce the instrumented packed-install timing discrepancy; retain the 290000 ms subprocess timeout and every coverage threshold; record standalone and full npm/Bun receipts
-comments[16]{created_at,author,text}:
+comments[17]{created_at,author,text}:
   "2026-10-26T19:08:31.471Z",codex-agent,"Standalone acceptance completed all five scenarios with matching SDK identities, rendered fixture counts and no missing fixture data. Full npm and Bun gates each passed 285/287 tests and timed out only their two instrumented real-install matrices. This separates functional acceptance from the unchanged 290000 ms budget; investigate instrumentation, fresh per-scenario caches and shared scheduling without lowering coverage or increasing that timeout."
   "2026-10-31T00:59:00.361Z",codex-agent,"Cursor-window delivery validation repeats the existing instrumented limit: complete isolated npm release check ran 350 tests, 348 passed, and only both real-install matrices exceeded 290000 ms. Runtime modules measured 100% in all four dimensions; acceptance-script paths left unexecuted by timeout reduced global coverage to 96.17% lines/statements, 99.88% branches, 97.59% functions. No timeout or coverage threshold was changed. Current-source Node/Bun standalone receipts and exact-head CI will be linked from pm-slack-standup-kovw."
   "2026-10-31T01:23:33.985Z",codex-agent,"Bun full release validation also completed 348/350 tests, failing only the same two 290000 ms matrix timeouts. Its runtime-module coverage and overall authored-source percentages match the npm receipt. Preserve this as timing evidence; it is not a passing release gate. Final-source standalone fresh-pack receipts and CI are pending on pm-slack-standup-kovw."
@@ -26,6 +26,7 @@ comments[16]{created_at,author,text}:
   "2026-11-15T22:38:15.949Z",codex-sol,"Round E evidence: PRRT_kwDOTbNzVM63t-q1 and PRRT_kwDOTbNzVM63t-q5 are valid. Scale the sleeping fixture to three times the integer-rounded harness ceiling, retaining the product 300 ms read deadline. Report the actual generated registry count. Targeted fetch/status/workflow tests, typecheck, lint and strict YAML passed. Greptile failure is the review status, not an Actions test log."
   "2026-11-15T22:50:25.339Z",codex-sol,"Round E final verification: typecheck, lint (docstring gate where no lint script exists), touched regression tests, workflow/tooling tests, strict workflow YAML and changelog:check passed. Duplication gates passed where provided. Self-review retained docs/tracker privacy and identity checks, unscaled product deadlines, integer-rounded validated harness budgets, platform filename guards and generated-only quick thresholds. No package coverage sources were edited; no package coverage run. No review thread actions or merge. Shared-runner hold and SteveBot commit identity will be checked before push. Hosted CI is intentionally not awaited. At harness scale 10, the unchanged 300 ms product deadline still produced ETIMEDOUT in 313 ms, before the scaled sleeping fixture could complete."
   "2026-11-16T13:16:47.622Z",codex-sol,"Pin PR #212 current-code quick retry reproduces both unchanged packed acceptance failures despite existing PM_TEST_TIME_SCALE=3 harness support: inherited npm_execpath case 873201 ms, unset case 871512 ms, child status null instead of zero. Broad run completes 363/365 with only these failures. Preserve real npm/Bun launcher coverage and investigate the stalled acceptance stage; no watchdog or product-budget source changes were made."
+  "2026-11-16T20:45:02.555Z",codex,"2026-11-16 (orchestrator): reset from in_progress to open. Nobody is actively working on it, and the fleet classification found the packed-stage stall still unexplained: no complete standalone or full npm/Bun evidence yet. Not closed: merged #194 links this item, but #194 did not deliver it."
 files[13]{path,scope}:
   .github/workflows/ci-deep.yml,project
   .github/workflows/ci.yml,project
