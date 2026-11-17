@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026.11.17 - 2026-11-17
+
+### Dependencies
+
+- Bump eslint ([#219](https://github.com/unbraind/pm-slack-standup/pull/219))
+- Bump @unbrained/pm-cli ([#218](https://github.com/unbraind/pm-slack-standup/pull/218))
+- Bump @babel/eslint-parser ([#215](https://github.com/unbraind/pm-slack-standup/pull/215))
+
 ## 2026.11.15 - 2026-11-15
 
 ### Other
