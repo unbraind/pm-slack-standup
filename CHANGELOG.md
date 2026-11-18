@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.11.18 - 2026-11-18
+
+### Dependencies
+
+- Bump pm-changelog ([#221](https://github.com/unbraind/pm-slack-standup/pull/221))
+
 ## 2026.11.17 - 2026-11-17
 
 ### Dependencies
