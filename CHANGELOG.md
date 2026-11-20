@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.11.20 - 2026-11-20
+
+### Dependencies
+
+- Bump unbraind/pm-ops/.github/workflows/daily-release.yml ([#227](https://github.com/unbraind/pm-slack-standup/pull/227))
+
 ## 2026.11.18 - 2026-11-18
 
 ### Dependencies
