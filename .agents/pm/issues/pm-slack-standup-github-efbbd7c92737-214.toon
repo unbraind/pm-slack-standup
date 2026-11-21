@@ -1,0 +1,25 @@
+id: pm-slack-standup-github-efbbd7c92737-214
+title: "CI Deep: synthetic localhost HTTPS fixture refuses connections on Node 22 and 26"
+description: "GH issue #214: https://github.com/unbraind/pm-slack-standup/issues/214 · author @unbraind · state reason completed · created 2026-11-16T01:37:26Z · updated 2026-11-16T19:38:56Z"
+type: Issue
+status: closed
+priority: 2
+tags[2]: "gh:unbraind/pm-slack-standup#214","github_author:unbraind"
+created_at: "2026-11-16T01:37:26Z"
+updated_at: "2026-11-21T09:53:11.572Z"
+closed_at: "2026-11-16T19:38:56Z"
+completed_at: "2026-11-16T19:38:56Z"
+author: pm-github
+release: v2026.11.17
+close_reason: "Closed on GitHub as completed on 2026-11-16T19:38:56Z; closing PR https://github.com/unbraind/pm-slack-standup/pull/216 (\"test: bind the HTTPS fixture to its advertised loopback\")"
+github_close_reason: "Closed on GitHub as completed on 2026-11-16T19:38:56Z; closing PR https://github.com/unbraind/pm-slack-standup/pull/216 (\"test: bind the HTTPS fixture to its advertised loopback\")"
+github_closed_at: "2026-11-16T19:38:56Z"
+github_created_at: "2026-11-16T01:37:26Z"
+github_link_only: false
+github_number: 214
+github_release: v2026.11.17
+github_state: closed
+github_state_reason: completed
+github_updated_at: "2026-11-16T19:38:56Z"
+github_url: "https://github.com/unbraind/pm-slack-standup/issues/214"
+body: "### Reproduction and impact\n\nOn main `431150b9f37767eb400f8b1cc16c4ed2e27a3838`, the npm legs of [CI Deep Node 22.18](https://github.com/unbraind/pm-slack-standup/actions/runs/43775378542/job/133000369474) and [Node 26](https://github.com/unbraind/pm-slack-standup/actions/runs/43775378542/job/133000369792) each pass 361 of 364 tests, then fail coverage. The same three tests try to reach the synthetic HTTPS endpoint and get `ECONNREFUSED 127.0.0.1` instead of exercising the transport:\n\n- [Runtime HTTPS port, query and body](https://github.com/unbraind/pm-slack-standup/blob/431150b9f37767eb400f8b1cc16c4ed2e27a3838/test/runtime-coverage.test.ts#L7-L25)\n- [HTTPS failures, timeout and multi-target fallback](https://github.com/unbraind/pm-slack-standup/blob/431150b9f37767eb400f8b1cc16c4ed2e27a3838/test/runtime-transport.test.ts#L6-L31)\n- [Scheduled posting](https://github.com/unbraind/pm-slack-standup/blob/431150b9f37767eb400f8b1cc16c4ed2e27a3838/test/runtime-transport.test.ts#L33-L56)\n\nThe [test fixture](https://github.com/unbraind/pm-slack-standup/blob/431150b9f37767eb400f8b1cc16c4ed2e27a3838/test/runtime-fixture.ts#L77-L108) binds and advertises `localhost`. An IPv4/IPv6 mismatch or fixture startup/lifetime problem is a hypothesis, not a confirmed cause. Standalone loopback controls passed on Node 22/24 in a different environment. No real Slack call or product transport regression was verified. The Bun-labelled leg that stops at npm install is a separate symptom, not part of this reproduction.\n\n### Expected and acceptance\n\nMake the synthetic listener, returned URL and readiness agree deterministically across supported environments. Include a small control for mismatched loopback resolution or make the address explicit and report listener versus client address on failure. Rerun the exact three tests and full Deep npm gates on Node 22 and 26 with 100% coverage unchanged. Do not send real Slack requests, weaken client TLS/transport behavior, or relax coverage. The related [G9 harness item](https://github.com/unbraind/pm-slack-standup/blob/431150b9f37767eb400f8b1cc16c4ed2e27a3838/.agents/pm/chores/pm-slack-standup-sdk-harness-g9.toon) describes the fixture work; it does not track this failure.\n\n---\n\n### GitHub comments (1)\n\n> **@unbraind** (2026-11-16T02:36:49Z)\n>\n> The [Node26/Bun Deep leg](https://github.com/unbraind/pm-slack-standup/actions/runs/43775378542/job/133000369759) on the same `431150b9` reached the coverage suite and reproduced the same three synthetic `ECONNREFUSED 127.0.0.1` failures. It misses coverage by the same amounts as the npm legs. This widens the observed setup to another matrix leg; that leg uses the same Node/c8 transport suite, so it does not prove a different Bun runtime cause. The Node22/Bun install failure is still separate."
