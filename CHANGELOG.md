@@ -1,16 +1,24 @@
 # Changelog
 
-## Unreleased
+## 2026.11.20 - 2026-11-20
 
-### Fixed
+### Dependencies
 
-- Accept calendar annotations only on trusted reusable workflow job pins ([pm-slack-standup-calendar-pins-195](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-calendar-pins-195.toon))
-- Synthetic HTTPS test webhook must advertise the address it listens on ([pm-slack-standup-wcyv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wcyv.toon))
+- Bump unbraind/pm-ops/.github/workflows/daily-release.yml ([#227](https://github.com/unbraind/pm-slack-standup/pull/227))
 
-### Other
+## 2026.11.18 - 2026-11-18
 
-- Replace residual standup registration mock with SDK harness ([pm-slack-standup-sdk-harness-g9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-sdk-harness-g9.toon))
-- Adopt the 2026.11.4 toolchain and literal SDK field contract ([pm-slack-standup-toolchain-1104](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-toolchain-1104.toon))
+### Dependencies
+
+- Bump pm-changelog ([#221](https://github.com/unbraind/pm-slack-standup/pull/221))
+
+## 2026.11.17 - 2026-11-17
+
+### Dependencies
+
+- Bump eslint ([#219](https://github.com/unbraind/pm-slack-standup/pull/219))
+- Bump @unbrained/pm-cli ([#218](https://github.com/unbraind/pm-slack-standup/pull/218))
+- Bump @babel/eslint-parser ([#215](https://github.com/unbraind/pm-slack-standup/pull/215))
 
 ## 2026.11.15 - 2026-11-15
 

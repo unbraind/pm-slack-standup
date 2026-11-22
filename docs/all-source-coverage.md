@@ -142,7 +142,7 @@ hash-only receipt is preserved separately in
 [evidence/runtime-abandoned-merge-receipt.json](evidence/runtime-abandoned-merge-receipt.json);
 it describes an abandoned candidate, not an applied merge.
 
-Both original source commits used SteveBot identity:
+The original source commits now display the mailmapped author name `unbrained`:
 `09fa83763956c6fdaee3694cbb542b751f4988a5` and
 `45e68dbfce46575ce3d245affa358b4adea991be`. The integrated code was reviewed before
 the combined gate. A caller-context fixture additionally verifies that inherited
