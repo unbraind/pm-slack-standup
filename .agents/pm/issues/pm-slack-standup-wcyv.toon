@@ -6,16 +6,16 @@ status: closed
 priority: 2
 tags[1]: "gh:unbraind/pm-slack-standup#214"
 created_at: "2026-11-16T14:43:32.259Z"
-updated_at: "2026-11-22T23:51:38.651Z"
+updated_at: "2026-11-23T16:12:23.810Z"
 closed_at: "2026-11-16T20:15:41.738Z"
-completed_at: "2026-11-16T20:15:41.738Z"
+completed_at: "2026-11-16T19:38:55.000Z"
 author: pi-glm
 acceptance_criteria: "The fixture binds one explicit loopback address and advertises that exact literal address, so the client performs no second name resolution; The transport tests pass on Node 22 and Node 26 with the rest of the quick tier; A regression test fails on the old fixture by asserting the advertised host equals the bound literal address"
 release: 2026.11.17
 resolution: Implemented and merged in #216 (cb8d554).
 expected_result: The change described by this item is on main.
 actual_result: "Merged in #216 as cb8d554; checks successful at head c363e52: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
-comments[7]{created_at,author,text}:
+comments[8]{created_at,author,text}:
   "2026-11-16T15:18:26.483Z",codex-sol,"Continuation: verified the existing worktree and remote branch state, preserved the earlier changes, and reused this item. Rerunning required gates to completion under the continuation author before committing results."
   "2026-11-16T15:25:43.239Z",codex-sol,"Controlled proof: with the original fixture and a resolver returning IPv6 for the listener then IPv4 for the HTTPS client, the new regression fails with connect ECONNREFUSED 127.0.0.1. This rules out an early close or port allocation race in the reproduction. The fixture now binds and advertises its actual IPv4 address and port; its self-signed certificate includes that IP SAN, preserving TLS verification. Historical runner DNS ordering was not directly observed. The original-fixture control exited 1 as expected."
   "2026-11-16T15:35:19.786Z",codex-sol,"Transport verification completed: node --test --test-concurrency=2 test/runtime-transport.test.ts test/runtime-coverage.test.ts passed all 6 tests with no skips on Node 22.23.4 and Node 26.13.0. The old-fixture resolver-order control failed with ECONNREFUSED as expected; the literal-address fixture passed with TLS verification enabled. The full quick tier and remaining package gates are running separately."
@@ -23,6 +23,7 @@ comments[7]{created_at,author,text}:
   "2026-11-16T15:59:15.031Z",codex-sol,"Gate results before publication: typecheck and lint completed successfully; changelog:check passed. Both transport files passed all 6 tests on Node 22.23.4 and Node 26.13.0. The controlled old-fixture run failed with ECONNREFUSED as expected. The first full quick test run timed out under disk contention; a replacement run is active and remains pending evidence. Publishing a draft for exact-head CI validation."
   "2026-11-16T16:00:08.147Z",codex-sol,"Implementation commit c589bccb90422af3ef56821fa838c7b0e760f23c preserves the controlled resolver-order failure proof and the 6-test transport passes on Node 22 and 26. Typecheck, lint and changelog checks passed. Broader quick tests and exact-head CI remain pending; the first local quick attempt timed out. Releasing the claim for orchestrator verification."
   "2026-11-16T16:47:56.760Z",codex-sol,"The completed broad quick suite reported 366 tests: 364 passed and 2 failed. Both failures were the existing packed npm/Bun acceptance matrices returning no exit status within their harness budget. All HTTPS transport tests passed, including all 6 targeted tests on both Node 22.23.4 and Node 26.13.0. The full quick tier remains non-green; the fixture fix itself has the controlled old-fixture refusal and passing transport evidence. Tracking PR: https://github.com/unbraind/pm-slack-standup/pull/216. The PR remains open for orchestrator verification; exact-head CI is queued or running."
+  "2026-11-23T16:12:23.807Z",codex-agent,"Completion recorded at the delivery merge 2026-11-16T19:38:55Z for PR #216 (https://github.com/unbraind/pm-slack-standup/pull/216), merge commit cb8d5546a73b2dc6eddf80f0a3fb37a80e3a7755; first containing tag v2026.11.17."
 files[4]{path,scope}:
   test/runtime-fixture.ts,project
   test/runtime-transport.test.ts,project
