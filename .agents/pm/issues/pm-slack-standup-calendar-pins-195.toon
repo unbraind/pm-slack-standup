@@ -6,7 +6,7 @@ status: closed
 priority: 1
 tags[4]: "gh:unbraind/pm-slack-standup#191","gh:unbraind/pm-slack-standup#192","gh:unbraind/pm-slack-standup#195","gh:unbraind/pm-slack-standup#212"
 created_at: "2026-11-09T16:19:14.707Z"
-updated_at: "2026-11-23T16:12:17.419Z"
+updated_at: "2026-11-23T22:31:31.412Z"
 closed_at: "2026-11-16T20:39:21.845Z"
 completed_at: "2026-11-10T18:12:42.000Z"
 author: codex-agent
@@ -15,7 +15,7 @@ release: 2026.11.11
 resolution: Implemented and merged in #195 (3c14920).
 expected_result: The change described by this item is on main.
 actual_result: "Merged in #195 as 3c14920; checks successful at head f136888: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
-comments[21]{created_at,author,text}:
+comments[22]{created_at,author,text}:
   "2026-11-09T16:19:16.938Z",codex-agent,"Continuation audit: reused PR #195 and fix/bot-green-1108. Remote head e0d816a; local merge 5a771dd already includes current main d67717d. Preserved the pending jobReference restriction and regression changes. Fetched all three unresolved threads with every comment; latest CodeRabbit review has no Outside diff range findings. All three are valid. Historical item pm-slack-standup-6wvl retains October release provenance; this separate item owns the new calendar fix and review evidence. Never rewrite existing history."
   "2026-11-09T16:23:05.812Z",codex-agent,"Behavioral revert proofs in disposable copies: fixed pin suite passes 13/13. Removing only jobReference from packageWorkflow fails the job-only regression (12/13); removing only the calendar exception also fails it (12/13); restored fixed code passes 13/13. Both actual PR #191 and #192 workflow patches apply and pass 13/13. Self-review preserved unpadded strict-semver tags for steps; padded calendar annotations require job references. The provenance regression verifies separate item/title/release ownership. The October-entry regression remains pending the historical-state restoration decision."
   "2026-11-09T16:24:53.876Z",codex-agent,"Review round status: PRRT_kwDOTbNzVM60_GdG fixed by jobReference restriction with pin-policy regression; both behavior-only reverts fail 12/13 and fixed restoration passes 13/13. PRRT_kwDOTbNzVM60_GdA addressed by this distinct issue, preserved historical title/release, and removal of the calendar acceptance criterion from the October item; reverting only that criterion fails the new provenance test 0/1, fixed passes 1/1. PRRT_kwDOTbNzVM60_GdD is valid and remains blocked: the generator filters done statuses, and the inherited reopening removes the October entry. A prepared assertion reproduces the missing entry (0/1); restoring the historical closed state needs an exception to the explicit no-close rule, requested from the owner. Do not interpret this as an invalid finding or completed review round. That failing assertion is retained outside the committed test suite until the correction is authorized."
@@ -37,6 +37,7 @@ comments[21]{created_at,author,text}:
   "2026-11-16T13:16:44.218Z",codex-sol,"Terminal current-code quick retry: PM_TEST_DEPTH=quick PM_TEST_TIME_SCALE=3 npm test exits 1; pm test wrapper exits 5 to report that failure. All 365 tests ran: 363 pass, 2 fail, 0 cancelled/skipped/todo; npm duration 2030060 ms. Both remaining failures are the unchanged packed acceptance npm/Bun matrices (npm_execpath inherited/unset), each returning null child status after roughly 870000 ms. Workflow and provenance tests pass, confirming c440905 fixed the stale validator and required-tag fixture. Focused workflow/provenance gate remains 18/18; typecheck, lint, changelog and tracker validation pass. This is not a complete-suite pass; existing pm-slack-standup-packed-timing retains the runtime blocker."
   "2026-11-17T02:00:57.653Z",pi-glm,"Review round AC ancestry verification: the #195 merge commit 3c14920 is contained by tags v2026.11.11, v2026.11.13 and v2026.11.15 (including the 2026.11.15 release commit 45ad137), and the first containing tag is v2026.11.11, so the rule pins release 2026.11.11. Applying it is deferred: regeneration with the release field set drops the three published Dependencies bullets from the 2026.11.11 section. Release attribution waits for pm-changelog#362; the field remains unset and the changelog is unchanged."
   "2026-11-23T16:12:17.418Z",codex-agent,"Completion recorded at the delivery merge 2026-11-10T18:12:42Z for PR #195 (https://github.com/unbraind/pm-slack-standup/pull/195), merge commit 3c14920ff068a0dbe45f91cd208f0e86e23c9c1f; first containing tag v2026.11.11."
+  "2026-11-23T22:31:31.411Z",codex-agent,Delivery PR #195 merged as 3c14920. The first containing tag is v2026.11.11. The later v2026.11.15 tag contains the same merge. Retain the earliest release attribution.
 files[4]{path,scope}:
   .agents/pm/history/pm-slack-standup-6wvl.jsonl,project
   .agents/pm/issues/pm-slack-standup-6wvl.toon,project
