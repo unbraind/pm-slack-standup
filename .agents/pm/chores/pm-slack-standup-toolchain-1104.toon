@@ -6,11 +6,12 @@ status: closed
 priority: 2
 tags[4]: dependencies,"gh:unbraind/pm-slack-standup#186",migration,sdk
 created_at: "2026-11-05T04:49:24.949Z"
-updated_at: "2026-11-17T02:00:26.882Z"
+updated_at: "2026-11-22T23:51:32.030Z"
 closed_at: "2026-11-16T20:39:04.827Z"
 completed_at: "2026-11-16T20:39:04.827Z"
 author: codex-toolchain-1104
 acceptance_criteria: Exact requested pins; focused regressions and coverage pass; typecheck and lint pass; separate review PR contains tracker evidence
+release: 2026.11.09
 resolution: Implemented and merged in #189 (9d9e715).
 expected_result: The change described by this item is on main.
 actual_result: "Merged in #189 as 9d9e715; checks successful at head 9034610: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."

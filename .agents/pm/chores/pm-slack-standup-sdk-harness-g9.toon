@@ -6,11 +6,12 @@ status: closed
 priority: 2
 tags[2]: sdk-adoption,testing
 created_at: "2026-11-06T15:47:19.852Z"
-updated_at: "2026-11-17T02:00:59.504Z"
+updated_at: "2026-11-22T23:51:30.722Z"
 closed_at: "2026-11-16T20:39:14.605Z"
 completed_at: "2026-11-16T20:39:14.605Z"
 author: codex-sol
 acceptance_criteria: No handwritten positive ExtensionApi host remains in smoke tests; real non-git tracker commands and exporter exercise registered flags and output receipts; behavioural revert proofs documented
+release: 2026.11.09
 resolution: Implemented and merged in #194 (169f3c4).
 expected_result: The change described by this item is on main.
 actual_result: "Merged in #194 as 169f3c4; checks successful at head b87dbd4: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."

@@ -6,11 +6,12 @@ status: closed
 priority: 1
 tags[4]: "gh:unbraind/pm-slack-standup#191","gh:unbraind/pm-slack-standup#192","gh:unbraind/pm-slack-standup#195","gh:unbraind/pm-slack-standup#212"
 created_at: "2026-11-09T16:19:14.707Z"
-updated_at: "2026-11-17T02:00:57.655Z"
+updated_at: "2026-11-22T23:51:33.698Z"
 closed_at: "2026-11-16T20:39:21.845Z"
 completed_at: "2026-11-16T20:39:21.845Z"
 author: codex-agent
 acceptance_criteria: Trusted reusable workflow jobs accept calendar annotations; steps retain strict semver; October action-pin release entry remains generated; behavioral reverts fail
+release: 2026.11.11
 resolution: Implemented and merged in #195 (3c14920).
 expected_result: The change described by this item is on main.
 actual_result: "Merged in #195 as 3c14920; checks successful at head f136888: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."

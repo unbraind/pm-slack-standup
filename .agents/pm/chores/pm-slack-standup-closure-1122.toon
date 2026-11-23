@@ -1,0 +1,21 @@
+id: pm-slack-standup-closure-1122
+title: Refresh tracker closure PR #217
+description: "Recheck current main, verify delivery evidence, regenerate the changelog and record the validation outcome."
+type: Chore
+status: open
+priority: 2
+tags[1]: tracker-sweep
+created_at: "2026-11-22T23:51:25.780Z"
+updated_at: "2026-11-23T00:07:42.512Z"
+author: codex-agent
+comments[3]{created_at,author,text}:
+  "2026-11-22T23:51:29.648Z",codex-agent,The first containing tag for calendar PR #195 is v2026.11.11. The branch has four pre-existing completion dates that do not match the delivering merge times. Preserve those dates and surface the verification discrepancy.
+  "2026-11-23T00:01:11.613Z",codex-agent,Focused linked test did not pass. The exact command and failing result are recorded in the refresh report for investigation.
+  "2026-11-23T00:07:42.511Z",codex-agent,Re-running the focused linked tests after regenerating the changelog passed 10/10. The first containing tag for PR #195 is v2026.11.11 and the generated notes put it there. The branch completion dates are preserved and prevent the exact merge-time closure verifier from passing.
+files[1]{path,scope}:
+  CHANGELOG.md,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/identity-audit.test.ts test/packaging.test.ts test/action-pin-provenance.test.ts test/decision-validation-guide.test.ts,project,codex-agent,"2026-11-22T23:51:45.263Z",local_mutation,codex/closure-1122/chore/close-merged-items-2026-11-16
+docs[1]{path,scope}:
+  CHANGELOG.md,project
+body: ""

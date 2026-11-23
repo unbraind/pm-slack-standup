@@ -6,11 +6,12 @@ status: closed
 priority: 2
 tags[1]: "gh:unbraind/pm-slack-standup#214"
 created_at: "2026-11-16T14:43:32.259Z"
-updated_at: "2026-11-16T20:15:41.807Z"
+updated_at: "2026-11-22T23:51:38.651Z"
 closed_at: "2026-11-16T20:15:41.738Z"
 completed_at: "2026-11-16T20:15:41.738Z"
 author: pi-glm
 acceptance_criteria: "The fixture binds one explicit loopback address and advertises that exact literal address, so the client performs no second name resolution; The transport tests pass on Node 22 and Node 26 with the rest of the quick tier; A regression test fails on the old fixture by asserting the advertised host equals the bound literal address"
+release: 2026.11.17
 resolution: Implemented and merged in #216 (cb8d554).
 expected_result: The change described by this item is on main.
 actual_result: "Merged in #216 as cb8d554; checks successful at head c363e52: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
