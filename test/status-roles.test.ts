@@ -181,8 +181,8 @@ test("reviewing active-role work survives hosted reports and exports without git
     process.env.PATH = fixture.directory;
     process.env.GIT_CEILING_DIRECTORIES = dirname(fixture.directory);
     for (const allOpen of [false, true]) for (const includeDone of [false, true]) {
-      const options = { "all-open": allOpen, "include-done": includeDone, "include-decisions": true, format: "plain", "dry-run": true };
-      const preview = await runtimeCommand(fixture, "standup", options);
+      const options = { "all-open": allOpen, "include-done": includeDone, "include-decisions": true };
+      const preview = await runtimeCommand(fixture, "standup", { ...options, format: "plain", "dry-run": true });
       assert.match(String(preview.rendered), /Reviewing custom work/);
       const receipt = await fixture.harness.runExporter({ exporter: "standup", pmRoot: fixture.pmRoot, options: { ...options, format: "json" } });
       const snapshot = JSON.parse(String((receipt.result as Record<string, unknown>).output)) as { sections_data: Record<string, PmItem[]> };

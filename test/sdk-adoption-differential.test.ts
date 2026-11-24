@@ -58,11 +58,13 @@ test("origin/main build and SDK adoption produce identical reports on immutable 
         assert.ok(items.length > 0, "the public corpus must contain real items");
         for (const command of ["standup", "slack-standup", "standup decisions"]) {
           for (const format of command === "standup decisions" ? ["plain"] : ["plain", "markdown", "slack", "blockkit"]) {
+            const options = command === "standup decisions"
+              ? {}
+              : { "dry-run": true, "include-done": true, "all-open": true, "include-blockers": true, format };
             const outputs = [];
             for (const harness of harnesses) {
               stdout.length = 0;
-              const result = await harness.runCommand({ command, pmRoot,
-                options: { "dry-run": true, "include-done": true, "all-open": true, "include-blockers": true, format } });
+              const result = await harness.runCommand({ command, pmRoot, options });
               outputs.push({ result, stdout: stdout.join("") });
             }
             assert.deepEqual(outputs[1], outputs[0], `${command} ${format} public corpus ${index}`);

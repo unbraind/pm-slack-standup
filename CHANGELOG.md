@@ -61,11 +61,19 @@
 
 ## 2026.11.3 - 2026-11-03
 
-No changes.
+### Dependencies
+
+- Bump eslint ([#183](https://github.com/unbraind/pm-slack-standup/pull/183))
+- Bump the codeql-action group across 1 directory with 2 updates ([#170](https://github.com/unbraind/pm-slack-standup/pull/170))
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#172](https://github.com/unbraind/pm-slack-standup/pull/172))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#171](https://github.com/unbraind/pm-slack-standup/pull/171))
 
 ## 2026.11.2 - 2026-11-02
 
-No changes.
+### Dependencies
+
+- Bump @types/node ([#180](https://github.com/unbraind/pm-slack-standup/pull/180))
+- Bump the pm-toolchain group with 3 updates ([#179](https://github.com/unbraind/pm-slack-standup/pull/179))
 
 ## 2026.11.1 - 2026-11-01
 
@@ -79,12 +87,20 @@ No changes.
 
 - Restore generated notes for prepared 2026.10.29 ([pm-slack-standup-release-notes-1029](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-release-notes-1029.toon))
 
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#169](https://github.com/unbraind/pm-slack-standup/pull/169))
+
 ## 2026.10.29 - 2026-10-29
 
 ### Added
 
 - Compare selected standup commitments with revision-cited outcomes and scope changes ([pm-slack-standup-commitment-variance](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-commitment-variance.toon))
 - Report progress gains with evidence revisions across standup windows ([pm-slack-standup-progress-evidence](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/features/pm-slack-standup-progress-evidence.toon))
+
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#165](https://github.com/unbraind/pm-slack-standup/pull/165))
 
 ## 2026.10.28 - 2026-10-28
 
@@ -96,17 +112,30 @@ No changes.
 
 - Stop Hound from linting generated dist/ output ([pm-slack-standup-hound-generated-dist](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-hound-generated-dist.toon))
 
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#162](https://github.com/unbraind/pm-slack-standup/pull/162))
+
 ## 2026.10.27 - 2026-10-27
 
 ### Changed
 
 - Use the pm SDK for certified standup reads and lifecycle roles ([pm-slack-standup-jti0](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-jti0.toon))
 
+### Dependencies
+
+- Bump @unbrained/pm-cli ([#158](https://github.com/unbraind/pm-slack-standup/pull/158))
+- Bump the pm-toolchain group across 1 directory with 3 updates ([#154](https://github.com/unbraind/pm-slack-standup/pull/154))
+
 ## 2026.10.26 - 2026-10-26
 
 ### Other
 
 - Point the npm homepage at the package catalog and link the author ([pm-slack-standup-vpn3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-vpn3.toon))
+
+### Dependencies
+
+- Bump jscpd ([#155](https://github.com/unbraind/pm-slack-standup/pull/155))
 
 ## 2026.10.25 - 2026-10-25
 
@@ -120,9 +149,17 @@ No changes.
 - Revalidate delivered decision-request sections on the current public tracker ([pm-slack-standup-defb](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/tasks/pm-slack-standup-defb.toon))
 - Correct tracker reconciliation review records ([pm-slack-standup-rh0e](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-rh0e.toon))
 
+### Dependencies
+
+- Bump the pm-toolchain group across 1 directory with 3 updates ([#140](https://github.com/unbraind/pm-slack-standup/pull/140))
+
 ## 2026.10.23 - 2026-10-23
 
-No changes.
+### Dependencies
+
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#144](https://github.com/unbraind/pm-slack-standup/pull/144))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#145](https://github.com/unbraind/pm-slack-standup/pull/145))
+- Bump the codeql-action group with 2 updates ([#143](https://github.com/unbraind/pm-slack-standup/pull/143))
 
 ## 2026.10.21 - 2026-10-21
 
@@ -151,27 +188,41 @@ No changes.
 
 ## 2026.10.20 - 2026-10-20
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group across 1 directory with 3 updates ([#135](https://github.com/unbraind/pm-slack-standup/pull/135))
+- Bump eslint ([#136](https://github.com/unbraind/pm-slack-standup/pull/136))
 
 ## 2026.10.19 - 2026-10-19
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#133](https://github.com/unbraind/pm-slack-standup/pull/133))
 
 ## 2026.10.18 - 2026-10-18
 
-No changes.
+### Dependencies
+
+- Bump actions/setup-node from 7.0.0 to 7.1.0 ([#126](https://github.com/unbraind/pm-slack-standup/pull/126))
 
 ## 2026.10.17 - 2026-10-17
 
-No changes.
+### Dependencies
+
+- Bump the codeql-action group across 1 directory with 2 updates ([#125](https://github.com/unbraind/pm-slack-standup/pull/125))
 
 ## 2026.10.16 - 2026-10-16
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 2 updates ([#124](https://github.com/unbraind/pm-slack-standup/pull/124))
 
 ## 2026.10.15 - 2026-10-15
 
-No changes.
+### Dependencies
+
+- Bump @unbrained/pm-cli ([#122](https://github.com/unbraind/pm-slack-standup/pull/122))
+- Bump @unbrained/pm-cli ([#121](https://github.com/unbraind/pm-slack-standup/pull/121))
 
 ## 2026.10.14 - 2026-10-14
 
@@ -181,15 +232,22 @@ No changes.
 
 ## 2026.10.13 - 2026-10-13
 
-No changes.
+### Dependencies
+
+- Bump the dependencies group across 1 directory with 3 updates ([#116](https://github.com/unbraind/pm-slack-standup/pull/116))
+- Bump the pm-toolchain group with 3 updates ([#115](https://github.com/unbraind/pm-slack-standup/pull/115))
 
 ## 2026.10.9 - 2026-10-09
 
-No changes.
+### Dependencies
+
+- Bump pm-ops ([#111](https://github.com/unbraind/pm-slack-standup/pull/111))
 
 ## 2026.10.8 - 2026-10-08
 
-No changes.
+### Dependencies
+
+- Bump @unbrained/pm-cli ([#109](https://github.com/unbraind/pm-slack-standup/pull/109))
 
 ## 2026.10.5 - 2026-10-05
 
@@ -221,7 +279,10 @@ No changes.
 
 ## 2026.9.25 - 2026-09-25
 
-No changes.
+### Dependencies
+
+- Bump @types/node from 26.5.1 to 26.6.2 ([#92](https://github.com/unbraind/pm-slack-standup/pull/92))
+- Bump the codeql-action group with 2 updates ([#93](https://github.com/unbraind/pm-slack-standup/pull/93))
 
 ## 2026.9.23 - 2026-09-23
 
@@ -229,7 +290,10 @@ No changes.
 
 ## 2026.9.19 - 2026-09-19
 
-No changes.
+### Dependencies
+
+- Bump the codeql-action group across 1 directory with 2 updates ([#86](https://github.com/unbraind/pm-slack-standup/pull/86))
+- Bump @types/node from 26.5.0 to 26.5.1 ([#85](https://github.com/unbraind/pm-slack-standup/pull/85))
 
 ## 2026.9.18 - 2026-09-18
 
@@ -242,6 +306,10 @@ No changes.
 ### Other
 
 - Certify pm CLI 2026.9.12 and the pm-ops 2026.9.11 auditor ([pm-slack-standup-d99b](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-d99b.toon))
+
+### Dependencies
+
+- Bump @types/node from 26.4.0 to 26.5.0 ([#80](https://github.com/unbraind/pm-slack-standup/pull/80))
 
 ## 2026.9.11 - 2026-09-11
 
@@ -270,6 +338,10 @@ No changes.
 
 - Closed: Disable cmd.exe delayed expansion on the Windows pm launch path ([pm-slack-standup-bqr8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-bqr8.toon))
 
+### Dependencies
+
+- Bump pm-changelog from 2026.8.17 to 2026.9.1 ([#70](https://github.com/unbraind/pm-slack-standup/pull/70))
+
 ## 2026.9.5 - 2026-09-05
 
 ### Security
@@ -286,6 +358,11 @@ No changes.
 
 - Converge the pinned pm-cli on 2026.8.31 and repair history hashes ([pm-slack-standup-kme9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-kme9.toon))
 
+### Dependencies
+
+- Bump @types/node from 26.3.0 to 26.4.0 ([#64](https://github.com/unbraind/pm-slack-standup/pull/64))
+- Bump the codeql-action group with 2 updates ([#65](https://github.com/unbraind/pm-slack-standup/pull/65))
+
 ## 2026.8.31 - 2026-08-31
 
 ### Fixed
@@ -300,7 +377,10 @@ No changes.
 
 ## 2026.8.29 - 2026-08-29
 
-No changes.
+### Dependencies
+
+- Bump @unbrained/pm-cli from 2026.8.21 to 2026.8.25 ([#58](https://github.com/unbraind/pm-slack-standup/pull/58))
+- Bump @types/node from 26.2.0 to 26.3.0 ([#57](https://github.com/unbraind/pm-slack-standup/pull/57))
 
 ## 2026.8.28 - 2026-08-28
 
@@ -329,6 +409,12 @@ No changes.
 - The .cmd shim resolvePmBin selects on win32 cannot be launched by its only caller ([pm-slack-standup-20gw](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-20gw.toon))
 - A truncated list-all envelope produces a partial standup that reads as a quiet day ([pm-slack-standup-5q1f](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-5q1f.toon))
 - Standup read failure must refuse, not render an empty standup ([pm-slack-standup-011l](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-011l.toon))
+
+### Dependencies
+
+- Bump pm-changelog from 2026.8.6 to 2026.8.9 ([#36](https://github.com/unbraind/pm-slack-standup/pull/36))
+- Bump pm-ops from 2026.8.8 to 2026.8.10 ([#37](https://github.com/unbraind/pm-slack-standup/pull/37))
+- Bump @types/node from 26.1.2 to 26.2.0 ([#38](https://github.com/unbraind/pm-slack-standup/pull/38))
 
 ## 2026.8.14 - 2026-08-14
 
@@ -367,6 +453,11 @@ No changes.
 ### Fixed
 
 - Release commits discard the rebuilt dist, so the git-install path serves the previous version ([pm-slack-standup-cims](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-cims.toon))
+
+### Dependencies
+
+- Bump @types/node from 26.1.1 to 26.1.2
+- Bump pm-changelog from 2026.7.27 to 2026.7.28
 
 ## 2026.7.31 - 2026-07-31
 
@@ -411,6 +502,11 @@ No changes.
 
 - Adopt --respect-item-release in changelog scripts and bump pm-changelog to 2026.7.24 ([pm-slack-standup-6nwd](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-6nwd.toon))
 
+### Dependencies
+
+- Bump pm-changelog from 2026.7.15 to 2026.7.23 ([#9](https://github.com/unbraind/pm-slack-standup/pull/9))
+- Bump @unbrained/pm-cli from 2026.7.22 to 2026.7.24 ([#10](https://github.com/unbraind/pm-slack-standup/pull/10))
+
 ## 2026.7.23 - 2026-07-23
 
 ### Other
@@ -437,11 +533,21 @@ No changes.
 
 ## 2026.7.18 - 2026-07-18
 
-No changes.
+### Dependencies
+
+- Bump @unbrained/pm-cli from 2026.7.16 to 2026.7.17 ([#4](https://github.com/unbraind/pm-slack-standup/pull/4))
+- Bump pm-changelog from 2026.7.10 to 2026.7.15 ([#3](https://github.com/unbraind/pm-slack-standup/pull/3))
+- Bump actions/setup-node from 6 to 7 ([#1](https://github.com/unbraind/pm-slack-standup/pull/1))
 
 ## 2026.7.11 - 2026-07-11
 
-No changes.
+### Dependencies
+
+- Bump @unbrained/pm-cli from 2026.7.5 to 2026.7.10
+- Bump typescript from 6.0.3 to 7.0.2
+- Bump @types/node from 25.9.2 to 26.1.1
+- Bump pm-changelog from 2026.7.6 to 2026.7.10
+- Bump actions/checkout from 6 to 7
 
 ## 2026.7.10 - 2026-07-10
 
