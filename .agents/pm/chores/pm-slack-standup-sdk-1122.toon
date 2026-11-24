@@ -1,0 +1,29 @@
+id: pm-slack-standup-sdk-1122
+title: Adopt pm-cli 2026.11.24 host-aligned SDK behaviour
+description: Adopt the current first-party toolchain and align standup tests with the shipped SDK. Companion item pm-cli-website-spus.
+type: Chore
+status: in_progress
+priority: 2
+tags[2]: dependencies,sdk-adoption
+created_at: "2026-11-24T10:52:57.511Z"
+updated_at: "2026-11-24T12:41:48.653Z"
+author: codex-agent
+acceptance_criteria: "Pin the latest first-party toolchain, classify host contract failures using the installed SDK, preserve published dependency bullets in all changelog entry points, and pass the unchanged package gates."
+comments[1]{created_at,author,text}:
+  "2026-11-24T12:41:44.196Z",codex-agent,"- `every SDK and registered report refuses adversarial history without authoritative maintenance`, `retained materialization cannot certify an unavailable target in any SDK report`, `origin/main build and SDK adoption produce identical reports on immutable public tracker copies`, and `reviewing active-role work survives hosted reports and exports without git` used flags from other command paths. The old harness forwarded them. The current host returns `unknown_option` before dispatch. Fixtures now pass each command's declared flags and still check the typed refusal and tracker state.\n- `the command refuses typed input errors and needs no git executable` previously received the window handler's diagnostic for array-valued `maxEvents`. The host now returns `extension_flag_value_invalid` for an array on a single-value flag. The test checks that boundary and still requires the package's own refusal for invalid scalar values.\n- `packed acceptance completes npm/Bun matrices with npm_execpath inherited` and `packed acceptance completes npm/Bun matrices with npm_execpath unset` reached the default local watchdog. The retry used the repository's deep CI timeout scale.\n\nThe first full run on the new pins passed 360 of 367 tests. The two packed watchdog expirations were resolved with PM_TEST_TIME_SCALE=3, which is the existing deep CI setting. In a disposable comparison, 2026.11.14 accepted undeclared flags and arrays on scalar flags. 2026.11.24 refused them before dispatch. Each changed test failed with its previous invocation, and removing any one dependency flag failed the changelog contract test.\n\nFull npm and Bun release checks each passed 368 tests, zero failed, skipped or cancelled. Coverage reported 19 source files, 5844 of 5844 lines and statements, 1838 of 1838 branches, and 213 of 213 functions. Both release checks passed the six standalone packed scenarios, production audit, typecheck, lint, duplication, build, 141 declaration docstrings, canonical-reader and changelog checks. Linked pm tests passed 17 and 1. A fresh dist build matched the tracked files. The installed Bun graph matched the exact pins. The isolated release check deferred the workflow SHA lookup, and a separate online run verified it. Regeneration retained all 12 published dependency bullets.\n\nThe installed testing declaration still says undeclared keys pass through. A minimal registered command with one declared `--count` flag, called through `runCommand` with `options: { foreignFlag: true }`, returns `unknown_option` with exit 2. The native validation is intentional."
+files[8]{path,scope}:
+  package-lock.json,project
+  package.json,project
+  test/history-readonly.test.ts,project
+  test/materialization.test.ts,project
+  test/release-workflow.test.ts,project
+  test/reporting-window.test.ts,project
+  test/sdk-adoption-differential.test.ts,project
+  test/status-roles.test.ts,project
+tests[2]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/history-readonly.test.ts test/materialization.test.ts test/release-workflow.test.ts test/sdk-adoption-differential.test.ts test/status-roles.test.ts,project,1200,codex-agent,"2026-11-24T11:10:17.417Z",local_mutation,deps/adopt-pm-cli-host-alignment-1122
+  "node --test --test-concurrency=2 --test-name-pattern=\"the command refuses typed input errors\" test/reporting-window.test.ts",project,300,codex-agent,"2026-11-24T11:18:27.699Z",local_mutation,deps/adopt-pm-cli-host-alignment-1122
+docs[2]{path,scope}:
+  CHANGELOG.md,project
+  docs/sdk-testing.md,project
+body: ""

@@ -864,10 +864,12 @@ test("the command refuses typed input errors and needs no git executable", async
       isWindowRefusal(error, "window_state_unreadable"));
     await assert.rejects(runtimeCommand(fixture, "standup window", { "cursor-file": join(fixture.directory, "ok.json"), "max-events": "0" }), (error: unknown) =>
       isWindowRefusal(error, "window_max_events_invalid"));
-    for (const raw of ["", "  ", null, 2, []]) {
+    for (const raw of ["", "  ", null, 2]) {
       await assert.rejects(runWindow(fixture, fixture.directory, { maxEvents: raw }),
         (error: unknown) => isWindowRefusal(error, "window_max_events_invalid"));
     }
+    await assert.rejects(runWindow(fixture, fixture.directory, { maxEvents: [] }),
+      { code: "extension_flag_value_invalid", exitCode: 2, message: /--max-events/u });
     await assert.rejects(runWindow(fixture, fixture.directory, { "max-events": "1", maxEvents: "2" }),
       { code: "extension_option_spelling_conflict", exitCode: 2 });
     assert.equal(existsSync(join(fixture.directory, "window-state.json")), false);

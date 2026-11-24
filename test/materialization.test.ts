@@ -50,12 +50,22 @@ test("retained materialization cannot certify an unavailable target in any SDK r
     assert.ok((await getItemAt(target, String(await nativeVersion(f.pmRoot, target)), { pmRoot: f.pmRoot })).document.metadata.id);
     try { noLiveOutcome(await readSdkStandupItems(f.ctx), target, "Commitment 0"); }
     catch (error) { assert.ok(refused("history_unavailable")(error)); }
-    const commands = f.harness.activation.commands.handlers.map(({ command }) => command);
-    for (const command of commands) {
+    const scope = { includeDone: true, allOpen: true };
+    const preview = { options: { ...scope, dryRun: true, format: "plain" } };
+    const commandInputs = {
+      standup: preview,
+      "slack-standup": preview,
+      "standup progress": { args: [target] },
+      "standup variance": { args: [f.source], options: { revision: f.selection.revision } },
+      "standup decisions": {},
+      "standup window": { options: { cursorFile: join(f.directory, "window.json"), noAdvance: true } },
+      "standup export": { options: { ...scope, format: "md" } },
+    };
+    assert.deepEqual(Object.keys(commandInputs).sort(), f.harness.activation.commands.handlers.map(({ command }) => command).sort());
+    for (const [command, input] of Object.entries(commandInputs)) {
       try {
-        const response = await f.harness.runCommand({ command, pmRoot: f.pmRoot,
-          args: [command === "standup progress" ? target : f.source],
-          options: { "cursor-file": join(f.directory, "window.json"), revision: f.selection.revision, dryRun: true, includeDone: true, allOpen: true, format: "plain" } });
+        const response = await f.harness.runCommand({ command, pmRoot: f.pmRoot, ...input });
+        assert.equal(response.handled, true, command);
         noLiveOutcome(response.result, target, "Commitment 0");
         if (command === "standup variance") assert.equal((response.result as CommitmentVarianceReport).rows[0].state, "unsupported");
       } catch (error) { assert.ok(refused("history_unavailable")(error)); }
