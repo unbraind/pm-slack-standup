@@ -2,7 +2,9 @@
 
 ## 2026.11.25 - 2026-11-25
 
-No changes.
+### Dependencies
+
+- Bump unbraind/pm-ops/.github/workflows/daily-release.yml
 
 ## 2026.11.20 - 2026-11-20
 
