@@ -2,7 +2,9 @@
 
 ## 2026.11.25 - 2026-11-25
 
-No changes.
+### Dependencies
+
+- Bump the codeql-action group with 2 updates
 
 ## 2026.11.20 - 2026-11-20
 
