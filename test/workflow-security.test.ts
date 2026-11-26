@@ -267,7 +267,7 @@ test("pm-github callers share one pinned release without a version override, and
     const line = source.split("\n").find(candidate => /^\s*uses:/.test(candidate) && candidate.includes(job.uses)) ?? "";
     const parts = /# pm-github (\d{4})\.(\d{1,2})\.(\d{1,2})(?:-(\d+))?\s*$/.exec(line);
     assert.ok(parts, `the ${name} pin must carry its release comment on the same line`);
-    const pinnedRelease = parts[0];
+    const pinnedRelease = parts.slice(1).join(".");
     // 2026.11.25 is the first pm-github release whose gated import works with the pm CLI this package installs.
     const [year, month, day] = parts.slice(1, 4).map(Number);
     assert.ok(year * 10_000 + month * 100 + day >= 2026_11_25, `${name} must not pin a release older than 2026.11.25`);
