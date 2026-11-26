@@ -4,8 +4,8 @@
 
 ### Dependencies
 
+- Bump the codeql-action group with 2 updates ([#235](https://github.com/unbraind/pm-slack-standup/pull/235))
 - Bump unbraind/pm-ops/.github/workflows/daily-release.yml from 2026.11.15 to 2026.11.22 ([#236](https://github.com/unbraind/pm-slack-standup/pull/236))
-- Bump the codeql-action group with 2 updates
 
 ## 2026.11.20 - 2026-11-20
 
