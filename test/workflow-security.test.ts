@@ -255,16 +255,24 @@ test("quick and deep tiers retain exact runtime floors and runner contracts", ()
 });
 
 
-test("pm-github callers pin the bounded-dispatch release without a version override", () => {
-  for (const name of ["sync", "closeout"]) {
+// The callers pin one full commit with its release comment. This test used to assert one literal commit, which made
+// every Dependabot bump of the callers fail CI; the gated sync then ran an extension older than the installed pm CLI.
+test("pm-github callers share one pinned release without a version override, and Dependabot moves them together", () => {
+  const pins = ["sync", "closeout"].map(name => {
     const source = readFileSync(new URL(`../.github/workflows/pm-github-${name}.yml`, import.meta.url), "utf8");
     const workflow = parseDocument(source).toJS();
     const job = workflow.jobs[`gated-${name}`];
-    assert.equal(job.uses, `unbraind/pm-github/.github/workflows/pm-github-${name}.yml@a3a2e7ccbee2bbd23933d10be578422b967a519c`);
-    assert.match(source, /# pm-github 2026\.11\.15/);
+    const revision = new RegExp(`^unbraind/pm-github/\\.github/workflows/pm-github-${name}\\.yml@([0-9a-f]{40})$`).exec(job.uses)?.[1];
+    assert.ok(revision, `${name} must pin a full commit`);
+    const line = source.split("\n").find(candidate => candidate.trim().startsWith(`uses: ${job.uses}`)) ?? "";
+    const pinnedRelease = /# pm-github (\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?)\s*$/.exec(line)?.[1];
+    assert.ok(pinnedRelease, `the ${name} pin must carry its release comment on the same line`);
     assert.equal(job.with?.["pm-github-version"], undefined);
     assert.equal(job["runs-on"], undefined);
-  }
+    return `${revision} ${pinnedRelease}`;
+  });
+  assert.equal(pins[0], pins[1], "sync and closeout must use one reviewed release");
+  assert.match(readFileSync(new URL("../.github/dependabot.yml", import.meta.url), "utf8"), /pm-github-workflows:\s+patterns:\s+- ["']unbraind\/pm-github\/\*["']/);
   const release = parseDocument(readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8")).toJS().jobs.release;
   assert.match(release.uses, /^unbraind\/pm-ops\/\.github\/workflows\/daily-release\.yml@[a-f0-9]{40}$/);
   assert.equal(release["runs-on"], undefined);
