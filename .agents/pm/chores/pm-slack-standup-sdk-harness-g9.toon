@@ -2,18 +2,26 @@ id: pm-slack-standup-sdk-harness-g9
 title: Replace residual standup registration mock with SDK harness
 description: Adopt the public SDK test harness for positive extension registration and invocation coverage from the G9 adoption audit.
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags[2]: sdk-adoption,testing
 created_at: "2026-11-06T15:47:19.852Z"
-updated_at: "2026-11-06T15:57:26.013Z"
+updated_at: "2026-11-23T16:11:59.346Z"
+closed_at: "2026-11-16T20:39:14.605Z"
+completed_at: "2026-11-06T20:18:22.000Z"
 author: codex-sol
 acceptance_criteria: No handwritten positive ExtensionApi host remains in smoke tests; real non-git tracker commands and exporter exercise registered flags and output receipts; behavioural revert proofs documented
-comments[4]{created_at,author,text}:
+release: 2026.11.09
+resolution: Implemented and merged in #194 (169f3c4).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #194 as 169f3c4; checks successful at head b87dbd4: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
+comments[6]{created_at,author,text}:
   "2026-11-06T15:47:32.993Z",codex-sol,"Scope: companion pm-cli-website-28c9 (G9), read-only evidence from docs/sdk-feature-adoption-2026-11-06.md. Replace the residual positive smoke-test API capture mock using createExtensionTestHarness and its public assertions/dispatch. Reuse the real non-git runtime fixture; preserve presentation/domain rules and intentional old-host tests. Installed pinned SDK is 2026.11.4; public registry now reports 2026.11.6; no dependency bump is needed or authorized."
   "2026-11-06T15:53:52.841Z",codex-sol,"Replaced the positive ExtensionApi capture mock with createExtensionTestHarness via the existing runtime fixture. Public assertCommandContract/assertExporter/assertServiceOverride and runCommand/runExporter/runServiceOverride now cover flags, both command names, schemaAddStatus plus PmClient.update on a real non-git tracker, stdout ownership and native storage preservation. No custom item schema or mutation hooks are registered; native schema/status roles and domain-specific Slack rendering remain covered. Intentional legacy-host test is retained. Revert/withdrawal proofs in a disposable copy: missing dry-run flag fails with missing --dry-run; missing alias fails registration; replacing the host tracker read with an empty list fails wip 0 versus 1; raw_stdout false fails true receipt assertion. Each control exits 1; restored implementation passes 6/6 smoke tests. This is a test-only migration, so these are behavioral negative controls rather than a production bugfix revert. Linked focused command passed 9/9 tests through pm test; lint, typecheck and build:test passed. Full npm/Bun gates and PR review follow."
   "2026-11-06T15:55:43.404Z",codex-sol,The first full npm gate caught six duplicated assertion lines in the expanded smoke test at the unchanged zero-duplication threshold. Reused runtimeCommand from the existing fixture so the SDK receipt assertions stay centralized; no threshold change. Rechecking focused tests and both full gates with isolated Git identity settings.
   "2026-11-06T15:57:21.543Z",codex-sol,"Final focused command after centralizing receipt assertions passed 9/9 with zero failures through pm test --run --progress. Lint, typecheck, build:test and duplication (0%) passed. Implementation and evidence are ready for one PR on standup-sdk-extension-test-harness; full npm/Bun gates, CI and the required bot loop are pending and will be reported on the PR. Item stays in_progress for orchestrator verification; claim released before the review handoff. No production implementation, SDK version or thresholds changed."
+  "2026-11-17T02:00:59.503Z",pi-glm,"Review round AC ancestry verification: the #194 merge commit 169f3c4 is first contained by tag v2026.11.09 (as is the #189 merge commit 9d9e715 for pm-slack-standup-toolchain-1104). Applying release 2026.11.9 is deferred: regeneration then drops the two published Dependencies bullets from the 2026.11.9 section. Release attribution waits for pm-changelog#362; fields remain unset and the changelog is unchanged. pm-slack-standup-wcyv (#216, cb8d554) is contained by no tag and correctly stays Unreleased."
+  "2026-11-23T16:11:59.345Z",codex-agent,"Completion recorded at the delivery merge 2026-11-06T20:18:22Z for PR #194 (https://github.com/unbraind/pm-slack-standup/pull/194), merge commit 169f3c4b9aeca6b2f81acbea5004c16103e573d1; first containing tag v2026.11.09."
 files[3]{path,scope}:
   test/runtime-export.test.ts,project
   test/runtime-fixture.ts,project
@@ -22,4 +30,5 @@ tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test --test-concurrency=2 test/smoke.test.ts test/runtime-export.test.ts,project,codex-sol,"2026-11-06T15:50:17.867Z",local_mutation,standup-sdk-extension-test-harness
 docs[1]{path,scope}:
   docs/sdk-testing.md,project
+close_reason: "Delivered by #194 \"test: replace standup registration mock with SDK harness\" (merged as 169f3c4). Checks successful at the PR head b87dbd4: CodeQL, codeql, test (22.18.0), test (26), windows-acceptance-launcher."
 body: ""

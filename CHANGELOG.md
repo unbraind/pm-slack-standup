@@ -1,6 +1,12 @@
 # Changelog
 
-## 2026.11.25 - 2026-11-25
+## Unreleased
+
+### Other
+
+- Keep published dependency bullets when releases also have tracker items ([pm-slack-standup-changelog-dependency-updates](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-changelog-dependency-updates.toon))
+
+## 2026.11.25 - 2026-11-26
 
 ### Dependencies
 
@@ -20,6 +26,10 @@
 - Bump pm-changelog ([#221](https://github.com/unbraind/pm-slack-standup/pull/221))
 
 ## 2026.11.17 - 2026-11-17
+
+### Fixed
+
+- Synthetic HTTPS test webhook must advertise the address it listens on ([pm-slack-standup-wcyv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wcyv.toon))
 
 ### Dependencies
 
@@ -41,6 +51,10 @@
 
 ## 2026.11.11 - 2026-11-11
 
+### Fixed
+
+- Accept calendar annotations only on trusted reusable workflow job pins ([pm-slack-standup-calendar-pins-195](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-calendar-pins-195.toon))
+
 ### Dependencies
 
 - Bump jscpd ([#201](https://github.com/unbraind/pm-slack-standup/pull/201))
@@ -54,6 +68,11 @@
 - Bump the pm-toolchain group with 3 updates ([#198](https://github.com/unbraind/pm-slack-standup/pull/198))
 
 ## 2026.11.9 - 2026-11-09
+
+### Other
+
+- Replace residual standup registration mock with SDK harness ([pm-slack-standup-sdk-harness-g9](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-sdk-harness-g9.toon))
+- Adopt the 2026.11.4 toolchain and literal SDK field contract ([pm-slack-standup-toolchain-1104](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-toolchain-1104.toon))
 
 ### Dependencies
 
