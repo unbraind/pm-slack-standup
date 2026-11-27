@@ -2,11 +2,16 @@ id: pm-slack-standup-changelog-dependency-updates
 title: Keep published dependency bullets when releases also have tracker items
 description: "Closing items for 2026.11.9, 2026.11.11, and 2026.11.17 reveals the package changelog generator's default suppression of published dependency bullets. Opt into dependency updates consistently in the generator, check, and release-note entry points in a separate change. Closure PR #217 should wait for that change."
 type: Chore
-status: open
+status: closed
 priority: 2
 tags[1]: changelog
 created_at: "2026-11-23T22:38:09.590Z"
-updated_at: "2026-11-23T22:38:09.590Z"
+updated_at: "2026-11-27T11:18:40.262Z"
+closed_at: "2026-11-27T11:18:40.178Z"
+completed_at: "2026-11-27T11:18:40.178Z"
 author: codex-agent
 acceptance_criteria: "Generation and its byte check retain all published dependency PR bullets in 2026.11.9, 2026.11.11, and 2026.11.17 alongside tracker entries."
+notes[1]{created_at,author,text}:
+  "2026-11-27T11:18:28.651Z","harness:claude-code","2026-11-27: the opt-in is complete on main. #231 (127bec7) added --dependency-updates to the changelog, changelog:full, changelog:check and release:notes scripts, and this branch's regeneration at 4b3d399 keeps all eight published dependency bullets in 2026.11.9, 2026.11.11 and 2026.11.17 (CodeRabbit confirmed on PR 217)."
+close_reason: "Acceptance met: generation and its byte check keep all published dependency PR bullets in 2026.11.9, 2026.11.11 and 2026.11.17 next to tracker entries. The flag landed on main in #231 (127bec7); changelog:check passes on PR 217 head 4b3d399 with the bullets present."
 body: ""

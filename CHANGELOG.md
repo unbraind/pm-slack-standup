@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Keep published dependency bullets when releases also have tracker items ([pm-slack-standup-changelog-dependency-updates](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-changelog-dependency-updates.toon))
+
 ## 2026.11.25 - 2026-11-26
 
 ### Dependencies
