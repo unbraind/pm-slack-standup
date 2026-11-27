@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "repository": "unbraind/pm-slack-standup",
-  "baseSha": "c669310685d1520cff039827c68fb9010fce2248",
-  "version": "2026.11.25",
-  "runId": 45822499292,
+  "baseSha": "b779ce6d7e74f3758416024b1ad04fbc4147f6f4",
+  "version": "2026.11.27",
+  "runId": 46000005053,
   "runAttempt": 1,
   "configDigest": "19f861084767fcd1b42ece3bc60c873d40cadd652aba909211d2aaf4f1e1ede6"
 }
