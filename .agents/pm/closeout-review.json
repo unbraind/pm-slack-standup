@@ -1,0 +1,251 @@
+{
+  "needs_review": [
+    {
+      "item": "pm-slack-standup-calendar-pins-195",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-g2vl",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-health-legacy-1027",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-identity-unbrained",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-packed-timing",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-release-caller-rollout",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-sdk-1122",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-sdk-harness-g9",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-toolchain-1104",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-wcyv",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-x0py",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-y8d7",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    },
+    {
+      "item": "pm-slack-standup-zzsp",
+      "action": "needs_review",
+      "candidates": [
+        228
+      ],
+      "missing_evidence": [
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "GitHub GET /repos/unbraind/pm-slack-standup/pulls/228 failed; verify token read access and retry: HTTP 422"
+        },
+        {
+          "pr": 228,
+          "code": "head_evidence_unavailable",
+          "reason": "Commit delivery evidence unavailable or incomplete."
+        }
+      ]
+    }
+  ]
+}

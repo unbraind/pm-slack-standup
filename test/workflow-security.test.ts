@@ -255,16 +255,31 @@ test("quick and deep tiers retain exact runtime floors and runner contracts", ()
 });
 
 
-test("pm-github callers pin the bounded-dispatch release without a version override", () => {
-  for (const name of ["sync", "closeout"]) {
+// The callers pin one full commit with its release comment. This test used to assert one literal commit, which made
+// every Dependabot bump of the callers fail CI; the gated sync then ran an extension older than the installed pm CLI.
+test("pm-github callers share one pinned release without a version override, and Dependabot moves them together", () => {
+  const pins = ["sync", "closeout"].map(name => {
     const source = readFileSync(new URL(`../.github/workflows/pm-github-${name}.yml`, import.meta.url), "utf8");
     const workflow = parseDocument(source).toJS();
     const job = workflow.jobs[`gated-${name}`];
-    assert.equal(job.uses, `unbraind/pm-github/.github/workflows/pm-github-${name}.yml@a3a2e7ccbee2bbd23933d10be578422b967a519c`);
-    assert.match(source, /# pm-github 2026\.11\.15/);
+    const revision = new RegExp(`^unbraind/pm-github/\\.github/workflows/pm-github-${name}\\.yml@([0-9a-f]{40})$`).exec(job.uses)?.[1];
+    assert.ok(revision, `${name} must pin a full commit`);
+    const line = source.split("\n").find(candidate => /^\s*uses:/.test(candidate) && candidate.includes(job.uses)) ?? "";
+    const parts = /# pm-github (\d{4})\.(\d{1,2})\.(\d{1,2})(?:-(\d+))?\s*$/.exec(line);
+    assert.ok(parts, `the ${name} pin must carry its release comment on the same line`);
+    const pinnedRelease = parts.slice(1).join(".");
+    // 2026.11.25 is the first pm-github release whose gated import works with the pm CLI this package installs.
+    const [year, month, day] = parts.slice(1, 4).map(Number);
+    assert.ok(year * 10_000 + month * 100 + day >= 2026_11_25, `${name} must not pin a release older than 2026.11.25`);
     assert.equal(job.with?.["pm-github-version"], undefined);
     assert.equal(job["runs-on"], undefined);
-  }
+    return `${revision} ${pinnedRelease}`;
+  });
+  assert.equal(pins[0], pins[1], "sync and closeout must use one reviewed release");
+  const updates = parseDocument(readFileSync(new URL("../.github/dependabot.yml", import.meta.url), "utf8")).toJS().updates as { "package-ecosystem": string; groups?: Record<string, { patterns?: string[] }> }[];
+  const actions = updates.filter(update => update["package-ecosystem"] === "github-actions");
+  assert.equal(actions.length, 1, "one github-actions update entry");
+  assert.deepEqual(actions[0].groups?.["pm-github-workflows"]?.patterns, ["unbraind/pm-github/*"]);
   const release = parseDocument(readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8")).toJS().jobs.release;
   assert.match(release.uses, /^unbraind\/pm-ops\/\.github\/workflows\/daily-release\.yml@[a-f0-9]{40}$/);
   assert.equal(release["runs-on"], undefined);

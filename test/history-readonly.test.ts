@@ -14,11 +14,30 @@ test("every SDK and registered report refuses adversarial history without author
   const harness = f.harness;
   const path = join(f.pmRoot, "history", `${f.id}.jsonl`);
   const original = readFileSync(path, "utf8");
+  const cursorFile = join(f.directory, "window.json");
+  const output = join(f.directory, "refused.json");
+  const historyDir = join(f.directory, "refused-snapshots");
+  const preview = { options: { dryRun: true, format: "plain" } };
+  const commandInputs = {
+    standup: preview,
+    "slack-standup": preview,
+    "standup progress": { args: [f.id] },
+    "standup variance": { args: [f.id], options: { revision: 1 } },
+    "standup decisions": {},
+    "standup window": { options: { cursorFile, output } },
+    "standup export": { options: { format: "json", output, historyDir } },
+  };
   const faults: Array<[string, string | null]> = [["missing", null], ["empty", " \r\n"], ["JSONL", "{broken\n"],
     ["shape", "null\n"], ["conflict", "<<<<<<< left\n=======\n>>>>>>> right\n"],
     ["hash", original.replace(/"after_hash":"[a-f0-9]+"/, '"after_hash":"broken"')]];
   try {
     assert.deepEqual(harness.activation.failed, []);
+    assert.deepEqual(Object.keys(commandInputs).sort(), harness.activation.commands.handlers.map(({ command }) => command).sort());
+    const intact = treeState(f.pmRoot, true);
+    await assert.rejects(harness.runCommand({
+      command: "standup", pmRoot: f.pmRoot, options: { ...preview.options, cursorFile },
+    }), { code: "unknown_option", exitCode: 2, message: /cursorFile/u });
+    assert.equal(treeState(f.pmRoot, true), intact);
     for (const policy of ["strict_error", "auto_create"] as const) {
       const settings = await readSettings(f.pmRoot); settings.history.missing_stream = policy;
       await writeSettings(f.pmRoot, settings);
@@ -28,10 +47,9 @@ test("every SDK and registered report refuses adversarial history without author
         const attempts: Array<() => Promise<unknown>> = [
           () => readProgressDeltas(f.ctx, f.id), () => readProgressDeltas({ pm_root: f.pmRoot }, f.id),
           () => readSdkStandupItems(f.ctx), () => readSdkStandupItems({ pm_root: f.pmRoot }),
-          ...f.harness.activation.commands.handlers.map(({ command }) => () => harness.runCommand({ command, args: [f.id], pmRoot: f.pmRoot,
-            options: { "cursor-file": join(f.directory, "window.json"), revision: 1, dryRun: true, format: command === "standup" || command === "slack-standup" ? "plain" : "json", output: join(f.directory, "refused.json"), historyDir: join(f.directory, "refused-snapshots") } })),
+          ...Object.entries(commandInputs).map(([command, input]) => () => harness.runCommand({ command, pmRoot: f.pmRoot, ...input })),
           ...["json", "md"].map((format) => () => harness.runExporter({ exporter: "standup", pmRoot: f.pmRoot,
-            options: { format, output: join(f.directory, "refused.json") } })),
+            options: { format, output, historyDir } })),
         ];
         for (const [index, attempt] of attempts.entries()) {
           const allBytes = treeState(f.pmRoot, true);
@@ -43,8 +61,9 @@ test("every SDK and registered report refuses adversarial history without author
           });
           assert.equal(treeState(f.pmRoot), before, `${policy}/${name}: refused reads must not change authoritative tracker bytes or mtimes`);
           if (index < 2) assert.equal(treeState(f.pmRoot, true), allBytes, "progress reads preserve derived files too");
-          assert.equal(existsSync(join(f.directory, "refused.json")), false);
-          assert.equal(existsSync(join(f.directory, "refused-snapshots")), false);
+          assert.equal(existsSync(output), false);
+          assert.equal(existsSync(historyDir), false);
+          assert.equal(existsSync(cursorFile), false);
         }
         writeFileSync(path, original);
         assert.equal((await f.read()).id, f.id, "restored valid history remains readable");
