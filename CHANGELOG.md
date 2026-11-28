@@ -31,6 +31,10 @@
 
 - Synthetic HTTPS test webhook must advertise the address it listens on ([pm-slack-standup-wcyv](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-wcyv.toon))
 
+### Closed
+
+- Closed: CI Deep: synthetic localhost HTTPS fixture refuses connections on Node 22 and 26 ([pm-slack-standup-github-efbbd7c92737-214](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-214.toon))
+
 ### Dependencies
 
 - Bump eslint ([#219](https://github.com/unbraind/pm-slack-standup/pull/219))
@@ -159,6 +163,10 @@
 
 - Point the npm homepage at the package catalog and link the author ([pm-slack-standup-vpn3](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-vpn3.toon))
 
+### Closed
+
+- Closed: Point the npm homepage at the package's website and link the author ([pm-slack-standup-github-efbbd7c92737-152](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-152.toon))
+
 ### Dependencies
 
 - Bump jscpd ([#155](https://github.com/unbraind/pm-slack-standup/pull/155))
@@ -207,10 +215,6 @@
 
 - Enable GitHub CodeQL code scanning ([pm-slack-standup-52od](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-52od.toon))
 - Certify pm-slack-standup on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates ([pm-slack-standup-74w8](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/chores/pm-slack-standup-74w8.toon))
-
-### Closed
-
-- Closed: Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ## 2026.10.20 - 2026-10-20
 
@@ -420,6 +424,7 @@ No changes.
 ### Closed
 
 - Closed: The identity gate deadlocks the one remediation its own failure message prescribes ([pm-slack-standup-yzns](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-yzns.toon))
+- Closed: Authorize reachable-history privacy remediation before next release ([pm-slack-standup-github-efbbd7c92737-45](https://github.com/unbraind/pm-slack-standup/blob/main/.agents/pm/issues/pm-slack-standup-github-efbbd7c92737-45.toon))
 
 ## 2026.8.17 - 2026-08-17
 

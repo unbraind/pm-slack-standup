@@ -1,0 +1,21 @@
+id: pm-slack-standup-github-efbbd7c92737-230
+title: Gated issue sync #202 is blocked by the one-holder rule for GitHub reference tags
+description: "GH issue #230: https://github.com/unbraind/pm-slack-standup/issues/230 · author @unbraind · created 2026-11-22T10:50:23Z · updated 2026-11-22T10:50:23Z"
+type: Issue
+status: open
+priority: 2
+tags[2]: "gh:unbraind/pm-slack-standup#230","github_author:unbraind"
+created_at: "2026-11-22T10:50:23Z"
+updated_at: "2026-11-28T10:30:47.674Z"
+author: pm-github
+github_close_reason: ""
+github_closed_at: ""
+github_created_at: "2026-11-22T10:50:23Z"
+github_link_only: false
+github_number: 230
+github_release: ""
+github_state: open
+github_state_reason: unspecified
+github_updated_at: "2026-11-22T10:50:23Z"
+github_url: "https://github.com/unbraind/pm-slack-standup/issues/230"
+body: "At [sync PR #202](https://github.com/unbraind/pm-slack-standup/pull/202), exact head `196765e15fc160305eda721bf24a7d9b9161ebe0`, the documentation/tracker test fails on [Node 22](https://github.com/unbraind/pm-slack-standup/actions/runs/45009500993/job/137168455511) and [Node 26](https://github.com/unbraind/pm-slack-standup/actions/runs/45009500993/job/137168455729). `test/action-pin-provenance.test.ts` asserts one holder for every `gh:` tag. For [GitHub #152](https://github.com/unbraind/pm-slack-standup/issues/152) it sees the pre-existing curated `pm-slack-standup-vpn3` and the newly generated `pm-slack-standup-github-efbbd7c92737-152`. The former carries a reference; the latter has explicit `github_number` and `github_url` fields.\n\nThis is a consumer validation conflict following the distinction in [PM GitHub #230](https://github.com/unbraind/pm-github/issues/230) between references and import identity, not proof that the importer overwrote the curated item or that there are duplicate explicit import owners. Keep the historical pin attribution check for curated items. Make the generated sync and validation agree: preserve the local record and history, enforce uniqueness on explicit import identities separately, and allow distinct reference and imported rows where intended. Add tests that accept this pair but reject two explicit owners of the same GitHub identity. A repeated sync should be idempotent and the tracker gate should pass on both tested Node versions. No runtime or publication impact was tested."
